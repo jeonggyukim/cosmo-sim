@@ -164,6 +164,27 @@ main()
   `options.need_avg_sep = 1`, which adds overhead. Currently disabled; use
   bin midpoints for plotting.
 
+## When ξ(r) is the wrong tool
+
+At high redshift (z ≳ 10), IC particles are nearly on a perfect lattice. The
+measured ξ(r) is dominated by lattice artifacts at small scales and shot noise
+at large scales; the cosmological signal (~10⁻⁶ at z=45) is undetectable with
+a subsampled pair count. Use **P(k) via FFT** (`compute_pk.py`) for IC validation
+instead — it uses all particles in O(N log N) and has much better S/N.
+
+ξ(r) from particles is only practical at low z (z ≲ 2) where ξ ~ 1 at small
+scales and the subsampling target of DD ~ 10,000 gives useful signal.
+
+## Key References
+
+- **Peebles & Hauser (1974)** ApJS 28, 19 — natural estimator ξ = DD/RR − 1
+- **Hamilton (1993)** ApJ 417, 19 — variance of ξ(r): σ(ξ) ≈ 1/√DD
+- **Sinha & Garrison (2020)** MNRAS 491, 3022 — Corrfunc: SIMD pair counting, periodic estimator (**primary reference**)
+- **Jing (2005)** ApJ 620, 559 — CIC window correction for P(k)
+- **Sefusatti et al. (2016)** MNRAS 460, 3624 — interlaced CIC for near-aliasing-free P(k)
+- **Hahn & Abel (2011)** MNRAS 415, 2101 — IC validation via P(k) (Fig. 4); transfer function ξ(r) (Fig. 2)
+- **Feldman, Kaiser & Peacock (1994)** ApJ 426, 23 — FKP estimator; shot noise vs. cosmic variance trade-off
+
 ## Performance Notes
 
 - `rmax` should be ≤ L/3 for the cell-linked-list to be efficient; near L/2 the
