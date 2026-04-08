@@ -1,0 +1,9 @@
+# MUSIC2 runtime logs
+*.conf_log.txt
+
+# MUSIC2 build output
+music_build/MUSIC
+
+# Python
+__pycache__/
+*.pyc
