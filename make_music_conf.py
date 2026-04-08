@@ -3,8 +3,8 @@
 make_music_conf.py — Generate a MUSIC2 config file from the template.
 
 Usage:
-    python make_music_conf.py -N 256 -z 45 -L 25
-    python make_music_conf.py -N 512 -z 100 -L 500 -o my_run.conf
+    python make_music_conf.py -N 256 -z 127 -L 25   # canonical CV_22 run
+    python make_music_conf.py -N 512 -z 127 -L 500 -o my_run.conf
 
 Arguments:
     -N  Particles per side (must be a power of 2, e.g. 64, 128, 256, 512)
