@@ -46,7 +46,7 @@ def bins_from_box(boxsize_mpc, npart, nbins):
     """
     mean_spacing = boxsize_mpc / npart   # mean interparticle separation in Mpc
     rmin = 2.0 * mean_spacing            # start safely above the mean spacing
-    rmax = boxsize_mpc / 4.0            # stay well within periodic boundary artifacts
+    rmax = boxsize_mpc / 3.0            # stay well within periodic boundary artifacts (hard limit is L/2)
 
     if rmin >= rmax:
         sys.exit(
