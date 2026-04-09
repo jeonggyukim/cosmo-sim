@@ -4,6 +4,13 @@
 # MUSIC2 build output
 music_build/MUSIC
 
+# Large binary data files (not versioned)
+data/*.hdf5
+data/*.bin
+
+# Compiled C binary
+compute_xi
+
 # Python
 __pycache__/
 *.pyc
