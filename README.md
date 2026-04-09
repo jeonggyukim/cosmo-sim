@@ -1,38 +1,122 @@
 # cosmo-pipeline
 
-Scripts and configuration for cosmological IC generation with MUSIC2 and analysis.
+Scripts and configuration for cosmological IC generation with MUSIC2 and IC validation.
 
-## Environment
+## Directory layout
+
+```
+scripts/   — Python scripts
+conf/      — MUSIC2 config files
+data/      — CLASS outputs, rbins, measured P(k)/ξ tables  (HDF5/bin files gitignored)
+plots/     — output figures  (gitignored)
+notes/     — LaTeX write-ups and supporting plot scripts
+```
+
+## Setup
 
 ```bash
 conda env create -f env.yml
 conda activate cosmo
 ```
 
-## IC Generation (MUSIC2)
+## Workflow
+
+### 1. Build MUSIC2
 
 ```bash
-# Build MUSIC2 (first time or after source changes)
 ./prepare-music.sh
-
-# Run
-./music_build/MUSIC CV_22_MUSIC.conf
 ```
 
-Config: 25 Mpc/h box, 256³ particles, z=127, SWIFT output format.
+Only needed once (or after source changes). Detects macOS vs cluster automatically.
+Binary placed at `music_build/MUSIC`; CLASS built at `music_build/_deps/class-build/class`.
 
-## Scripts
+---
 
-| Script | Description |
-|--------|-------------|
-| `prepare-music.sh` | Builds MUSIC2 binary into `music_build/` |
-| `read_ics_swift.py` | Reads and summarizes `ics_swift.hdf5` header and particle data |
-| `read_wnoise.py` | Reads `wnoise_NNNN.bin` white noise binary into a numpy array |
-| `plot_dr_histogram.py` | Plots histogram of particle displacement from lattice (dr/dx) |
+### 2. Generate a MUSIC2 config
 
-## Configuration Files
+```bash
+conda run -n cosmo python scripts/make_music_conf.py -N 256 -z 45 -L 500
+# → conf/CV_22_MUSIC_n256_z45_L500.conf
+```
 
-| File | Description |
-|------|-------------|
-| `CV_22_MUSIC.conf` | MUSIC2 config: 25 Mpc/h, 256³, z=127 |
-| `CV_22_MUSIC_z400.conf` | Same but z=400 (for comparison) |
+Arguments: `-N` particles per side, `-z` starting redshift, `-L` box size in Mpc/h.
+Uses `conf/CV_22_MUSIC_template.conf` (CV_22 cosmology, SWIFT output format).
+
+---
+
+### 3. Run MUSIC2
+
+```bash
+./music_build/MUSIC conf/CV_22_MUSIC_n256_z45_L500.conf
+# → data/ics_swift_n256_z45_L500.hdf5
+```
+
+MUSIC2 writes the IC file path embedded in the config (`data/ics_swift_n{N}_z{z}_L{L}.hdf5`).
+
+---
+
+### 4. Generate CLASS theory P(k)
+
+Edit `data/class_pk.ini`: set `z_pk` to match the IC redshift, adjust `root` if needed.
+
+```bash
+./music_build/_deps/class-build/class data/class_pk.ini
+# → class_pk_z{z}_pk.dat  (move to data/ after)
+mv class_pk_z45_pk.dat data/
+```
+
+---
+
+### 5. Validate ICs — power spectrum
+
+```bash
+conda run -n cosmo python scripts/compute_pk.py \
+    data/ics_swift_n256_z45_L500.hdf5 \
+    --theory data/class_pk_z45_pk.dat
+# → plots/pk_n256_z45_L500.png
+```
+
+Produces two panels: P(k) with theory overlay, and ξ(r) via Hankel transform.
+Markers: fundamental mode k_f, Nyquist k_Ny, Bragg peak 2k_Ny, shot noise P_shot,
+BAO scale r_d from Eisenstein & Hu (1998).
+
+Optional flags: `--ngrid`, `--nkbins`, `--H0`, `--Omega_m`, `--Omega_b`, `-o output.png`.
+
+---
+
+### 6. Validate ICs — correlation function (low z only)
+
+At z ≳ 10 the signal is shot-noise dominated; use P(k) instead.
+
+```bash
+# Generate bin file
+conda run -n cosmo python scripts/make_rbins.py \
+    --hdf5 data/ics_swift_n256_z45_L500.hdf5
+# → data/rbins_n256_z45_L500.txt
+
+# Measure ξ(r) with Corrfunc (last arg = number of threads)
+./compute_xi data/ics_swift_n256_z45_L500.hdf5 \
+             data/rbins_n256_z45_L500.txt 8
+```
+
+---
+
+### 7. Diagnostic plots
+
+```bash
+# Particle displacement histogram (dr/dx from lattice)
+conda run -n cosmo python scripts/plot_dr_histogram.py \
+    data/ics_swift_n256_z45_L500.hdf5
+```
+
+---
+
+## Notes
+
+`notes/ic_sampling_review.tex` reviews the IC sampling literature (Pen 1997, Sirko 2005,
+Hahn & Abel 2011): P-sampled vs ξ-sampled methods, box window truncation errors,
+and implications for MUSIC2/monofonIC.
+
+```bash
+cd notes && make    # compiles PDF and opens it
+```
