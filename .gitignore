@@ -11,6 +11,14 @@ data/*.bin
 # Compiled C binary
 compute_xi
 
+# Figures (generated; only notes/*.pdf used by LaTeX are versioned)
+plots/
+notes/*.png
+notes/*.pdf
+!notes/box_window.pdf
+!notes/tophat_window.pdf
+!notes/pgrid_comparison.pdf
+
 # Python
 __pycache__/
 *.pyc
