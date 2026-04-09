@@ -1,6 +1,9 @@
 # MUSIC2 runtime logs
 *.conf_log.txt
 
+# Generated MUSIC2 configs (reproducible via make_music_conf.py)
+conf/CV_22_MUSIC_n*.conf
+
 # MUSIC2 build output
 music_build/
 
