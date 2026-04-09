@@ -11,6 +11,10 @@ data/*.bin
 # Compiled C binary
 compute_xi
 
+# Claude Code auto-memory (machine-local)
+memory/
+.claude/
+
 # Figures (generated; only notes/*.pdf used by LaTeX are versioned)
 plots/
 notes/*.png
