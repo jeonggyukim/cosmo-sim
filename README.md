@@ -118,5 +118,12 @@ Hahn & Abel 2011): P-sampled vs ξ-sampled methods, box window truncation errors
 and implications for MUSIC2/monofonIC.
 
 ```bash
-cd notes && make    # compiles PDF and opens it
+cd notes
+make            # regenerate figures + compile PDF (opens automatically)
+make figures    # regenerate figures only
+make notes      # compile PDF only (assumes figures exist)
+make clean      # remove figures, PDF, and LaTeX aux files
 ```
+
+Figures are generated from `plot_box_window.py`, `plot_tophat_window.py`, and
+`plot_pgrid.py` (the last requires `data/class_pk_z45_pk.dat`).
