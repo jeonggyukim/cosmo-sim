@@ -24,7 +24,7 @@ conda activate cosmo
 ### 1. Build MUSIC2
 
 ```bash
-./prepare-music.sh
+./build-music.sh
 ```
 
 Only needed once (or after source changes). Detects macOS vs cluster automatically.

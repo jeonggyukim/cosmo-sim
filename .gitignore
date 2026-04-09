@@ -2,7 +2,7 @@
 *.conf_log.txt
 
 # MUSIC2 build output
-music_build/MUSIC
+music_build/
 
 # Large binary data files (not versioned)
 data/*.hdf5

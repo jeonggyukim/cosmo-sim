@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# prepare-music.sh — Build MUSIC2 from source into music_build/
+# build-music.sh — Build MUSIC2 from source into music_build/
 #
 # Usage:
-#   ./prepare-music.sh           # builds into <script_dir>/music_build/
-#   ./prepare-music.sh -d DIR    # builds into DIR
+#   ./build-music.sh           # builds into <script_dir>/music_build/
+#   ./build-music.sh -d DIR    # builds into DIR
 #
 # Skips compilation if the MUSIC binary already exists in BUILDDIR.
 #

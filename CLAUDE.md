@@ -18,7 +18,7 @@ Note: `data/*.hdf5` and `data/*.bin` are gitignored (large binary files).
 
 ## Key Files
 
-- `prepare-music.sh` — builds MUSIC2 from source and places the binary in `music_build/`
+- `build-music.sh` — builds MUSIC2 from source and places the binary in `music_build/`
 - `conf/CV_22_MUSIC.conf` — canonical MUSIC2 config: 25 Mpc/h box, 256^3 (level 8), z=127, SWIFT output
 - `conf/CV_22_MUSIC_template.conf` — template config with `{BOXLENGTH}`, `{ZSTART}`, `{LEVEL}`, `{FILENAME}` placeholders
 - `scripts/make_music_conf.py` — generates a config from the template given N, z, L
@@ -42,7 +42,7 @@ Source lives at `~/Dropbox/Projects/MUSIC2`.
 
 ```bash
 # Build (first time or after source changes)
-./prepare-music.sh
+./build-music.sh
 
 # Generate a config (canonical CV_22 run: N=256, z=127, L=25 Mpc/h)
 conda run -n cosmo python scripts/make_music_conf.py -N 256 -z 127 -L 25
@@ -90,7 +90,7 @@ conda run -n cosmo python scripts/make_rbins.py --hdf5 data/ics_swift_n256_z127_
 At z ≳ 10 the cosmological signal in ξ(r) is ~10⁻⁶ — undetectable with subsampled pair counts.
 Use P(k) instead. See CORRFUNC.md § "When ξ(r) is the wrong tool".
 
-## prepare-music.sh
+## build-music.sh
 
 Uses `uname -s` to detect macOS vs cluster:
 - **macOS (Darwin):** sets `FC=gfortran-14`, relies on Homebrew-installed fftw, gsl, hdf5, open-mpi

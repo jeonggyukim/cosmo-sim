@@ -54,7 +54,7 @@ LDFLAGS := -L$(HDF5_LIB) -lhdf5 -lm $(OMP_FLAG)
 # --- Targets ---
 all: compute_xi
 
-compute_xi: compute_xi.c $(CORRFUNC_LIB)
+compute_xi: scripts/compute_xi.c $(CORRFUNC_LIB)
 	$(CC) $(CFLAGS) $< $(CORRFUNC_LIB) $(LDFLAGS) -o $@
 
 clean:
