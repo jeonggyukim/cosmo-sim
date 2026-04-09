@@ -52,7 +52,7 @@ def main():
     z_s = fmt(args.redshift)
     L_s = fmt(args.boxlength)
 
-    ic_filename   = f"ics_swift_n{N_s}_z{z_s}_L{L_s}.hdf5"
+    ic_filename   = f"data/ics_swift_n{N_s}_z{z_s}_L{L_s}.hdf5"
     # Write config to conf/ relative to repo root (two levels up from scripts/)
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     conf_dir  = os.path.join(repo_root, "conf")
@@ -75,7 +75,7 @@ def main():
         f.write(conf)
 
     print(f"Written : {conf_filename}")
-    print(f"IC file : data/{ic_filename}")
+    print(f"IC file : {ic_filename}")
     print(f"Run with: ./music_build/MUSIC {conf_filename}")
 
 
