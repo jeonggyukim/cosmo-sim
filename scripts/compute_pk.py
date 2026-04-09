@@ -114,6 +114,10 @@ def main():
                         help="Number of logarithmic k-bins (default: 30)")
     parser.add_argument("--H0", type=float, default=67.11,
                         help="H0 in km/s/Mpc for unit conversion (default: 67.11)")
+    parser.add_argument("--Omega_m", type=float, default=0.3,
+                        help="Matter density (default: 0.3)")
+    parser.add_argument("--Omega_b", type=float, default=0.049,
+                        help="Baryon density (default: 0.049)")
     parser.add_argument("--theory", default=None,
                         help="Optional CLASS P(k) ASCII file (columns: k[h/Mpc]  P[Mpc/h]^3)")
     parser.add_argument("-o", "--output", default=None,
@@ -121,6 +125,15 @@ def main():
     args = parser.parse_args()
 
     h = args.H0 / 100.0
+
+    # --- BAO scale: Eisenstein & Hu (1998) fitting formula ---
+    Omh2 = args.Omega_m * h**2
+    Obh2 = args.Omega_b * h**2
+    r_d_Mpc  = 44.5 * np.log(9.83 / Omh2) / np.sqrt(1 + 10 * Obh2**(3/4))  # Mpc
+    r_d_mpch = r_d_Mpc * h                                                    # Mpc/h
+    k_BAO    = 2 * np.pi / r_d_mpch                                           # h/Mpc
+    print(f"BAO scale  : r_d = {r_d_Mpc:.1f} Mpc = {r_d_mpch:.1f} Mpc/h  "
+          f"(k_BAO = {k_BAO:.4f} h/Mpc)  [Eisenstein & Hu 1998]")
 
     # --- Read HDF5 ---
     with h5py.File(args.hdf5, "r") as f:
@@ -193,18 +206,23 @@ def main():
     Pk_flat = Pk_modes.ravel()
     mask    = K_flat > 0
 
+    Pk_raw_mean = np.zeros(args.nkbins)   # without shot subtraction
+
     for i, (klo, khi) in enumerate(zip(k_edges[:-1], k_edges[1:])):
         sel = mask & (K_flat >= klo) & (K_flat < khi)
         n = sel.sum()
         if n > 0:
-            k_cen[i]   = np.mean(K_flat[sel])
-            Pk_mean[i] = np.mean(Pk_flat[sel]) - P_shot
-            Pk_err[i]  = np.std(Pk_flat[sel]) / np.sqrt(n)
-            nmodes[i]  = n
+            k_cen[i]       = np.mean(K_flat[sel])
+            Pk_raw_mean[i] = np.mean(Pk_flat[sel])
+            Pk_mean[i]     = Pk_raw_mean[i] - P_shot
+            Pk_err[i]      = np.std(Pk_flat[sel]) / np.sqrt(n)
+            nmodes[i]      = n
 
     # Keep only populated bins
     good = nmodes > 0
-    k_cen, Pk_mean, Pk_err, nmodes = k_cen[good], Pk_mean[good], Pk_err[good], nmodes[good]
+    k_cen, Pk_mean, Pk_raw_mean, Pk_err, nmodes = (
+        k_cen[good], Pk_mean[good], Pk_raw_mean[good],
+        Pk_err[good], nmodes[good])
 
     # --- Save ASCII output ---
     import os
@@ -212,28 +230,98 @@ def main():
     out_txt = f"pk_{stem}.txt"
     header  = (f"P(k) from {args.hdf5}\n"
                f"BoxSize={boxsize_mpch:.4g} Mpc/h  N={N}  ngrid={ngrid}\n"
-               f"Shot noise subtracted: P_shot = {P_shot:.4e} (Mpc/h)^3\n"
-               f"Columns: k[h/Mpc]  P(k)[(Mpc/h)^3]  sigma_P  nmodes")
-    np.savetxt(out_txt, np.column_stack([k_cen, Pk_mean, Pk_err, nmodes]),
-               header=header, fmt=["%.6e", "%.6e", "%.6e", "%d"])
+               f"P_shot = {P_shot:.4e} (Mpc/h)^3  (NOT subtracted; shown separately)\n"
+               f"Columns: k[h/Mpc]  P_raw[(Mpc/h)^3]  P_shot_sub[(Mpc/h)^3]  sigma_P  nmodes")
+    np.savetxt(out_txt, np.column_stack([k_cen, Pk_raw_mean, Pk_mean, Pk_err, nmodes]),
+               header=header, fmt=["%.6e", "%.6e", "%.6e", "%.6e", "%d"])
     print(f"Saved: {out_txt}")
+
+    # --- Correlation function via Hankel transform of measured P(k) ---
+    from mcfit import P2xi
+    from scipy.interpolate import interp1d
+
+    trapz = np.trapezoid
+
+    # Theory xi(r) from CLASS P(k)
+    # Also find BAO peak from r^2*xi(r) maximum in 50-200 Mpc/h
+    xi_theory_r = xi_theory_xi = None
+    if args.theory:
+        kt, Pt = np.loadtxt(args.theory, comments='#', unpack=True)
+        xi_theory_r, xi_theory_xi = P2xi(kt, l=0)(Pt, extrap=True)
+
+    # Measured xi(r): direct integration over measured k bins
+    # xi(r) = 1/(2pi^2) int P(k) sin(kr)/(kr) k^2 dk
+    r_xi = np.logspace(-1, np.log10(boxsize_mpch / 2), 300)
+    xi_meas = np.zeros(len(r_xi))
+    for i, r in enumerate(r_xi):
+        x = k_cen * r
+        sinc = np.where(np.abs(x) < 1e-8, 1.0, np.sin(x) / x)
+        xi_meas[i] = trapz(Pk_raw_mean * sinc * k_cen**2, k_cen) / (2 * np.pi**2)
 
     # --- Plot ---
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(7, 5))
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+    ax, ax2 = axes
 
-    ax.loglog(k_cen, Pk_mean, 'o-', ms=4, lw=1.2, label='measured (shot subtracted)')
+    # ---- Left panel: P(k) ----
+    ax.loglog(k_cen, Pk_raw_mean, 'o-', ms=4, lw=1.2, color='C0',
+              label='measured (raw)')
 
-    # Overlay theory if provided
     if args.theory:
-        kt, Pt = np.loadtxt(args.theory, comments='#', unpack=True)
         ax.loglog(kt, Pt, 'k-', lw=1.2, label='theory (CLASS)')
+
+    knyq_mpch   = knyq / h
+    kfund_mpch  = kf / h
+    kbragg_mpch = 2 * np.pi * npart_side / boxsize_mpch   # = 2*k_Ny
+
+    ax.axvline(kfund_mpch,  color='C2',   ls=':', lw=1.0,
+               label=fr'$k_f = 2\pi/L$ = {kfund_mpch:.2g} $h$/Mpc')
+    ax.axvline(knyq_mpch,   color='gray', ls='--', lw=1.0,
+               label=fr'$k_\mathrm{{Ny}}$ = {knyq_mpch:.2g} $h$/Mpc')
+    ax.axvline(kbragg_mpch, color='red',  ls=':', lw=1.0,
+               label=fr'$k_\mathrm{{Bragg}} = 2k_\mathrm{{Ny}}$ = {kbragg_mpch:.2g} $h$/Mpc (aliased)')
+    ax.axhline(P_shot, color='orange', ls='--', lw=1.0,
+               label=fr'$P_\mathrm{{shot}}$ = {P_shot:.2g} (Mpc/$h$)$^3$')
+    ax.axvline(k_BAO, color='purple', ls='-', lw=1.2,
+               label=fr'$k_\mathrm{{BAO}}$ (E&H) = {k_BAO:.3f} $h$/Mpc')
 
     ax.set_xlabel(r'$k$ [$h$ Mpc$^{-1}$]')
     ax.set_ylabel(r'$P(k)$ [(Mpc/$h$)$^3$]')
     ax.set_title(f'{npart_side}³, L={boxsize_mpch:.4g} Mpc/h, z=?')
-    ax.legend()
+    ax.legend(fontsize=8)
+
+    ax_top = ax.twiny()
+    ax_top.set_xscale('log')
+    ax_top.set_xlim(2 * np.pi / np.array(ax.get_xlim()))
+    ax_top.invert_xaxis()
+    ax_top.set_xlabel(r'$\lambda = 2\pi/k$ [Mpc/$h$]')
+
+    # ---- Right panel: xi(r) ----
+    if xi_theory_r is not None:
+        mask_t = (xi_theory_r > 0) & (xi_theory_xi > 0) & (xi_theory_r < boxsize_mpch / 2)
+        ax2.loglog(xi_theory_r[mask_t], xi_theory_xi[mask_t],
+                   'k-', lw=1.2, label='theory (CLASS)')
+
+    ax2.loglog(r_xi[xi_meas > 0], xi_meas[xi_meas > 0], 'o-', ms=4, lw=1.2,
+               color='C0', alpha=0.5, label='measured (from raw $P(k)$)')
+
+    # Mark L/2 — maximum reliable separation
+    ax2.axvline(boxsize_mpch / 2, color='gray', ls='--', lw=1.0,
+                label=fr'$L/2$ = {boxsize_mpch/2:.4g} Mpc/$h$')
+    # Mark mean particle spacing
+    dx_mpch = boxsize_mpch / npart_side
+    ax2.axvline(dx_mpch, color='C2', ls=':', lw=1.0,
+                label=fr'$\Delta x$ = {dx_mpch:.2g} Mpc/$h$')
+    # BAO scale
+    ax2.axvline(r_d_mpch, color='purple', ls='-', lw=1.2,
+                label=fr'$r_d$ (E&H) = {r_d_mpch:.1f} Mpc/$h$')
+
+    ax2.set_xlabel(r'$r$ [Mpc/$h$]')
+    ax2.set_ylabel(r'$\xi(r)$')
+    ax2.set_title(r'Correlation function $\xi(r)$')
+    ax2.legend(fontsize=8)
+
     fig.tight_layout()
 
     out_png = args.output or f"pk_{stem}.png"
