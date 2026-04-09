@@ -227,7 +227,8 @@ def main():
     # --- Save ASCII output ---
     import os
     stem = os.path.basename(args.hdf5).replace(".hdf5", "").replace("ics_swift_", "")
-    out_txt = f"pk_{stem}.txt"
+    data_dir = os.path.dirname(os.path.abspath(args.hdf5))
+    out_txt = os.path.join(data_dir, f"pk_{stem}.txt")
     header  = (f"P(k) from {args.hdf5}\n"
                f"BoxSize={boxsize_mpch:.4g} Mpc/h  N={N}  ngrid={ngrid}\n"
                f"P_shot = {P_shot:.4e} (Mpc/h)^3  (NOT subtracted; shown separately)\n"
