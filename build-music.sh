@@ -19,6 +19,12 @@ else
     MUSICDIR=$HOME/MUSIC2
 fi
 
+# --- Clone MUSIC2 if source directory does not exist ---
+if [ ! -d "$MUSICDIR" ]; then
+    echo "MUSIC2 source not found at $MUSICDIR — cloning from GitHub..."
+    git clone https://github.com/cosmo-sims/MUSIC2.git "$MUSICDIR"
+fi
+
 # --- Parse command line arguments ---
 BUILDDIR_DEFAULT="$(dirname "$(readlink -f "$0")")/music_build"
 BUILDDIR=""
