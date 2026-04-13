@@ -2,40 +2,75 @@
 # run_pipeline.sh — End-to-end IC generation and validation pipeline.
 #
 # Steps (each skipped if output already exists):
-#   1. Build MUSIC2
-#   2. Build compute_xi
-#   3. Generate CLASS P(k) at zstart
-#   4. Generate MUSIC2 config
-#   5. Run MUSIC2 → IC HDF5
-#   6. Generate rbins for compute_xi
-#   7. Measure ξ(r) with compute_xi
-#   8. Measure P(k) with compute_pk.py
+#   1. Build MUSIC2         — compile the MUSIC2 binary (clones from GitHub if needed)
+#   2. Build compute_xi     — compile the Corrfunc-based ξ(r) estimator
+#   3. Generate MUSIC2 conf — expand the template conf for the chosen NGRID, ZSTART, LBOX
+#   4. Run MUSIC2           — generate IC HDF5 + input_class_parameters.ini
+#   5. Run CLASS P(k)       — adapt MUSIC2's CLASS ini for P(k) output; run CLASS
+#   6. Generate rbins       — bin edges for compute_xi (rmin=2Δx, rmax=L/3, in Mpc)
+#   7. Measure ξ(r)         — pair counts via Corrfunc (low-z only; shot-noise dominated at z≳10)
+#   8. Measure P(k)         — CIC + FFT estimator, overlaid with CLASS theory
 #
 # Usage:
-#   ./run_pipeline.sh                     # defaults: N=256, L=1000, Z=45
-#   N=512 L=500 Z=127 ./run_pipeline.sh   # override via env vars
+#   ./run_pipeline.sh [--ngrid NGRID] [--lbox LBOX] [--zstart ZSTART] [--nthreads NTHREADS]
+#
+#   --ngrid    particles per side (default: 256)
+#   --lbox     box side length in Mpc/h (default: 1000)
+#   --zstart   IC starting redshift (default: 45)
+#   --nthreads OpenMP threads for compute_xi (default: 8)
+#
+# Examples:
+#   ./run_pipeline.sh
+#   ./run_pipeline.sh --ngrid 512 --lbox 500 --zstart 127
+#
+# All outputs are keyed by STEM = n{NGRID}_z{ZSTART}_L{LBOX}:
+#   conf/CV_22_MUSIC_{STEM}.conf           — MUSIC2 config
+#   conf/input_class_parameters_{STEM}.ini — CLASS ini written by MUSIC2 (transfer functions)
+#   data/ics_swift_{STEM}.hdf5             — IC particle file (SWIFT format, coords in Mpc)
+#   data/class_pk_z{ZSTART}_pk.dat         — CLASS matter P(k) at z=ZSTART
+#   data/rbins_{STEM}.txt                  — Corrfunc radial bin edges (Mpc)
+#   data/xi_{STEM}.txt                     — measured ξ(r)
+#   data/pk_{STEM}.txt                     — measured P(k) table
+#   plots/pk_{STEM}.png                    — P(k) + ξ(r) validation figure
 
 set -euo pipefail
 
+# Always run from the repo root regardless of where the script is invoked from
+cd "$(dirname "$(readlink -f "$0")")"
+
 # ---------------------------------------------------------------------------
-# Parameters
+# Parse arguments
 # ---------------------------------------------------------------------------
-N=${N:-256}
-L=${L:-1000}
-Z=${Z:-45}
-NTHREADS=${NTHREADS:-8}
+NGRID=512
+LBOX=687   # ≈ 1024 Mpc for h=0.6711
+ZSTART=45
+NTHREADS=8
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --ngrid)    NGRID="$2";    shift 2 ;;
+        --lbox)     LBOX="$2";     shift 2 ;;
+        --zstart)   ZSTART="$2";   shift 2 ;;
+        --nthreads) NTHREADS="$2"; shift 2 ;;
+        *) echo "Unknown argument: $1"; echo "Usage: $0 [--ngrid N] [--lbox L] [--zstart Z] [--nthreads T]"; exit 1 ;;
+    esac
+done
+
+# CV_22 cosmology (Illustris/TNG) — must match conf/CV_22_MUSIC_template.conf
 H0=67.11
 OMEGA_M=0.3
 OMEGA_B=0.049
 
 # ---------------------------------------------------------------------------
-# Derived paths
+# Derived paths — all keyed by STEM so multiple runs coexist without collision
 # ---------------------------------------------------------------------------
-STEM="n${N}_z${Z}_L${L}"
+STEM="n${NGRID}_z${ZSTART}_L${LBOX}"
 IC_FILE="data/ics_swift_${STEM}.hdf5"
 CONF_FILE="conf/CV_22_MUSIC_${STEM}.conf"
-CLASS_INI="data/class_pk.ini"
-CLASS_PKS="data/class_pk_z${Z}_pk.dat"
+# input_class_parameters.ini is written by MUSIC2 to CWD during the IC run;
+# we move it to conf/ immediately after so it stays with the other run artifacts.
+CLASS_INI="conf/input_class_parameters_${STEM}.ini"
+CLASS_PKS="data/class_pk_z${ZSTART}_pk.dat"
 RBINS_FILE="data/rbins_${STEM}.txt"
 MUSIC_BIN="music_build/MUSIC"
 CLASS_BIN="music_build/_deps/class-build/class"
@@ -48,10 +83,13 @@ log() { echo; echo "==> $*"; }
 # ---------------------------------------------------------------------------
 # Ensure output directories exist
 # ---------------------------------------------------------------------------
-mkdir -p data plots
+mkdir -p data plots conf
 
 # ---------------------------------------------------------------------------
 # Step 1: Build MUSIC2
+# Skipped if the binary already exists.
+# build-music.sh clones MUSIC2 from GitHub if the source directory is missing,
+# then compiles with CMake (also builds CLASS as a dependency).
 # ---------------------------------------------------------------------------
 if [ ! -f "$MUSIC_BIN" ]; then
     log "Building MUSIC2..."
@@ -62,6 +100,8 @@ fi
 
 # ---------------------------------------------------------------------------
 # Step 2: Build compute_xi
+# Skipped if the binary already exists.
+# Compiled via the repo-root Makefile; links against Corrfunc.
 # ---------------------------------------------------------------------------
 if [ ! -f "compute_xi" ]; then
     log "Building compute_xi..."
@@ -71,17 +111,65 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 3: Generate CLASS P(k)
+# Step 3: Generate MUSIC2 config
+# Skipped if the conf file already exists.
+# make_music_conf.py expands conf/CV_22_MUSIC_template.conf with the chosen
+# N, z, L and writes conf/CV_22_MUSIC_{STEM}.conf.
+# ---------------------------------------------------------------------------
+if [ ! -f "$CONF_FILE" ]; then
+    log "Generating MUSIC2 config..."
+    conda run -n cosmo python scripts/make_music_conf.py -N "$NGRID" -z "$ZSTART" -L "$LBOX"
+else
+    log "MUSIC2 config already exists — skipping ($CONF_FILE)"
+fi
+
+# ---------------------------------------------------------------------------
+# Step 4: Run MUSIC2
+# Skipped if the IC HDF5 already exists.
+# MUSIC2 generates the IC particle file (SWIFT HDF5 format, coordinates in Mpc)
+# and writes input_class_parameters.ini to CWD with the cosmological parameters
+# it passed to CLASS for the transfer function calculation.
+# We immediately move that file to conf/ so it lives alongside the other
+# run-specific config files and is not left cluttering the repo root.
+# ---------------------------------------------------------------------------
+if [ ! -f "$IC_FILE" ]; then
+    log "Running MUSIC2..."
+    "$MUSIC_BIN" "$CONF_FILE"
+    mv input_class_parameters.ini "$CLASS_INI"
+    echo "    Saved: $IC_FILE"
+    echo "    Saved: $CLASS_INI"
+else
+    log "IC file already exists — skipping ($IC_FILE)"
+fi
+
+# ---------------------------------------------------------------------------
+# Step 5: Generate CLASS matter P(k) at z=Z
+# Skipped if the output file already exists.
+# input_class_parameters.ini (written by MUSIC2) is configured for transfer
+# function output (dTk, vTk) in synchronous gauge. We adapt it for matter P(k)
+# by changing the output type to mPk, removing transfer-function-specific
+# settings (extra metric transfer functions, gauge), and appending z_pk and
+# root. A temp file with a .ini extension is required — CLASS ignores files
+# without a recognised extension.
+# CLASS writes class_pk_z{Z}_pk.dat to CWD; we move it to data/.
 # ---------------------------------------------------------------------------
 if [ ! -f "$CLASS_PKS" ]; then
-    log "Running CLASS for z=${Z}..."
-    TMP_INI=$(mktemp /tmp/class_pk_XXXXXX.ini)
+    log "Running CLASS for z=${ZSTART}..."
+    if [ ! -f "$CLASS_INI" ]; then
+        echo "Error: $CLASS_INI not found — was MUSIC2 run with transfer_function = CLASS?"
+        exit 1
+    fi
+    # mktemp on macOS requires X's at the end, so rename to add .ini suffix
+    TMP_INI=$(mktemp /tmp/class_pk_XXXXXX) && mv "$TMP_INI" "${TMP_INI}.ini" && TMP_INI="${TMP_INI}.ini"
     sed \
-        -e "s/^z_pk =.*/z_pk = ${Z}/" \
-        -e "s/^root =.*/root = class_pk_z${Z}_/" \
+        -e "s/^output =.*/output = mPk/" \
+        -e "s/^z_pk =.*/z_pk = ${ZSTART}/" \
+        -e "/^extra metric transfer functions/d" \
+        -e "/^gauge/d" \
         "$CLASS_INI" > "$TMP_INI"
+    echo "root = class_pk_z${ZSTART}_" >> "$TMP_INI"
     "$CLASS_BIN" "$TMP_INI"
-    mv "class_pk_z${Z}_pk.dat" "$CLASS_PKS"
+    mv "class_pk_z${ZSTART}_pk.dat" "$CLASS_PKS"
     rm "$TMP_INI"
     echo "    Saved: $CLASS_PKS"
 else
@@ -89,28 +177,11 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 4: Generate MUSIC2 config
-# ---------------------------------------------------------------------------
-if [ ! -f "$CONF_FILE" ]; then
-    log "Generating MUSIC2 config..."
-    conda run -n cosmo python scripts/make_music_conf.py -N "$N" -z "$Z" -L "$L"
-else
-    log "MUSIC2 config already exists — skipping ($CONF_FILE)"
-fi
-
-# ---------------------------------------------------------------------------
-# Step 5: Run MUSIC2
-# ---------------------------------------------------------------------------
-if [ ! -f "$IC_FILE" ]; then
-    log "Running MUSIC2..."
-    "$MUSIC_BIN" "$CONF_FILE"
-    echo "    Saved: $IC_FILE"
-else
-    log "IC file already exists — skipping ($IC_FILE)"
-fi
-
-# ---------------------------------------------------------------------------
-# Step 6: Generate rbins
+# Step 6: Generate Corrfunc radial bin file
+# Skipped if the rbins file already exists.
+# make_rbins.py reads the HDF5 header to get BoxSize and N, then sets
+# rmin = 2 × mean particle spacing, rmax = L/3, logarithmically spaced.
+# Bins are in Mpc (matching SWIFT's coordinate units).
 # ---------------------------------------------------------------------------
 if [ ! -f "$RBINS_FILE" ]; then
     log "Generating rbins..."
@@ -120,13 +191,21 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 7: Measure ξ(r)
+# Step 7: Measure ξ(r) with compute_xi
+# Not skipped — always re-runs (fast, and output is overwritten each time).
+# Note: ξ(r) is shot-noise dominated at high z; use P(k) for IC validation.
+# See CORRFUNC.md § "When ξ(r) is the wrong tool" for the quantitative argument.
 # ---------------------------------------------------------------------------
 log "Measuring ξ(r) with compute_xi (${NTHREADS} threads)..."
 ./compute_xi "$IC_FILE" "$RBINS_FILE" "$NTHREADS"
 
 # ---------------------------------------------------------------------------
-# Step 8: Measure P(k)
+# Step 8: Measure P(k) with compute_pk.py
+# Not skipped — always re-runs.
+# CIC mass assignment on an Ngrid³ mesh, FFT, CIC window deconvolution,
+# shot-noise subtraction (P_shot = V/N), binning into log k-shells.
+# Outputs both an ASCII table (data/pk_{STEM}.txt) and a PNG figure with
+# two panels: P(k) vs CLASS theory, and ξ(r) via Hankel transform.
 # ---------------------------------------------------------------------------
 log "Measuring P(k) with compute_pk.py..."
 conda run -n cosmo python scripts/compute_pk.py \
