@@ -168,9 +168,30 @@ main()
 
 At high redshift (z ≳ 10), IC particles are nearly on a perfect lattice. The
 measured ξ(r) is dominated by lattice artifacts at small scales and shot noise
-at large scales; the cosmological signal (~10⁻⁶ at z=45) is undetectable with
-a subsampled pair count. Use **P(k) via FFT** (`compute_pk.py`) for IC validation
+at large scales. Use **P(k) via FFT** (`compute_pk.py`) for IC validation
 instead — it uses all particles in O(N log N) and has much better S/N.
+
+### Why the signal is undetectable at high z
+
+The linear growth factor suppresses ξ(r) as D(z)² ≈ 1/(1+z)²:
+
+$$\xi(r, z) \approx \frac{\xi(r, 0)}{(1+z)^2}$$
+
+At BAO scales (~100 Mpc/h), ξ(r=100, z=0) ~ 10⁻³, so at z=45:
+
+$$\xi \sim \frac{10^{-3}}{46^2} \approx 5 \times 10^{-7}$$
+
+To detect a signal at level ξ ~ 10⁻⁶ at 3σ, using σ(ξ) ≈ 1/√DD:
+
+$$N_\mathrm{pairs} \geq \left(\frac{3}{\xi}\right)^2 = \left(\frac{3}{10^{-6}}\right)^2 = 9 \times 10^{12}$$
+
+For a 256³, L=500 Mpc/h box, the expected pair count in a 10 Mpc/h wide bin
+at r=100 Mpc/h is:
+
+$$DD \sim \frac{N}{2} \cdot \bar{n} \cdot 4\pi r^2 \Delta r \approx \frac{1.7 \times 10^7}{2} \cdot 1.3 \times 10^{-4} \cdot 4\pi \cdot 100^2 \cdot 10 \approx 1.4 \times 10^9$$
+
+That is **4 orders of magnitude short** of what is needed. Even a 1024³ box
+(~10¹² pairs at BAO scales) falls short by a factor of ~10.
 
 ξ(r) from particles is only practical at low z (z ≲ 2) where ξ ~ 1 at small
 scales and the subsampling target of DD ~ 10,000 gives useful signal.
