@@ -138,6 +138,7 @@ def main():
     # --- Read HDF5 ---
     with h5py.File(args.hdf5, "r") as f:
         boxsize_mpc = float(f["Header"].attrs["BoxSize"])    # Mpc
+        redshift    = float(f["Header"].attrs["Redshift"])
         coords      = f["PartType1/Coordinates"][:]          # (N, 3), Mpc
 
     N = len(coords)
@@ -289,7 +290,7 @@ def main():
 
     ax.set_xlabel(r'$k$ [$h$ Mpc$^{-1}$]')
     ax.set_ylabel(r'$P(k)$ [(Mpc/$h$)$^3$]')
-    ax.set_title(f'{npart_side}³, L={boxsize_mpch:.4g} Mpc/h, z=?')
+    ax.set_title(f'{npart_side}³, L={boxsize_mpch:.4g} Mpc/h, z={redshift:.4g}')
     ax.legend(fontsize=8)
 
     ax_top = ax.twiny()
