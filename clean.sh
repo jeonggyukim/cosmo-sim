@@ -26,21 +26,22 @@ rm -f data/pk_*.txt data/xi_*.txt
 log "Removing rbins files..."
 rm -f data/rbins*.txt
 
-log "Removing generated MUSIC2 configs..."
+log "Removing generated MUSIC2 configs and CLASS ini files..."
 rm -f conf/CV_22_MUSIC_n*.conf
+rm -f conf/input_class_parameters_*.ini
 
 log "Removing compiled compute_xi binary..."
 rm -f compute_xi
 
+log "Removing CLASS P(k) outputs..."
+rm -f data/class_pk_z*.dat
+
 if $ALL; then
     # -----------------------------------------------------------------------
-    # Also remove: IC HDF5 files, CLASS P(k) outputs, wnoise binaries
+    # Also remove: IC HDF5 files, wnoise binaries (slow to regenerate)
     # -----------------------------------------------------------------------
     log "Removing IC HDF5 files..."
     rm -f data/ics_swift_*.hdf5
-
-    log "Removing CLASS P(k) outputs..."
-    rm -f data/class_pk_z*.dat
 
     log "Removing wnoise binary files..."
     rm -f data/wnoise_*.bin
