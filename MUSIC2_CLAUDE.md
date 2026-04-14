@@ -1,4 +1,4 @@
-# CLAUDE.md — MUSIC2
+# CLAUDE.md — MUSIC2 and monofonIC
 
 MUSIC2 is a C++17 application for generating nested-grid initial conditions for cosmological zoom simulations, using Lagrangian Perturbation Theory (1LPT/2LPT), FFTW3-based Poisson solving, and a plugin architecture for output formats, transfer functions, and random number generators.
 
@@ -112,6 +112,49 @@ Likely a combination of:
 2. **Complexity**: required disk caching (`temp_kernel_level*.tmp`) and FFTLog integration
 3. **Practical accuracy**: for large boxes (L ≳ 100 h⁻¹ Mpc), the suppression is negligible
 
+## Velocity Potential φ_v and LPT Displacement/Velocity Generation
+
+There is no variable literally named `phi_v` in MUSIC2. The velocity potential is named **`u`** (1LPT branch) or **`u1`** (2LPT branch) in `src/main.cc`. These correspond exactly to Jenkins (2010) φ⁽¹⁾ and φ⁽²⁾.
+
+Reference: Jenkins (2010), MNRAS 403, 1859 — "Second-order Lagrangian perturbation theory initial conditions for resimulations."
+
+### 1LPT branch (`use_2LPT = no`)
+
+| Step | Code (`src/main.cc`) | Physics |
+|---|---|---|
+| Velocity source | `GenerateDensityHierarchy(..., theta_cdm, ...)` line 831 | θ = −f H δ (velocity divergence TF) |
+| Poisson solve | `the_poisson_solver->solve(f, u)` line 839 | ∇²φ⁽¹⁾ = θ |
+| Velocity | `gradient(icoord, u, data) *= cosmo_vfact` lines 858, 861 | **v = f₁ a H/h × (−∇φ⁽¹⁾)** |
+| Displacement source | `GenerateDensityHierarchy(..., delta_cdm, ...)` line 625 | δ (density TF) |
+| Poisson solve | `the_poisson_solver->solve(f, u)` line 637 | ∇²φ⁽¹⁾ = δ |
+| Displacement | `gradient(icoord, u, data)` line 663 | **Δx = −∇φ⁽¹⁾** |
+
+Velocity uses `theta_cdm`, displacement uses `delta_cdm`. These differ only by the growth rate factor absorbed into `cosmo_vfact = f × a × H(a)/h` (`src/cosmology_calculator.hh` line 346).
+
+### 2LPT branch (`use_2LPT = yes`)
+
+**Velocities** (lines 981–1063):
+1. `solve(f, u1)` → ∇²φ⁽¹⁾ = δ⁽¹⁾
+2. `compute_2LPT_source(u1, f2LPT)` → S = Σᵢ<ⱼ (φ,ᵢᵢ φ,ⱼⱼ − φ,ᵢⱼ²)  [Jenkins eq. 5; Hessian determinant terms]
+3. `solve(f2LPT, u2LPT)` → ∇²φ⁽²⁾ = S
+4. `u2LPT *= 6.0/7.0; u1 += u2LPT` → φ_vel = φ⁽¹⁾ + (6/7)φ⁽²⁾
+5. `gradient(icoord, u1, data) *= cosmo_vfact` → **v = f₁aH/h × (−∇φ_vel)**
+
+**Displacements** (lines 1163–1229):
+1. Re-solve u1 from delta_cdm, re-solve u2LPT from 2LPT source
+2. `u2LPT *= 3.0/7.0; u1 += u2LPT` → φ_disp = φ⁽¹⁾ + (3/7)φ⁽²⁾
+3. `gradient(icoord, u1, data)` → **Δx = −∇φ_disp**
+
+The **6/7 vs 3/7** factors reflect D₂/D₁² ≈ −3/7 (Einstein–de Sitter); velocities pick up an extra factor of 2 from dD₂/dt vs dD₁/dt.
+
+### Gradient method: finite differences
+
+`the_poisson_solver->gradient()` (`src/poisson.cc` lines 156–179) uses **configurable-order finite differences** (2nd, 4th, or 6th order stencils from `src/fd_schemes.hh`) — not ik multiplication in Fourier space.
+
+### Jenkins (2010) formula: D·v − ½D²(dv/dD)
+
+Jenkins (2010) describes an alternative approach to recover 2LPT displacements from the velocity field via a Taylor expansion in D, without re-running the Poisson solver. MUSIC2 does **not** use this — it takes the direct route of solving two Poisson equations for φ⁽¹⁾ and φ⁽²⁾. The Jenkins formula is mainly useful in resimulation contexts where you only have particle snapshots.
+
 ## IC Generation Pipeline
 
 ### White noise field (`wnoise_NNNN.bin`)
@@ -168,3 +211,110 @@ For the CLASS plugin (`src/plugins/transfer_CLASS.cc:279`), `compute()`:
 2. Returns 0 outside `[kmin_, kmax_]`
 3. Looks up the requested field via log-log spline interpolation (`interpolated_function_1d`) of the CLASS output table
 4. Returns `val * tnorm_` (normalized so T(k→0) = 1)
+
+---
+
+## monofonIC: Higher-Order ICs for Two-Fluid (Baryon+CDM) Simulations
+
+Source: `~/Dropbox/Projects/monofonIC`
+
+References:
+- Hahn, Rampf & Uhlemann (2021), MNRAS 503, 426 — "Higher order initial conditions for mixed baryon–CDM simulations" (`Hahn-2021-*.pdf`)
+- Rampf, Uhlemann & Hahn (2021) — companion theory paper
+
+monofonIC is the successor to MUSIC2. The key advances over MUSIC2 (and over Jenkins 2010) are: **3LPT support**, a novel **Propagator Perturbation Theory (PPT)** method, and proper treatment of **CDM and baryons as two distinct fluids**.
+
+### What monofonIC adds over MUSIC2 / Jenkins (2010)
+
+| Feature | Jenkins (2010) | MUSIC2 | monofonIC / Hahn (2021) |
+|---|---|---|---|
+| LPT order | 2LPT | 2LPT | 3LPT + PPT |
+| Fluid model | single | single (CDM≈matter) | two-fluid: CDM + baryons separately |
+| Gradient method | finite differences | finite differences (2nd/4th/6th order) | ik multiplication in Fourier space (exact) |
+| Aliasing suppression | none | none | Orszag 3/2-rule padding for LPT convolutions |
+| Fixed amplitude | no | `fix_mode_amplitude = yes` | `DoFixing = yes` (Angulo & Pontzen 2016) |
+| Paired ICs | no | no | `DoInversion = yes` |
+| Particle lattice | SC | SC | SC, BCC, FCC, glass |
+| Reference redshift | z=0 backscaled | `ztarget=0` backscaled | z_ref ≈ 2.125 (more accurate TF) |
+| Transversal (vector) 3LPT | no | no | yes (A3 field) |
+
+### Two-fluid framework (Hahn 2021 §2)
+
+Hahn (2021) reformulates the CDM+baryon system in terms of **sum** (m) and **difference** (bc) variables (eq. 3):
+
+```
+δ_m = f_b δ_b + f_c δ_c     (total matter = baryon fraction × δ_b + CDM fraction × δ_c)
+δ_bc = δ_b − δ_c             (baryon–CDM difference field)
+```
+
+At linear order δ_bc ≠ 0 due to baryon acoustic oscillations and Jeans damping. The combined displacement ξ^m drives gravity (Poisson source); the difference field δ_bc introduces a separate potential that separates baryons from CDM.
+
+MUSIC2's approach of using `delta_baryon` vs `delta_cdm` transfer functions is only first-order accurate for the two-fluid case. monofonIC evolves both fluids self-consistently to 2LPT/3LPT.
+
+### LPT potentials in monofonIC (`src/ic_generator.cc`)
+
+| Variable | Order | Jenkins analogue | Code location |
+|---|---|---|---|
+| `phi` | 1LPT, φ⁽¹⁾ | φ⁽¹⁾ = u1 | lines 433–501 |
+| `phi2` | 2LPT, φ⁽²⁾ | φ⁽²⁾ = u2LPT | lines 508–542 |
+| `phi3a` | 3LPT scalar (a) | — | lines 545–575 |
+| `phi3b` | 3LPT scalar (b), depends on φ⁽²⁾ | — | lines 576–597 |
+| `A3x/y/z` | 3LPT transversal vector | — | lines 580–597 |
+
+φ⁽¹⁾ is built **directly in Fourier space** (not via a real-space Poisson solve):
+```cpp
+phi(k) = white_noise(k) × sqrt(P(k)) / k²   // = δ(k) / k²
+```
+
+The 2LPT source is the Hessian determinant sum (Hahn 2021 eq. 20 / Jenkins eq. 5), computed using `OrszagConvolver` with 3/2-padded grids to suppress aliasing:
+```cpp
+Conv.convolve_SumOfHessians(phi, {0,0}, phi, {1,1}, {2,2}, assign_to(phi2));  // φ,00(φ,11+φ,22)
+Conv.convolve_Hessians(phi, {1,1}, phi, {2,2}, add_to(phi2));                 // φ,11 φ,22
+Conv.convolve_Hessians(phi, {0,1}, phi, {0,1}, subtract_from(phi2));          // −φ,01²
+// ... etc.
+phi2.apply_InverseLaplacian();   // solve ∇²φ⁽²⁾ = source
+```
+
+### Growth factors and velocity scaling (`include/cosmology_calculator.hh`)
+
+monofonIC solves a coupled ODE system for all growth factors simultaneously:
+
+| Variable | ODE solution | Physical meaning |
+|---|---|---|
+| D (y[1]) | 1LPT growth factor | D₁(a) |
+| E (y[3]) | 2LPT growth factor | D₂(a) ≈ −(3/7)D₁² |
+| Fa (y[5]) | 3LPT scalar (a) | D₃ₐ(a) |
+| Fb (y[7]) | 3LPT scalar (b) | D₃ᵦ(a) |
+| Fc (y[9]) | 3LPT transversal | D₃꜀(a) |
+
+Velocity factors `vfac1..vfac3c` = `Ḋₙ/Dₙ/h` (line 259–264), analogous to MUSIC2's `cosmo_vfact = f₁ × aH/h` but computed for each LPT order separately.
+
+Displacements and velocities are combined as (lines 883–1007):
+```
+Δx_i = −∂_i (φ⁽¹⁾ + φ⁽²⁾ + φ⁽³ᵃ⁾ + φ⁽³ᵇ⁾) + curl term from A3
+v_i  = −∂_i (vfac1·φ⁽¹⁾ + vfac2·φ⁽²⁾ + vfac3a·φ⁽³ᵃ⁾ + vfac3b·φ⁽³ᵇ⁾) + vfac3c × curl(A3)
+```
+
+where ∂_i = i·k_i in Fourier space (exact, no FD truncation error).
+
+### Propagator Perturbation Theory (PPT) (Hahn 2021 §2.4)
+
+PPT is a novel alternative to standard LPT, formulated as a Schrödinger-like equation:
+```
+iħ ∂_D ψ_α = −(ħ²/2) ∇²ψ_α + V_eff ψ_α
+```
+where the wavefunction ψ_α encodes the fluid displacement field, ħ is a free parameter (set by the grid spacing / Nyquist condition, eq. 26), and V_eff is an effective potential derived from φ⁽²⁾.
+
+At leading order (free propagator, V_eff = 0): recovers Zel'dovich (1LPT).
+At next-to-leading order (2PPT, eq. 20): V_eff = (3/4)(φ⁽²⁾_,ii − φ⁽¹⁾_,ij φ⁽¹⁾_,ij)
+
+PPT is implemented as a sequence of **drift** (Fourier-space, multiplication by e^{−iħk²ΔD/2}) and **kick** (real-space, multiplication by e^{−iΔD·V_eff/ħ}) operators, executed as a leapfrog (eq. 25):
+```
+ψ(x; a) = DFT⁻¹ { e^{−iħk²/2} DFT{ e^{−iKick} ψ^ini } }   [schematically]
+```
+
+Key advantage of PPT over LPT: preserves Hamiltonian structure, so no spurious high-order modes are excited. The baryon power spectrum in PPT agrees with full Eulerian simulation to sub-percent level at z ≲ 24.
+
+### Backscaling reference redshift
+
+monofonIC uses z_ref = 2.125 (not z=0) as the reference for the CLASS transfer function (Hahn 2021 §2.5). At z=0, decaying modes and relativistic effects have already been erased; backscaling from z_ref ≈ 2 captures the BAO scale and the dominant large-scale modes more accurately. MUSIC2 uses `ztarget = 0` (default).

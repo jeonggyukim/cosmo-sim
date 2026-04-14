@@ -122,6 +122,10 @@ def main():
                         help="Optional CLASS P(k) ASCII file (columns: k[h/Mpc]  P[Mpc/h]^3)")
     parser.add_argument("-o", "--output", default=None,
                         help="Output PNG filename (default: pk_<stem>.png)")
+    parser.add_argument("--hankel", action="store_true", default=False,
+                        help="Overplot xi(r) from Hankel transform of P(k) (default: off)")
+    parser.add_argument("--interlace", action="store_true", default=False,
+                        help="Use interlaced CIC (two grids offset by half a cell) to suppress aliasing (default: off)")
     args = parser.parse_args()
 
     h = args.H0 / 100.0
@@ -172,11 +176,26 @@ def main():
     KX, KY, KZ = np.meshgrid(kx, ky, kz, indexing='ij')
     K = np.sqrt(KX**2 + KY**2 + KZ**2)   # |k| in Mpc⁻¹
 
+    # --- Interlacing (optional) ---
+    # Compute a second CIC grid shifted by half a cell (dx/2 in each dimension),
+    # then average the two grids in Fourier space after correcting for the shift phase.
+    # This cancels leading alias terms: δ_int(k) = ½[δ₁(k) + e^{ik·Δ} δ₂(k)]
+    # where Δ = (dx/2, dx/2, dx/2).  The CIC window deconvolution below still applies.
+    if args.interlace:
+        print("Interlacing: assigning shifted particles to second mesh...")
+        dx = boxsize_mpc / ngrid
+        coords_shifted = (coords + dx / 2) % boxsize_mpc
+        delta2 = cic_assign(coords_shifted, boxsize_mpc, ngrid)
+        delta2_k = np.fft.rfftn(delta2)
+        phase = np.exp(1j * (KX + KY + KZ) * (dx / 2))
+        delta_k = 0.5 * (delta_k + phase * delta2_k)
+
     # --- CIC deconvolution ---
     W2 = cic_window(KX, KY, KZ, knyq)
     W2[0, 0, 0] = 1.0   # avoid divide-by-zero at DC
 
     Pk_raw = np.abs(delta_k)**2 / W2   # deconvolved |delta(k)|²
+    Pk_raw_nodeconv = np.abs(delta_k)**2   # no MAS deconvolution
 
     # --- Convert to P(k) in (Mpc/h)³ ---
     # P(k) = |delta(k)|² * V_box / Ngrid^6  (from DFT convention)
@@ -184,6 +203,7 @@ def main():
     # Then convert to (Mpc/h)³ by multiplying by h³
     V_box_mpc = boxsize_mpc**3
     Pk_modes = Pk_raw * V_box_mpc / ngrid**6 * h**3   # (Mpc/h)³
+    Pk_modes_nodeconv = Pk_raw_nodeconv * V_box_mpc / ngrid**6 * h**3   # no deconv
 
     # --- Shot noise in (Mpc/h)³ ---
     P_shot = V_box_mpc / N * h**3   # Poisson shot noise
@@ -193,7 +213,7 @@ def main():
 
     # --- Bin into logarithmic k-shells ---
     kmin_mpch = kf / h            # fundamental mode in h/Mpc
-    kmax_mpch = knyq / h * 0.5   # go to half-Nyquist for reliability
+    kmax_mpch = knyq / h * 0.9   # go to 90% Nyquist (use --interlace to suppress aliasing near k_Ny)
 
     k_edges = np.logspace(np.log10(kmin_mpch), np.log10(kmax_mpch), args.nkbins + 1)
 
@@ -205,24 +225,27 @@ def main():
     # Flatten arrays for binning (exclude DC mode k=0)
     K_flat  = K_mpch.ravel()
     Pk_flat = Pk_modes.ravel()
+    Pk_flat_nodeconv = Pk_modes_nodeconv.ravel()
     mask    = K_flat > 0
 
-    Pk_raw_mean = np.zeros(args.nkbins)   # without shot subtraction
+    Pk_raw_mean = np.zeros(args.nkbins)   # deconvolved, no shot subtraction
+    Pk_nodeconv_mean = np.zeros(args.nkbins)   # no deconvolution, no shot subtraction
 
     for i, (klo, khi) in enumerate(zip(k_edges[:-1], k_edges[1:])):
         sel = mask & (K_flat >= klo) & (K_flat < khi)
         n = sel.sum()
         if n > 0:
-            k_cen[i]       = np.mean(K_flat[sel])
-            Pk_raw_mean[i] = np.mean(Pk_flat[sel])
-            Pk_mean[i]     = Pk_raw_mean[i] - P_shot
-            Pk_err[i]      = np.std(Pk_flat[sel]) / np.sqrt(n)
-            nmodes[i]      = n
+            k_cen[i]            = np.mean(K_flat[sel])
+            Pk_raw_mean[i]      = np.mean(Pk_flat[sel])
+            Pk_nodeconv_mean[i] = np.mean(Pk_flat_nodeconv[sel])
+            Pk_mean[i]          = Pk_raw_mean[i] - P_shot
+            Pk_err[i]           = np.std(Pk_flat[sel]) / np.sqrt(n)
+            nmodes[i]           = n
 
     # Keep only populated bins
     good = nmodes > 0
-    k_cen, Pk_mean, Pk_raw_mean, Pk_err, nmodes = (
-        k_cen[good], Pk_mean[good], Pk_raw_mean[good],
+    k_cen, Pk_mean, Pk_raw_mean, Pk_nodeconv_mean, Pk_err, nmodes = (
+        k_cen[good], Pk_mean[good], Pk_raw_mean[good], Pk_nodeconv_mean[good],
         Pk_err[good], nmodes[good])
 
     # --- Save ASCII output ---
@@ -238,27 +261,23 @@ def main():
                header=header, fmt=["%.6e", "%.6e", "%.6e", "%.6e", "%d"])
     print(f"Saved: {out_txt}")
 
-    # --- Correlation function via Hankel transform of measured P(k) ---
-    from mcfit import P2xi
-    from scipy.interpolate import interp1d
-
-    trapz = np.trapezoid
-
-    # Theory xi(r) from CLASS P(k)
-    # Also find BAO peak from r^2*xi(r) maximum in 50-200 Mpc/h
+    # --- Theory xi(r) from CLASS P(k) via Hankel transform ---
     xi_theory_r = xi_theory_xi = None
     if args.theory:
+        from mcfit import P2xi
         kt, Pt = np.loadtxt(args.theory, comments='#', unpack=True)
         xi_theory_r, xi_theory_xi = P2xi(kt, l=0)(Pt, extrap=True)
 
-    # Measured xi(r): direct integration over measured k bins
-    # xi(r) = 1/(2pi^2) int P(k) sin(kr)/(kr) k^2 dk
-    r_xi = np.logspace(-1, np.log10(boxsize_mpch / 2), 300)
-    xi_meas = np.zeros(len(r_xi))
-    for i, r in enumerate(r_xi):
-        x = k_cen * r
-        sinc = np.where(np.abs(x) < 1e-8, 1.0, np.sin(x) / x)
-        xi_meas[i] = trapz(Pk_raw_mean * sinc * k_cen**2, k_cen) / (2 * np.pi**2)
+    # --- Measured xi(r) via Hankel transform of P(k) (optional) ---
+    xi_meas = None
+    if args.hankel:
+        trapz = np.trapezoid
+        r_xi = np.logspace(-1, np.log10(boxsize_mpch / 2), 300)
+        xi_meas = np.zeros(len(r_xi))
+        for i, r in enumerate(r_xi):
+            x = k_cen * r
+            sinc = np.where(np.abs(x) < 1e-8, 1.0, np.sin(x) / x)
+            xi_meas[i] = trapz(Pk_raw_mean * sinc * k_cen**2, k_cen) / (2 * np.pi**2)
 
     # --- Plot ---
     import matplotlib.pyplot as plt
@@ -267,8 +286,13 @@ def main():
     ax, ax2 = axes
 
     # ---- Left panel: P(k) ----
+    ax.loglog(k_cen, Pk_nodeconv_mean, 's--', ms=3, lw=1.0, color='C3', alpha=0.7,
+              label='no MAS deconv, no shot subtraction')
     ax.loglog(k_cen, Pk_raw_mean, 'o-', ms=4, lw=1.2, color='C0',
-              label='measured (raw)')
+              label='MAS deconvolved, no shot subtraction')
+    pos_shot_sub = Pk_mean > 0
+    ax.loglog(k_cen[pos_shot_sub], Pk_mean[pos_shot_sub], '^-', ms=4, lw=1.2, color='C2',
+              label='MAS deconvolved + shot noise subtracted')
 
     if args.theory:
         ax.loglog(kt, Pt, 'k-', lw=1.2, label='theory (CLASS)')
@@ -305,8 +329,24 @@ def main():
         ax2.loglog(xi_theory_r[mask_t], xi_theory_xi[mask_t],
                    'k-', lw=1.2, label='theory (CLASS)')
 
-    ax2.loglog(r_xi[xi_meas > 0], xi_meas[xi_meas > 0], 'o-', ms=4, lw=1.2,
-               color='C0', alpha=0.5, label='measured (from raw $P(k)$)')
+    if xi_meas is not None:
+        ax2.loglog(r_xi[xi_meas > 0], xi_meas[xi_meas > 0], 'o-', ms=4, lw=1.2,
+                   color='C0', alpha=0.5, label='measured (Hankel transform of $P(k)$)')
+
+    # Overplot Corrfunc xi(r) if the output file exists
+    # Columns: r_avg r_low r_high xi npairs  (r_avg=0 unless need_avg_sep=1)
+    xi_corrfunc_file = os.path.join(data_dir, f"xi_{stem}.txt")
+    if os.path.exists(xi_corrfunc_file):
+        cf = np.loadtxt(xi_corrfunc_file, comments='#')
+        r_low, r_high, xi_cf = cf[:, 1], cf[:, 2], cf[:, 3]
+        r_mid = np.sqrt(r_low * r_high) * h   # geometric mean, Mpc → Mpc/h
+        pos = xi_cf > 0
+        neg = xi_cf < 0
+        ax2.loglog(r_mid[pos], xi_cf[pos], 's-', ms=4, lw=1.2,
+                   color='C1', label='measured (Corrfunc)')
+        if neg.any():
+            ax2.loglog(r_mid[neg], np.abs(xi_cf[neg]), 's--', ms=4, lw=0.8,
+                       color='C1', alpha=0.4, label=r'measured (Corrfunc, $\xi<0$)')
 
     # Mark L/2 — maximum reliable separation
     ax2.axvline(boxsize_mpch / 2, color='gray', ls='--', lw=1.0,
