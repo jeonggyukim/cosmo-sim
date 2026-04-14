@@ -116,7 +116,7 @@ Likely a combination of:
 
 There is no variable literally named `phi_v` in MUSIC2. The velocity potential is named **`u`** (1LPT branch) or **`u1`** (2LPT branch) in `src/main.cc`. These correspond exactly to Jenkins (2010) φ⁽¹⁾ and φ⁽²⁾.
 
-Reference: Jenkins (2010), MNRAS 403, 1859 — "Second-order Lagrangian perturbation theory initial conditions for resimulations."
+Reference: Jenkins (2010), MNRAS 403, 1859 — "Second-order Lagrangian perturbation theory initial conditions for resimulations." https://ui.adsabs.harvard.edu/abs/2010MNRAS.403.1859J
 
 ### 1LPT branch (`use_2LPT = no`)
 
@@ -219,7 +219,7 @@ For the CLASS plugin (`src/plugins/transfer_CLASS.cc:279`), `compute()`:
 Source: `~/Dropbox/Projects/monofonIC`
 
 References:
-- Hahn, Rampf & Uhlemann (2021), MNRAS 503, 426 — "Higher order initial conditions for mixed baryon–CDM simulations" (`Hahn-2021-*.pdf`)
+- Hahn, Rampf & Uhlemann (2021), MNRAS 503, 426 — "Higher order initial conditions for mixed baryon–CDM simulations" https://ui.adsabs.harvard.edu/abs/2021MNRAS.503..426H
 - Rampf, Uhlemann & Hahn (2021) — companion theory paper
 
 monofonIC is the successor to MUSIC2. The key advances over MUSIC2 (and over Jenkins 2010) are: **3LPT support**, a novel **Propagator Perturbation Theory (PPT)** method, and proper treatment of **CDM and baryons as two distinct fluids**.
