@@ -251,22 +251,24 @@ At linear order δ_bc ≠ 0 due to baryon acoustic oscillations and Jeans dampin
 
 MUSIC2's approach of using `delta_baryon` vs `delta_cdm` transfer functions is only first-order accurate for the two-fluid case. monofonIC evolves both fluids self-consistently to 2LPT/3LPT.
 
-### LPT potentials in monofonIC (`src/ic_generator.cc`)
+### LPT potentials in monofonIC
 
-| Variable | Order | Jenkins analogue | Code location |
+All in [`src/ic_generator.cc`](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/src/ic_generator.cc):
+
+| Variable | Order | Jenkins analogue | Key lines |
 |---|---|---|---|
-| `phi` | 1LPT, φ⁽¹⁾ | φ⁽¹⁾ = u1 | lines 433–501 |
-| `phi2` | 2LPT, φ⁽²⁾ | φ⁽²⁾ = u2LPT | lines 508–542 |
-| `phi3a` | 3LPT scalar (a) | — | lines 545–575 |
-| `phi3b` | 3LPT scalar (b), depends on φ⁽²⁾ | — | lines 576–597 |
-| `A3x/y/z` | 3LPT transversal vector | — | lines 580–597 |
+| `phi` | 1LPT, φ⁽¹⁾ | φ⁽¹⁾ = u1 | [L431–501](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/src/ic_generator.cc#L431) |
+| `phi2` | 2LPT, φ⁽²⁾ | φ⁽²⁾ = u2LPT | [L512–534](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/src/ic_generator.cc#L512) |
+| `phi3a` | 3LPT scalar (a) | — | [L555–563](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/src/ic_generator.cc#L555) |
+| `phi3b` | 3LPT scalar (b), depends on φ⁽²⁾ | — | [L568–578](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/src/ic_generator.cc#L568) |
+| `A3x/y/z` | 3LPT transversal vector | — | [L590–594](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/src/ic_generator.cc#L590) |
 
-φ⁽¹⁾ is built **directly in Fourier space** (not via a real-space Poisson solve):
+φ⁽¹⁾ is built **directly in Fourier space** (not via a real-space Poisson solve) at [L437–491](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/src/ic_generator.cc#L437):
 ```cpp
 phi(k) = white_noise(k) × sqrt(P(k)) / k²   // = δ(k) / k²
 ```
 
-The 2LPT source is the Hessian determinant sum (Hahn 2021 eq. 20 / Jenkins eq. 5), computed using `OrszagConvolver` with 3/2-padded grids to suppress aliasing:
+The 2LPT source is the Hessian determinant sum (Hahn 2021 eq. 20 / Jenkins eq. 5), computed using [`OrszagConvolver`](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/convolution.hh#L430) with 3/2-padded grids ([L464](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/convolution.hh#L464)) to suppress aliasing. The [`convolve_Hessians`](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/convolution.hh#L137) and [`convolve_SumOfHessians`](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/convolution.hh#L214) methods implement φ,ᵢⱼ products in Fourier space ([ic_generator.cc L517–534](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/src/ic_generator.cc#L517)):
 ```cpp
 Conv.convolve_SumOfHessians(phi, {0,0}, phi, {1,1}, {2,2}, assign_to(phi2));  // φ,00(φ,11+φ,22)
 Conv.convolve_Hessians(phi, {1,1}, phi, {2,2}, add_to(phi2));                 // φ,11 φ,22
@@ -275,21 +277,21 @@ Conv.convolve_Hessians(phi, {0,1}, phi, {0,1}, subtract_from(phi2));          //
 phi2.apply_InverseLaplacian();   // solve ∇²φ⁽²⁾ = source
 ```
 
-### Growth factors and velocity scaling (`include/cosmology_calculator.hh`)
+### Growth factors and velocity scaling
 
-monofonIC solves a coupled ODE system for all growth factors simultaneously:
+[`include/cosmology_calculator.hh`](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/cosmology_calculator.hh) — monofonIC solves a coupled ODE system ([L47–78](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/cosmology_calculator.hh#L47)) for all growth factors simultaneously:
 
-| Variable | ODE solution | Physical meaning |
-|---|---|---|
-| D (y[1]) | 1LPT growth factor | D₁(a) |
-| E (y[3]) | 2LPT growth factor | D₂(a) ≈ −(3/7)D₁² |
-| Fa (y[5]) | 3LPT scalar (a) | D₃ₐ(a) |
-| Fb (y[7]) | 3LPT scalar (b) | D₃ᵦ(a) |
-| Fc (y[9]) | 3LPT transversal | D₃꜀(a) |
+| Variable | ODE state | Physical meaning | vfac function |
+|---|---|---|---|
+| D | y[1] ([L70](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/cosmology_calculator.hh#L70)) | D₁(a), 1LPT | [`get_vfacD`](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/cosmology_calculator.hh#L586) |
+| E | y[3] ([L72](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/cosmology_calculator.hh#L72)) | D₂(a) ≈ −(3/7)D₁² | [`get_vfacE`](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/cosmology_calculator.hh#L592) |
+| Fa | y[5] ([L74](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/cosmology_calculator.hh#L74)) | D₃ₐ(a) | [`get_vfacFa`](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/cosmology_calculator.hh#L598) |
+| Fb | y[7] ([L76](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/cosmology_calculator.hh#L76)) | D₃ᵦ(a) | `get_vfacFb` |
+| Fc | y[9] ([L234](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/include/cosmology_calculator.hh#L234)) | D₃꜀(a) | `get_vfacFc` |
 
-Velocity factors `vfac1..vfac3c` = `Ḋₙ/Dₙ/h` (line 259–264), analogous to MUSIC2's `cosmo_vfact = f₁ × aH/h` but computed for each LPT order separately.
+Velocity factors `vfac1..vfac3c` = `Ḋₙ/Dₙ/h` ([ic_generator.cc L260–264](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/src/ic_generator.cc#L260)), analogous to MUSIC2's `cosmo_vfact = f₁ × aH/h` but computed for each LPT order separately. Growth factor scaling applied at [L600–612](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/src/ic_generator.cc#L600).
 
-Displacements and velocities are combined as (lines 883–1007):
+Displacements ([L907–910](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/src/ic_generator.cc#L907)) and velocities ([L963–966](https://github.com/cosmo-sims/monofonIC/blob/bd5ad10/src/ic_generator.cc#L963)) are combined as:
 ```
 Δx_i = −∂_i (φ⁽¹⁾ + φ⁽²⁾ + φ⁽³ᵃ⁾ + φ⁽³ᵇ⁾) + curl term from A3
 v_i  = −∂_i (vfac1·φ⁽¹⁾ + vfac2·φ⁽²⁾ + vfac3a·φ⁽³ᵃ⁾ + vfac3b·φ⁽³ᵇ⁾) + vfac3c × curl(A3)
