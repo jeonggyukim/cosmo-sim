@@ -206,18 +206,33 @@ echo "    Saved: $XI_FILE"
 # Not skipped — always re-runs.
 # CIC mass assignment on an Ngrid³ mesh, FFT, CIC window deconvolution,
 # shot-noise subtraction (P_shot = V/N), binning into log k-shells.
-# Outputs both an ASCII table (data/pk_{STEM}.txt) and a PNG figure with
-# two panels: P(k) vs CLASS theory, and ξ(r) via Hankel transform.
+# Outputs an ASCII table: data/pk_{STEM}.txt
 # ---------------------------------------------------------------------------
+PK_FILE="data/pk_${STEM}.txt"
 log "Measuring P(k) with compute_pk.py..."
 conda run -n cosmo python scripts/compute_pk.py \
     "$IC_FILE" \
+    --H0 "$H0" \
+    -o "$PK_FILE"
+echo "    Saved: $PK_FILE"
+
+# ---------------------------------------------------------------------------
+# Step 9: Plot diagnostics with plot_ic.py
+# Reads pk_{STEM}.txt; auto-detects xi_{STEM}.txt, xi_cic_{STEM}.txt,
+# vel_cic_{STEM}.txt alongside it; overlays CLASS theory curves.
+# Outputs: plots/pk_{STEM}.png
+# ---------------------------------------------------------------------------
+PLOT_FILE="plots/pk_${STEM}.png"
+log "Plotting diagnostics with plot_ic.py..."
+conda run -n cosmo python scripts/plot_ic.py \
+    "$PK_FILE" \
     --theory "$CLASS_PKS" \
     --H0 "$H0" \
     --Omega_m "$OMEGA_M" \
     --Omega_b "$OMEGA_B" \
-    -o "plots/pk_${STEM}.png"
+    -o "$PLOT_FILE"
 
 log "Pipeline complete."
 echo "    IC file : $IC_FILE"
-echo "    P(k)    : plots/pk_${STEM}.png"
+echo "    P(k)    : $PK_FILE"
+echo "    Plot    : $PLOT_FILE"

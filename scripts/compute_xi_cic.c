@@ -125,17 +125,19 @@ typedef struct { int di, dj, dk; double r; } Lag;
 /* ─── program options ────────────────────────────────────────────────────── */
 typedef struct {
     char    input[512];
-    int     ptype;      /* HDF5 PartType index; 1 = dark matter in SWIFT */
-    int     Ngrid;      /* CIC grid size; -1 = auto: min(cbrt(N), 128) */
+    int     ptype;        /* HDF5 PartType index; 1 = dark matter in SWIFT */
+    int     Ngrid;        /* CIC grid size; -1 = auto: min(cbrt(N), 128) */
     XiMode  mode;
-    int     nbins;      /* number of radial bins */
-    double  rmin;       /* minimum lag in Mpc; -1 = auto: cell size */
-    double  rmax;       /* maximum lag in Mpc; -1 = auto: boxsize/3 */
-    char    output[512];
-    int     r2_plot;    /* if set, also write xi(r)·r² as an extra column */
-    int     periodic;   /* bit mask: which axes use periodic wrapping */
-    int     logbin;     /* 1 = log-spaced bins (default), 0 = linear */
-    int     nthreads;   /* OpenMP threads; 0 = defer to OMP_NUM_THREADS */
+    int     nbins;        /* number of radial bins */
+    double  rmin;         /* minimum lag in Mpc; -1 = auto: cell size */
+    double  rmax;         /* maximum lag in Mpc; -1 = auto: boxsize/3 */
+    char    output[512];  /* output file for xi(r) */
+    int     r2_plot;      /* if set, also write xi(r)·r² as an extra column */
+    int     periodic;     /* bit mask: which axes use periodic wrapping */
+    int     logbin;       /* 1 = log-spaced bins (default), 0 = linear */
+    int     nthreads;     /* OpenMP threads; 0 = defer to OMP_NUM_THREADS */
+    int     compute_vel;  /* if set, also compute velocity correlation ψ(r) */
+    char    vel_output[512]; /* output file for ψ(r); auto-derived if empty */
 } Opts;
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -257,6 +259,40 @@ static int read_coords(const char *fname, int ptype,
     return 0;
 }
 
+/*
+ * read_velocities — read all PartType{ptype}/Velocities into a flat double array.
+ *
+ * SWIFT stores peculiar velocities as float32 in km/s (comoving peculiar
+ * velocity a·v_pec, where a is the scale factor at the IC redshift).
+ * The dataset has shape (N, 3) and is laid out as [vx0,vy0,vz0, vx1,...].
+ *
+ * HDF5 auto-promotes float32 → float64 during the read (H5T_NATIVE_DOUBLE).
+ */
+static int read_velocities(const char *fname, int ptype,
+                           double **vels, long long N)
+{
+    *vels = (double *)malloc((size_t)N * 3 * sizeof(double));
+    if (!*vels) { fprintf(stderr, "OOM reading velocities\n"); return -1; }
+
+    char dset_name[64];
+    snprintf(dset_name, sizeof(dset_name), "PartType%d/Velocities", ptype);
+
+    hid_t file = H5Fopen(fname, H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (file < 0) { fprintf(stderr, "Cannot open %s\n", fname); free(*vels); return -1; }
+
+    /* Check that the dataset exists before opening */
+    if (!H5Lexists(file, dset_name, H5P_DEFAULT)) {
+        fprintf(stderr, "Dataset %s not found in %s\n", dset_name, fname);
+        H5Fclose(file); free(*vels); return -1;
+    }
+
+    hid_t dset = H5Dopen2(file, dset_name, H5P_DEFAULT);
+    H5Dread(dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, *vels);
+    H5Dclose(dset);
+    H5Fclose(file);
+    return 0;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  *  CIC density grid
  * ═══════════════════════════════════════════════════════════════════════════ */
@@ -324,6 +360,100 @@ static void cic_assign(const double *coords, long long npart,
         }
     }
 #undef IDX
+}
+
+/*
+ * cic_vel_assign — assign per-particle velocities to three CIC grids.
+ *
+ * Uses mass-weighted (CIC-weighted) assignment: each particle's velocity
+ * is distributed to the 8 surrounding cells with the same trilinear weights
+ * as cic_assign.  The velocity grids therefore hold
+ *
+ *   vα_sum[cell] = Σ_p w_p * vα_p
+ *
+ * which must be divided by the mass (count) grid to obtain the mean velocity:
+ *
+ *   v_field[cell] = vα_sum[cell] / count[cell]
+ *
+ * The caller supplies the pre-built count grid (output of cic_assign before
+ * normalisation) and receives three normalised velocity-field grids.
+ *
+ * For cells with zero mass (empty cells — extremely rare in IC files), the
+ * velocity is set to 0 (the linear-theory mean is zero, so this is unbiased).
+ *
+ * Note on SWIFT velocity units: SWIFT ICs store a·v_pec (km/s) where a is
+ * the scale factor at the IC snapshot.  For cosmological ICs the velocities
+ * are already in the frame needed for ψ(r) = ⟨v·v'⟩ in (km/s)².
+ */
+static void cic_vel_assign(const double *coords, const double *vels,
+                           long long npart, double boxsize, int Ngrid,
+                           const double *count_grid,
+                           double *vx_field, double *vy_field, double *vz_field)
+{
+    double cell = boxsize / Ngrid;
+    long   Ng   = Ngrid;
+    long   Ng2  = Ng * Ng;
+
+    /* Temporary arrays to accumulate weighted velocity sums */
+    long Ng3 = Ng * Ng * Ng;
+    double *vx_sum = (double *)calloc((size_t)Ng3, sizeof(double));
+    double *vy_sum = (double *)calloc((size_t)Ng3, sizeof(double));
+    double *vz_sum = (double *)calloc((size_t)Ng3, sizeof(double));
+    if (!vx_sum || !vy_sum || !vz_sum) {
+        fprintf(stderr, "OOM in cic_vel_assign\n"); exit(1);
+    }
+
+#define IDX(i,j,k) ((long)(i)*Ng2 + (long)(j)*Ng + (long)(k))
+
+    for (long long p = 0; p < npart; p++) {
+        double px = coords[p*3+0] / cell;
+        double py = coords[p*3+1] / cell;
+        double pz = coords[p*3+2] / cell;
+
+        int    i0 = (int)floor(px); double dx = px - floor(px);
+        int    j0 = (int)floor(py); double dy = py - floor(py);
+        int    k0 = (int)floor(pz); double dz = pz - floor(pz);
+
+        double tx = 1.0-dx, ty = 1.0-dy, tz = 1.0-dz;
+
+        /* Particle velocity components */
+        double vpx = vels[p*3+0], vpy = vels[p*3+1], vpz = vels[p*3+2];
+
+        for (int di = 0; di < 2; di++) {
+            double wx = di ? dx : tx;
+            int ix = ((i0+di) % Ngrid + Ngrid) % Ngrid;
+            for (int dj = 0; dj < 2; dj++) {
+                double wy = dj ? dy : ty;
+                int iy = ((j0+dj) % Ngrid + Ngrid) % Ngrid;
+                for (int dk = 0; dk < 2; dk++) {
+                    double wz = dk ? dz : tz;
+                    int iz = ((k0+dk) % Ngrid + Ngrid) % Ngrid;
+                    double w = wx * wy * wz;
+                    vx_sum[IDX(ix,iy,iz)] += w * vpx;
+                    vy_sum[IDX(ix,iy,iz)] += w * vpy;
+                    vz_sum[IDX(ix,iy,iz)] += w * vpz;
+                }
+            }
+        }
+    }
+#undef IDX
+
+    /*
+     * Normalise: divide weighted sum by cell mass (particle count).
+     * count_grid is the raw count (before normalisation to 1+δ), so
+     * count_grid[cell] = mean_count * den[cell].  For the velocity field
+     * we need count_grid[cell] itself (the denominator for the weighted mean).
+     *
+     * Empty cells: set velocity to 0 (linear-theory mean ≈ 0, so unbiased).
+     */
+    for (long i = 0; i < Ng3; i++) {
+        double cnt = count_grid[i];
+        vx_field[i] = (cnt > 0.0) ? vx_sum[i] / cnt : 0.0;
+        vy_field[i] = (cnt > 0.0) ? vy_sum[i] / cnt : 0.0;
+        vz_field[i] = (cnt > 0.0) ? vz_sum[i] / cnt : 0.0;
+    }
+
+    free(vx_sum); free(vy_sum); free(vz_sum);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -551,6 +681,125 @@ static void accumulate_pairs(const double *den, int Ngrid,
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ *  Velocity pair accumulation — ψ(r) = ⟨v(x)·v(x+r)⟩
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * accumulate_vel_pairs — compute the isotropic velocity autocorrelation ψ(r).
+ *
+ * For each lag (di,dj,dk), accumulates the scalar product of velocity vectors
+ * at the two ends of the lag across all grid cells:
+ *
+ *   vv_sum(lag) = Σ_cells  [vx(lo)·vx(hi) + vy(lo)·vy(hi) + vz(lo)·vz(hi)]
+ *
+ * Then ψ(r) = vv_sum / N_cell_pairs  (normalised per cell pair).
+ *
+ * This is the estimator of the 3D isotropic velocity autocorrelation:
+ *
+ *   ψ(r) ≡ ⟨v(x)·v(x+r)⟩ = ψ_x(r) + ψ_y(r) + ψ_z(r)
+ *
+ * In linear theory (for an irrotational velocity field):
+ *
+ *   ψ(r) = [H(z)·f(z)]² / (2π²) ∫₀^∞ dk P(k,z) j₀(kr)
+ *
+ * where f = d ln D / d ln a ≈ Ω_m(z)^0.55 and P(k,z) is the matter power
+ * spectrum.  This is the same Hankel transform as ξ(r) but without the k²
+ * factor — so ψ(r) is dominated by large-scale modes and is more sensitive
+ * to the BAO bump than ξ(r) from density.
+ *
+ * No Landy-Szalay correction is needed because ⟨v⟩ = 0 in linear theory;
+ * the estimator simplifies to a plain normalised cross-correlation.
+ *
+ * Units: ψ(r) is in (km/s)² since SWIFT velocities are stored in km/s.
+ *
+ * OpenMP strategy: same per-thread accumulator pattern as accumulate_pairs.
+ * Each thread accumulates into a private VV row; serial reduction at the end.
+ */
+static void accumulate_vel_pairs(const double *vx, const double *vy, const double *vz,
+                                 int Ngrid,
+                                 const Lag *lags, long n_lags,
+                                 const double *bin_edges, int nbins,
+                                 double *VV, double *RR_vel,
+                                 int periodic)
+{
+    long Ng  = Ngrid;
+    long Ng2 = Ng * Ng;
+
+    int per_x = (periodic & PERIODIC_X) != 0;
+    int per_y = (periodic & PERIODIC_Y) != 0;
+    int per_z = (periodic & PERIODIC_Z) != 0;
+
+    int nthreads = 1;
+#ifdef _OPENMP
+    nthreads = omp_get_max_threads();
+#endif
+
+    /* Per-thread accumulators for VV (sum of v·v') and RR (cell-pair count) */
+    double *VV_t  = (double *)calloc((size_t)nthreads * nbins, sizeof(double));
+    double *RR_t  = (double *)calloc((size_t)nthreads * nbins, sizeof(double));
+    if (!VV_t || !RR_t) { fprintf(stderr, "OOM in accumulate_vel_pairs\n"); exit(1); }
+
+#pragma omp parallel for schedule(dynamic, 64)
+    for (long l = 0; l < n_lags; l++) {
+        int tid = 0;
+#ifdef _OPENMP
+        tid = omp_get_thread_num();
+#endif
+        double *my_VV = VV_t + (size_t)tid * nbins;
+        double *my_RR = RR_t + (size_t)tid * nbins;
+
+        int di = lags[l].di, dj = lags[l].dj, dk = lags[l].dk;
+
+        int b = find_bin(bin_edges, nbins, lags[l].r);
+        if (b < 0) continue;
+
+        long nx = per_x ? Ng : (Ng - di);
+        long ny = per_y ? Ng : (Ng - dj);
+        long nz = per_z ? Ng : (Ng - dk);
+
+        double vv_sum = 0.0;
+
+        for (long i = 0; i < nx; i++) {
+            long ihi = per_x ? (i+di)%Ng : (i+di);
+            for (long j = 0; j < ny; j++) {
+                long jhi = per_y ? (j+dj)%Ng : (j+dj);
+                /*
+                 * Row-pointer optimisation: precompute base offsets for the
+                 * (i,j) and (ihi,jhi) rows so the inner k-loop is a simple
+                 * stride-1 access.
+                 */
+                const double *vx_lo = vx + i  *Ng2 + j  *Ng;
+                const double *vy_lo = vy + i  *Ng2 + j  *Ng;
+                const double *vz_lo = vz + i  *Ng2 + j  *Ng;
+                const double *vx_hi = vx + ihi*Ng2 + jhi*Ng;
+                const double *vy_hi = vy + ihi*Ng2 + jhi*Ng;
+                const double *vz_hi = vz + ihi*Ng2 + jhi*Ng;
+                for (long k = 0; k < nz; k++) {
+                    long khi = per_z ? (k+dk)%Ng : (k+dk);
+                    /* Scalar product of velocity at the two ends of the lag */
+                    vv_sum += vx_lo[k]*vx_hi[khi]
+                            + vy_lo[k]*vy_hi[khi]
+                            + vz_lo[k]*vz_hi[khi];
+                }
+            }
+        }
+
+        /* Factor 2: mirror lag (-di,-dj,-dk) gives the same vv_sum */
+        my_VV[b] += 2.0 * vv_sum;
+        my_RR[b] += 2.0 * (double)(nx * ny * nz);
+    }
+
+    /* Reduce per-thread rows */
+    for (int t = 0; t < nthreads; t++) {
+        for (int b = 0; b < nbins; b++) {
+            VV[b]     += VV_t[(size_t)t * nbins + b];
+            RR_vel[b] += RR_t[(size_t)t * nbins + b];
+        }
+    }
+    free(VV_t); free(RR_t);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
  *  Argument parsing
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -567,15 +816,18 @@ static void usage(const char *prog)
         "  --nbins INT        number of r bins (default 30)\n"
         "  --rmin  FLOAT      minimum lag in Mpc (default: cell size)\n"
         "  --rmax  FLOAT      maximum lag in Mpc (default: boxsize/3)\n"
-        "  --output FILE      output text file (default xi_cic_out.txt)\n"
+        "  --output FILE      output text file for xi(r) (default xi_cic_out.txt)\n"
         "  --r2               also write xi(r)·r² as an extra column\n"
         "  --logbin           log-spaced bins (default: on)\n"
         "  --nthreads INT     OpenMP threads (default: OMP_NUM_THREADS)\n"
         "  --periodic STR     none|x|y|z|xy|xz|yz|xyz (default: xyz)\n"
+        "  --vel              also compute velocity correlation ψ(r) = <v·v'>\n"
+        "  --vel-output FILE  output file for ψ(r) (default: auto-derived from --output)\n"
         "  --help\n"
         "\n"
         "  r and BoxSize are in Mpc (SWIFT IC units, not Mpc/h).\n"
-        "  Output columns: r_avg  r_low  r_high  xi(r)  DD  DR  RR\n",
+        "  xi output columns:  r_avg  r_low  r_high  xi(r)  DD  DR  RR\n"
+        "  psi output columns: r_avg  r_low  r_high  psi(r) [(km/s)^2]\n",
         prog);
     exit(1);
 }
@@ -590,10 +842,12 @@ static Opts parse_args(int argc, char **argv)
     o.nbins    = 30;
     o.rmin     = -1.0;     /* -1 → set to cell size after header is read */
     o.rmax     = -1.0;     /* -1 → set to boxsize/3 after header is read */
-    o.periodic = PERIODIC_X | PERIODIC_Y | PERIODIC_Z;  /* xyz = all periodic */
-    o.logbin   = 1;        /* default: log-spaced bins */
-    o.nthreads = 0;        /* 0 → use OMP_NUM_THREADS environment variable */
-    strcpy(o.output, "xi_cic_out.txt");
+    o.periodic    = PERIODIC_X | PERIODIC_Y | PERIODIC_Z;  /* xyz = all periodic */
+    o.logbin      = 1;        /* default: log-spaced bins */
+    o.nthreads    = 0;        /* 0 → use OMP_NUM_THREADS environment variable */
+    o.compute_vel = 0;        /* default: density xi only */
+    strcpy(o.output,     "xi_cic_out.txt");
+    o.vel_output[0] = '\0';   /* empty: auto-derived from --output in main() */
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--help"))                      usage(argv[0]);
@@ -605,8 +859,10 @@ static Opts parse_args(int argc, char **argv)
         else if (!strcmp(argv[i], "--rmin")     && i+1<argc) o.rmin     = atof(argv[++i]);
         else if (!strcmp(argv[i], "--rmax")     && i+1<argc) o.rmax     = atof(argv[++i]);
         else if (!strcmp(argv[i], "--nthreads") && i+1<argc) o.nthreads = atoi(argv[++i]);
-        else if (!strcmp(argv[i], "--r2"))                    o.r2_plot  = 1;
-        else if (!strcmp(argv[i], "--logbin"))                o.logbin   = 1;
+        else if (!strcmp(argv[i], "--r2"))                    o.r2_plot     = 1;
+        else if (!strcmp(argv[i], "--logbin"))                o.logbin      = 1;
+        else if (!strcmp(argv[i], "--vel"))                   o.compute_vel = 1;
+        else if (!strcmp(argv[i], "--vel-output") && i+1<argc) strncpy(o.vel_output, argv[++i], 511);
         else if (!strcmp(argv[i], "--periodic") && i+1<argc) {
             i++;
             o.periodic = 0;
@@ -709,16 +965,31 @@ int main(int argc, char **argv)
     if (!den) { fprintf(stderr, "OOM for CIC grid\n"); return 1; }
 
     cic_assign(coords, N_total, boxsize, Ngrid, den);
-    free(coords);   /* particle positions no longer needed */
 
     /*
      * Normalise: den[i] = count[i] / mean_count = 1 + δ[i].
      * mean_count = N_total / Ngrid³ (exact for integer-multiple grids).
      * Track min/max as a sanity check (a perfect lattice → den near 1 at high z).
+     *
+     * IMPORTANT: if --vel is requested we need the raw count grid (before
+     * normalisation) as the denominator for the mass-weighted velocity mean.
+     * We save it to count_raw before dividing.
      */
     double mean = 0.0;
     for (long i = 0; i < Ngrid3; i++) mean += den[i];
     mean /= (double)Ngrid3;
+
+    /*
+     * Save raw counts for the velocity CIC assignment (needed as denominator
+     * in mass-weighted mean: v_cell = Σ w·v / Σ w = vsum / count_raw).
+     * Allocate only if --vel is requested.
+     */
+    double *count_raw = NULL;
+    if (o.compute_vel) {
+        count_raw = (double *)malloc((size_t)Ngrid3 * sizeof(double));
+        if (!count_raw) { fprintf(stderr, "OOM for count_raw\n"); return 1; }
+        for (long i = 0; i < Ngrid3; i++) count_raw[i] = den[i]; /* raw counts */
+    }
 
     double dmin = DBL_MAX, dmax = -DBL_MAX;
     for (long i = 0; i < Ngrid3; i++) {
@@ -727,6 +998,12 @@ int main(int argc, char **argv)
         if (den[i] > dmax) dmax = den[i];
     }
     printf("  mean=%.4f counts/cell, den in [%.4f, %.4f]\n", mean, dmin, dmax);
+
+    /* coords still needed for velocity CIC assignment; free after that step */
+    if (!o.compute_vel) {
+        free(coords);
+        coords = NULL;
+    }
 
     /* ── Step 4: construct radial bin edges ─────────────────────────────── */
     int     nbins     = o.nbins;
@@ -851,7 +1128,166 @@ int main(int argc, char **argv)
     fclose(fp);
     printf("Saved → %s\n\n", o.output);
 
-    free(bin_edges); free(r_c);
     free(DD); free(DR); free(RR); free(xi);
+
+    /* ── Optional: velocity correlation ψ(r) = ⟨v(x)·v(x+r)⟩ ─────────────
+     *
+     * Requires --vel flag.  Steps:
+     *   (a) Read PartType{ptype}/Velocities from HDF5 (float32 → double, km/s)
+     *   (b) CIC-assign mass-weighted velocity to three grids (vx, vy, vz)
+     *   (c) Enumerate the same lag list (already built above)
+     *   (d) Accumulate ψ(r) = Σ v(lo)·v(hi) / N_cell_pairs
+     *   (e) Write to vel output file
+     *
+     * The lag list `lags` has already been freed above; we rebuild it here.
+     * The bin_edges/r_c arrays are still valid.
+     */
+    if (o.compute_vel) {
+
+        /* (a) Read velocities */
+        printf("\n-- Velocity correlation ψ(r) --\n");
+        printf("Reading velocities from %s ...\n", o.input);
+        double *vels = NULL;
+        if (read_velocities(o.input, o.ptype, &vels, N_total) != 0) {
+            fprintf(stderr, "Failed to read velocities; skipping ψ(r).\n");
+            free(coords); free(count_raw);
+            goto cleanup;
+        }
+
+        /* Print rms velocity as a sanity check */
+        double vrms2 = 0.0;
+        for (long long p = 0; p < N_total; p++)
+            vrms2 += vels[p*3+0]*vels[p*3+0]
+                   + vels[p*3+1]*vels[p*3+1]
+                   + vels[p*3+2]*vels[p*3+2];
+        vrms2 /= (double)N_total;
+        printf("  v_rms = %.4f km/s  (3D, particle average)\n", sqrt(vrms2));
+
+        /* (b) CIC-assign velocity to three grids */
+        printf("Building velocity CIC grids (%d^3) ...\n", Ngrid);
+        double *vx_f = (double *)calloc((size_t)Ngrid3, sizeof(double));
+        double *vy_f = (double *)calloc((size_t)Ngrid3, sizeof(double));
+        double *vz_f = (double *)calloc((size_t)Ngrid3, sizeof(double));
+        if (!vx_f || !vy_f || !vz_f) {
+            fprintf(stderr, "OOM for velocity grids\n");
+            free(vels); free(coords); free(count_raw);
+            goto cleanup;
+        }
+
+        cic_vel_assign(coords, vels, N_total, boxsize, Ngrid,
+                       count_raw, vx_f, vy_f, vz_f);
+        free(vels); free(coords); free(count_raw);
+        coords = NULL;
+
+        /* (c) Rebuild lag list (same parameters as density run) */
+        long n_lags_v = 0;
+        Lag *lags_v = build_lag_list(Ngrid, cell, o.rmin, o.rmax,
+                                     o.mode, &n_lags_v);
+        printf("Lag vectors (velocity): %ld\n", n_lags_v);
+
+        /* (d) Accumulate ψ(r) */
+        printf("Pair counting (velocity) ...\n");
+        fflush(stdout);
+        double *VV     = (double *)calloc((size_t)nbins, sizeof(double));
+        double *RR_vel = (double *)calloc((size_t)nbins, sizeof(double));
+        if (!VV || !RR_vel) {
+            fprintf(stderr, "OOM for VV/RR_vel\n");
+            free(vx_f); free(vy_f); free(vz_f); free(lags_v);
+            goto cleanup;
+        }
+
+        accumulate_vel_pairs(vx_f, vy_f, vz_f, Ngrid,
+                             lags_v, n_lags_v,
+                             bin_edges, nbins, VV, RR_vel, o.periodic);
+        free(lags_v); free(vx_f); free(vy_f); free(vz_f);
+
+        /* ψ(r) = VV / RR_vel  (normalised per cell pair) */
+        double *psi = (double *)malloc((size_t)nbins * sizeof(double));
+        if (!psi) { fprintf(stderr, "OOM for psi\n"); free(VV); free(RR_vel); goto cleanup; }
+
+        double psi_min = DBL_MAX, psi_max = -DBL_MAX;
+        for (int b = 0; b < nbins; b++) {
+            psi[b] = (RR_vel[b] > 0.0) ? VV[b] / RR_vel[b] : 0.0/0.0;
+            if (isfinite(psi[b])) {
+                if (psi[b] < psi_min) psi_min = psi[b];
+                if (psi[b] > psi_max) psi_max = psi[b];
+            }
+        }
+        printf("psi in [%.4e, %.4e] (km/s)^2\n", psi_min, psi_max);
+
+        /* (e) Write velocity correlation output */
+        /*
+         * Auto-derive vel output filename: replace "xi_cic" with "vel_cic"
+         * in the xi output path, or append "_vel" before the extension.
+         */
+        char vel_out_path[512];
+        if (o.vel_output[0] != '\0') {
+            strncpy(vel_out_path, o.vel_output, 511);
+        } else {
+            /* Try to substitute "xi_cic" → "vel_cic" in the output filename */
+            char *p = strstr(o.output, "xi_cic");
+            if (p) {
+                /* Copy the part before "xi_cic", then "vel_cic", then the rest */
+                size_t prefix_len = (size_t)(p - o.output);
+                snprintf(vel_out_path, sizeof(vel_out_path),
+                         "%.*s%s%s",
+                         (int)prefix_len, o.output,
+                         "vel_cic",
+                         p + strlen("xi_cic"));
+            } else {
+                /* Fallback: insert "_vel" before the last "." */
+                char *dot = strrchr(o.output, '.');
+                if (dot) {
+                    snprintf(vel_out_path, sizeof(vel_out_path),
+                             "%.*s_vel%s",
+                             (int)(dot - o.output), o.output, dot);
+                } else {
+                    snprintf(vel_out_path, sizeof(vel_out_path),
+                             "%s_vel", o.output);
+                }
+            }
+        }
+
+        FILE *fv = fopen(vel_out_path, "w");
+        if (!fv) {
+            fprintf(stderr, "Cannot open %s for writing\n", vel_out_path);
+        } else {
+            fprintf(fv,
+                "# Velocity autocorrelation  ψ(r) = <v(x)·v(x+r)>  |  compute_xi_cic.c\n"
+                "# Method  : CIC mass-weighted velocity field + lag autocorrelation\n"
+                "#           ψ(r) = Σ_cells v(x)·v(x+r) / N_cell_pairs\n"
+                "# Linear theory: ψ(r) = [H(z)f(z)]^2/(2π^2) ∫ P(k) j0(kr) dk\n"
+                "#           where f ≈ Ω_m(z)^0.55 (Linder 2005)\n"
+                "# File    : %s\n"
+                "# PartType: %d   N_particles: %lld\n"
+                "# Ngrid   : %d   cell: %.6f Mpc\n"
+                "# Mode    : %s\n"
+                "# Periodic: %s\n"
+                "# BoxSize : %.6f Mpc   z: %.6f\n"
+                "# Binning : %s\n"
+                "# Units   : r in Mpc, ψ in (km/s)^2\n"
+                "# Columns : r_avg  r_low  r_high  psi(r)\n",
+                o.input, o.ptype, N_total,
+                Ngrid, cell, mode_str, per_str,
+                boxsize, redshift,
+                o.logbin ? "logarithmic" : "linear");
+
+            for (int b = 0; b < nbins; b++) {
+                fprintf(fv, "%12.6f  %12.6f  %12.6f  %15.8e\n",
+                        r_c[b], bin_edges[b], bin_edges[b+1], psi[b]);
+            }
+            fclose(fv);
+            printf("Saved → %s\n", vel_out_path);
+        }
+
+        free(VV); free(RR_vel); free(psi);
+    } else {
+        /* --vel not requested: free coords (may have been kept above) */
+        free(coords);
+        coords = NULL;
+    }
+
+cleanup:
+    free(bin_edges); free(r_c);
     return 0;
 }
