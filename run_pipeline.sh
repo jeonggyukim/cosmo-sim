@@ -9,7 +9,8 @@
 #   5. Run CLASS P(k)       — adapt MUSIC2's CLASS ini for P(k) output; run CLASS
 #   6. Generate rbins       — bin edges for compute_xi (rmin=2Δx, rmax=L/3, in Mpc)
 #   7. Measure ξ(r)         — pair counts via Corrfunc (low-z only; shot-noise dominated at z≳10)
-#   8. Measure P(k)         — CIC + FFT estimator, overlaid with CLASS theory
+#   8. Measure ξ(r), ψ(r)  — CIC grid estimator; works at any z; includes velocity correlation
+#   9. Measure P(k)         — CIC + FFT estimator, overlaid with CLASS theory
 #
 # Usage:
 #   ./run_pipeline.sh [--ngrid NGRID] [--lbox LBOX] [--zstart ZSTART] [--nthreads NTHREADS]
@@ -29,7 +30,9 @@
 #   data/ics_swift_{STEM}.hdf5             — IC particle file (SWIFT format, coords in Mpc)
 #   data/class_pk_z{ZSTART}_pk.dat         — CLASS matter P(k) at z=ZSTART
 #   data/rbins_{STEM}.txt                  — Corrfunc radial bin edges (Mpc)
-#   data/xi_{STEM}.txt                     — measured ξ(r)
+#   data/xi_{STEM}.txt                     — measured ξ(r) (Corrfunc)
+#   data/xi_cic_{STEM}.txt                 — measured ξ(r) (CIC grid)
+#   data/vel_cic_{STEM}.txt                — measured ψ(r) (CIC grid velocity)
 #   data/pk_{STEM}.txt                     — measured P(k) table
 #   plots/pk_{STEM}.png                    — P(k) + ξ(r) validation figure
 
@@ -202,7 +205,30 @@ log "Measuring ξ(r) with compute_xi (${NTHREADS} threads)..."
 echo "    Saved: $XI_FILE"
 
 # ---------------------------------------------------------------------------
-# Step 8: Measure P(k) with compute_pk.py
+# Step 8: Measure ξ(r) and ψ(r) on a CIC grid with compute_xi_cic
+# Not skipped — always re-runs.
+# Assigns particle positions and velocities to a 128³ CIC grid, then
+# computes the density autocorrelation ξ(r) and the velocity autocorrelation
+# ψ(r) = ⟨v_pec(x)·v_pec(x+r)⟩ via lag-sum over the grid.
+# Works at any redshift (avoids Corrfunc shot-noise limitations at high z).
+# Outputs:
+#   data/xi_cic_{STEM}.txt  — CIC density correlation
+#   data/vel_cic_{STEM}.txt — CIC velocity correlation
+# ---------------------------------------------------------------------------
+XI_CIC_FILE="data/xi_cic_${STEM}.txt"
+VEL_CIC_FILE="data/vel_cic_${STEM}.txt"
+log "Measuring ξ(r) and ψ(r) on CIC grid with compute_xi_cic (${NTHREADS} threads)..."
+./compute_xi_cic \
+    --input    "$IC_FILE" \
+    --Ngrid    128 \
+    --nthreads "$NTHREADS" \
+    --output   "$XI_CIC_FILE" \
+    --vel
+echo "    Saved: $XI_CIC_FILE"
+echo "    Saved: $VEL_CIC_FILE"
+
+# ---------------------------------------------------------------------------
+# Step 10: Measure P(k) with compute_pk.py
 # Not skipped — always re-runs.
 # CIC mass assignment on an Ngrid³ mesh, FFT, CIC window deconvolution,
 # shot-noise subtraction (P_shot = V/N), binning into log k-shells.
@@ -217,7 +243,7 @@ conda run -n cosmo python scripts/compute_pk.py \
 echo "    Saved: $PK_FILE"
 
 # ---------------------------------------------------------------------------
-# Step 9: Plot diagnostics with plot_ic.py
+# Step 11: Plot diagnostics with plot_ic.py
 # Reads pk_{STEM}.txt; auto-detects xi_{STEM}.txt, xi_cic_{STEM}.txt,
 # vel_cic_{STEM}.txt alongside it; overlays CLASS theory curves.
 # Outputs: plots/pk_{STEM}.png

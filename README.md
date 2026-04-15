@@ -7,7 +7,7 @@ Scripts and configuration for cosmological IC generation with MUSIC2 and IC vali
 ```
 scripts/   — Python scripts
 conf/      — MUSIC2 config files
-data/      — CLASS outputs, rbins, measured P(k)/ξ tables  (HDF5/bin files gitignored)
+data/      — CLASS outputs, rbins, measured P(k)/ξ/ψ tables  (HDF5/bin files gitignored)
 plots/     — output figures  (gitignored)
 notes/     — LaTeX write-ups and supporting plot scripts
 ```
@@ -24,11 +24,24 @@ conda activate cosmo
 ### Run the full pipeline (recommended)
 
 ```bash
-./run_pipeline.sh                                          # defaults: ngrid=512, lbox=687 (~1024 Mpc), zstart=45
-./run_pipeline.sh --ngrid 512 --lbox 500 --zstart 127      # example: 512³, L=500 Mpc/h, z=127
+./run_pipeline.sh                                          # defaults: N=256, L=687 Mpc/h (~1024 Mpc), z=2
+./run_pipeline.sh --ngrid 256 --lbox 344 --zstart 2        # 256³, L=344 Mpc/h (~512 Mpc), z=2
+./run_pipeline.sh --ngrid 256 --lbox 172 --zstart 2        # 256³, L=172 Mpc/h (~256 Mpc), z=2
 ```
 
 The pipeline runs all steps below automatically, skipping any that are already complete.
+
+Pipeline steps:
+1. Build MUSIC2 (skipped if binary exists)
+2. Build `compute_xi` (skipped if binary exists)
+3. Generate MUSIC2 config from template
+4. Run MUSIC2 → IC HDF5 + `input_class_parameters.ini`
+5. Run CLASS → `data/class_pk_z{z}_pk.dat`
+6. Generate Corrfunc radial bin file
+7. Measure ξ(r) with Corrfunc pair counting
+8. Measure ξ(r) and ψ(r) on CIC grid (`compute_xi_cic --vel`)
+9. Measure P(k) with CIC+FFT (`compute_pk.py`)
+10. Plot diagnostics (`plot_ic.py`) → `plots/pk_{STEM}.png`
 
 ---
 
@@ -49,8 +62,8 @@ Binary placed at `music_build/MUSIC`; CLASS built at `music_build/_deps/class-bu
 #### 2. Generate a MUSIC2 config
 
 ```bash
-conda run -n cosmo python scripts/make_music_conf.py -N 256 -z 45 -L 500
-# → conf/CV_22_MUSIC_n256_z45_L500.conf
+conda run -n cosmo python scripts/make_music_conf.py -N 256 -z 2 -L 687
+# → conf/CV_22_MUSIC_n256_z2_L687.conf
 ```
 
 Arguments: `-N` particles per side, `-z` starting redshift, `-L` box size in Mpc/h.
@@ -61,10 +74,13 @@ Uses `conf/CV_22_MUSIC_template.conf` (CV_22 cosmology, SWIFT output format).
 #### 3. Run MUSIC2
 
 ```bash
-./music_build/MUSIC conf/CV_22_MUSIC_n256_z45_L500.conf
-# → data/ics_swift_n256_z45_L500.hdf5
-# → input_class_parameters.ini  (written to repo root by MUSIC2's CLASS plugin)
+./music_build/MUSIC conf/CV_22_MUSIC_n256_z2_L687.conf
+# → data/ics_swift_n256_z2_L687.hdf5
+# → conf/input_class_parameters_n256_z2_L687.ini  (moved from repo root by pipeline)
 ```
+
+SWIFT stores coordinates and BoxSize in **Mpc** (not Mpc/h). Velocities are stored as
+`v_int = a × v_pec` (canonical momentum convention); divide by a² when computing ψ(r).
 
 ---
 
@@ -76,12 +92,12 @@ changing `output` to `mPk` and setting `z_pk` to the IC redshift. No hand-edited
 ```bash
 # Manually (after MUSIC2 has run):
 TMP=$(mktemp /tmp/class_pk_XXXXXX)
-sed -e "s/^output =.*/output = mPk/" -e "s/^z_pk =.*/z_pk = 45/" \
+sed -e "s/^output =.*/output = mPk/" -e "s/^z_pk =.*/z_pk = 2/" \
     -e "/^extra metric transfer functions/d" -e "/^gauge/d" \
-    input_class_parameters.ini > "$TMP"
-echo "root = class_pk_z45_" >> "$TMP"
+    conf/input_class_parameters_n256_z2_L687.ini > "$TMP"
+echo "root = class_pk_z2_" >> "$TMP"
 ./music_build/_deps/class-build/class "$TMP"
-mv class_pk_z45_pk.dat data/
+mv class_pk_z2_pk.dat data/
 ```
 
 ---
@@ -90,38 +106,51 @@ mv class_pk_z45_pk.dat data/
 
 ```bash
 conda run -n cosmo python scripts/compute_pk.py \
-    data/ics_swift_n256_z45_L500.hdf5 \
-    --theory data/class_pk_z45_pk.dat
-# → data/pk_n256_z45_L500.txt + plots/pk_n256_z45_L500.png
+    data/ics_swift_n256_z2_L687.hdf5 \
+    -o data/pk_n256_z2_L687.txt
+
+conda run -n cosmo python scripts/plot_ic.py \
+    data/pk_n256_z2_L687.txt \
+    --theory data/class_pk_z2_pk.dat
+# → plots/pk_n256_z2_L687.png
 ```
 
-Produces two panels: P(k) with theory overlay, and ξ(r) via Hankel transform.
-Markers: fundamental mode k_f, Nyquist k_Ny, Bragg peak 2k_Ny, shot noise P_shot,
-BAO scale r_d from Eisenstein & Hu (1998).
-
-To re-plot from saved `.txt` files (e.g. to overlay multiple runs):
+Overlay multiple box sizes:
 ```bash
-conda run -n cosmo python scripts/plot_pk.py \
-    data/pk_n256_z45_L500.txt data/pk_n512_z45_L500.txt \
-    --theory data/class_pk_z45_pk.dat -o plots/comparison.png
+conda run -n cosmo python scripts/plot_ic.py \
+    data/pk_n256_z2_L172.txt data/pk_n256_z2_L344.txt data/pk_n256_z2_L687.txt \
+    --theory data/class_pk_z2_pk.dat -o plots/comparison.png
 ```
 
 ---
 
-#### 6. Validate ICs — correlation function (low z only)
-
-At z ≳ 10 the signal is shot-noise dominated; use P(k) instead.
+#### 6. Validate ICs — correlation functions
 
 ```bash
-# Generate bin file
+# Corrfunc pair-counting ξ(r) (low z; shot-noise dominated at z ≳ 10):
 conda run -n cosmo python scripts/make_rbins.py \
-    --hdf5 data/ics_swift_n256_z45_L500.hdf5
-# → data/rbins_n256_z45_L500.txt
+    --hdf5 data/ics_swift_n256_z2_L687.hdf5
+# → data/rbins_n256_z2_L687.txt
 
-# Measure ξ(r) with Corrfunc (last arg = number of threads)
-./compute_xi data/ics_swift_n256_z45_L500.hdf5 \
-             data/rbins_n256_z45_L500.txt 8
+./compute_xi data/ics_swift_n256_z2_L687.hdf5 \
+             data/rbins_n256_z2_L687.txt 8 \
+             > data/xi_n256_z2_L687.txt
+
+# CIC grid ξ(r) and ψ(r) = ⟨v_pec·v_pec'⟩ (works at any z):
+./compute_xi_cic \
+    --input    data/ics_swift_n256_z2_L687.hdf5 \
+    --Ngrid    128 \
+    --nthreads 8 \
+    --output   data/xi_cic_n256_z2_L687.txt \
+    --vel
+# → data/xi_cic_n256_z2_L687.txt
+# → data/vel_cic_n256_z2_L687.txt
 ```
+
+`plot_ic.py` auto-detects all `xi_*`, `xi_cic_*`, and `vel_cic_*` files alongside the pk file
+and overlays them. Theory ψ(r) = [H(z)f(z)]²/(2π²) ∫ P(k) j₀(kr) dk is computed from
+CLASS P(k); the measured ψ is corrected from SWIFT internal units (a·v_pec) to peculiar
+velocity units automatically.
 
 ---
 
@@ -139,7 +168,7 @@ conda run -n cosmo python scripts/make_rbins.py \
 ```bash
 # Particle displacement histogram (dr/dx from lattice)
 conda run -n cosmo python scripts/plot_dr_histogram.py \
-    data/ics_swift_n256_z45_L500.hdf5
+    data/ics_swift_n256_z2_L687.hdf5
 ```
 
 ---
@@ -159,4 +188,4 @@ make clean      # remove figures, PDF, and LaTeX aux files
 ```
 
 Figures are generated from `plot_box_window.py`, `plot_tophat_window.py`, and
-`plot_pgrid.py` (the last requires `data/class_pk_z45_pk.dat`).
+`plot_pgrid.py` (the last requires `data/class_pk_z2_pk.dat`).

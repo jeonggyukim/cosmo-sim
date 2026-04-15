@@ -181,30 +181,30 @@ class ICPlotter:
     @staticmethod
     def _compute_theory_psi(kt, Pt, Hz_hMpc, fz):
         """
-        Compute ψ(r) = [Hz_hMpc·fz]²/(2π²) ∫ P(k) j₀(kr) dk.
+        Compute the true peculiar-velocity correlation ψ(r) = ⟨v_pec(x)·v_pec(x+r)⟩.
 
         In linear theory the velocity field is irrotational:
             v_k = i (H·f/k) k̂ δ_k
-        so the isotropic scalar correlation
-            ψ(r) = ⟨v(x)·v(x+r)⟩ = Tr[Ψ_ij(r)]
-        is the Hankel transform of P(k)/k² (times [H·f]²):
-            ψ(r) = [H·f]²/(2π²) ∫ k² P(k)/k² j₀(kr) dk
-                 = [H·f]²/(2π²) ∫ P(k) j₀(kr) dk
+        so the isotropic scalar correlation is:
+            ψ_true(r) = [H·f]²/(2π²) ∫ P(k) j₀(kr) dk
 
-        Compare with ξ(r) = 1/(2π²) ∫ k² P(k) j₀(kr) dk: the missing k²
-        factor means ψ(r) is dominated by large-scale modes (BAO peak is
-        relatively more prominent than in ξ).
+        The k²/k² factor (from the velocity power spectrum vs the angular
+        measure) cancels, unlike ξ(r) which has an extra k² in the integrand.
+
+        Note on SWIFT velocity convention: SWIFT stores v_int = a × v_pec.
+        The measured CIC correlation must be divided by a² before comparing
+        to this theory curve (see load_vel_cic).
 
         Parameters
         ----------
-        kt, Pt     : CLASS P(k): k in h/Mpc, P in (Mpc/h)³
-        Hz_hMpc    : H(z) in km/s/(Mpc/h)  [= H(z) in km/s/Mpc divided by h]
-        fz         : growth rate f ≈ Ω_m(z)^0.55
+        kt, Pt  : CLASS P(k): k in h/Mpc, P in (Mpc/h)³
+        Hz_hMpc : H(z) in km/s/(Mpc/h)
+        fz      : growth rate f ≈ Ω_m(z)^0.55
 
         Returns
         -------
         r   : array [Mpc/h]
-        psi : array [(km/s)²]
+        psi : array [(km/s)²]  peculiar velocity correlation
 
         Unit check:
             [Hz_hMpc·fz]² × [Pt] × [dkt]
@@ -267,11 +267,18 @@ class ICPlotter:
         r_mid = np.sqrt(cic[:, 1] * cic[:, 2]) * self.h   # Mpc → Mpc/h
         self.xi_cic = {"r_mid": r_mid, "xi": cic[:, 3]}
 
-    def load_vel_cic(self, vel_cic_file):
-        """Load CIC velocity correlation ψ(r) from vel_cic_*.txt."""
+    def load_vel_cic(self, vel_cic_file, a=1.0):
+        """
+        Load CIC velocity correlation ψ(r) from vel_cic_*.txt.
+
+        SWIFT stores velocities as v_int = a × v_pec, so the raw correlation
+        from compute_xi_cic is ψ_raw = a² × ψ_pec.  Pass a=1/(1+z) to
+        convert to true peculiar-velocity units: ψ_pec = ψ_raw / a².
+        """
         vel = np.loadtxt(vel_cic_file, comments='#')
         r_mid = np.sqrt(vel[:, 1] * vel[:, 2]) * self.h   # Mpc → Mpc/h
-        self.vel_cic = {"r_mid": r_mid, "psi": vel[:, 3]}
+        psi   = vel[:, 3] / a**2                           # convert to v_pec units
+        self.vel_cic = {"r_mid": r_mid, "psi": psi}
 
     def auto_load_xi(self, nseeds=8, nthreads=4,
                      xi_cic_file=None, vel_cic_file=None):
@@ -309,10 +316,12 @@ class ICPlotter:
         if os.path.exists(path):
             self.load_xi_cic(path)
 
-        # CIC vel
+        # CIC vel — divide by a² to convert SWIFT v_int=a·v_pec → v_pec
+        z_run = run.get("z")
+        a_run = 1.0 / (1.0 + z_run) if z_run is not None else 1.0
         path = vel_cic_file or os.path.join(data_dir, f"vel_cic_{stem}.txt")
         if os.path.exists(path):
-            self.load_vel_cic(path)
+            self.load_vel_cic(path, a=a_run)
 
     # ------------------------------------------------------------------ #
     # Plotting
@@ -322,7 +331,7 @@ class ICPlotter:
         """
         Create the two-panel P(k) + ξ(r)/ψ(r) figure.
 
-        Left panel  : P(k), theory, shot noise level, k_f, k_Ny
+        Left panel  : P(k), theory, shot noise level, k_fund, k_Ny
         Right panel : ξ(r) from theory / Corrfunc / CIC grid;
                       ψ(r) on a twin y-axis (right side) if velocity data loaded
         """
@@ -348,18 +357,18 @@ class ICPlotter:
 
             if show_nodeconv and i == 0:
                 ax.loglog(k, run["Pk_nodeconv"], 's--', ms=3, lw=1.0,
-                          color='C3', alpha=0.7, label='no MAS deconv')
+                          color='C3', alpha=0.7, label='no CIC correction')
 
             ax.loglog(k, run["Pk_raw"], 'o-', ms=4, lw=1.2, color=color,
-                      label=f'MAS deconvolved ({label})')
+                      label=f'CIC-corrected ({label})')
             pos = run["Pk_ss"] > 0
             ax.loglog(k[pos], run["Pk_ss"][pos], '^-', ms=4, lw=1.2,
                       color=color, alpha=0.6,
-                      label=f'MAS deconv + shot sub ({label})')
+                      label=f'CIC-corrected − shot noise ({label})')
 
             if run["P_shot"] is not None:
                 ax.axhline(run["P_shot"], color=color, ls='--', lw=0.8, alpha=0.6,
-                           label=fr'$P_{{\rm shot}}$ = {run["P_shot"]:.2g} (Mpc/$h$)$^3$')
+                           label=fr'$P_{{\rm shot}} = V/N = {run["P_shot"]:.2g}$ (Mpc/$h$)$^3$')
 
         # Reference lines from primary run
         if self.pk_runs:
@@ -370,7 +379,7 @@ class ICPlotter:
                 kf   = 2 * np.pi / L
                 knyq = np.pi * n / L
                 ax.axvline(kf,   color='C2',   ls=':', lw=1.0,
-                           label=fr'$k_f$ = {kf:.2g} $h$/Mpc')
+                           label=fr'$k_{{\rm fund}}$ = {kf:.2g} $h$/Mpc')
                 ax.axvline(knyq, color='gray', ls='--', lw=1.0,
                            label=fr'$k_{{\rm Ny}}$ = {knyq:.2g} $h$/Mpc')
 
@@ -378,14 +387,15 @@ class ICPlotter:
         ax.set_ylabel(r'$P(k)$ [(Mpc/$h$)$^3$]')
         if self.pk_runs:
             run = self.pk_runs[0]
-            ax.set_title(f'{run["npart_side"]}³, L={run["boxsize_mpch"]:.4g} Mpc/h, '
+            ax.set_title(f'N={run["npart_side"]}³, L={run["boxsize_mpch"]:.4g} Mpc/h, '
                          f'z={run["z"] or "?"}')
-        ax.legend(fontsize=8)
+        ax.legend(fontsize="medium")
 
         ax_top = ax.twiny()
         ax_top.set_xscale('log')
+        # 2π/[k_min, k_max] = [λ_max, λ_min]: already decreasing left→right,
+        # matching k increasing left→right on the bottom axis.
         ax_top.set_xlim(2 * np.pi / np.array(ax.get_xlim()))
-        ax_top.invert_xaxis()
         ax_top.set_xlabel(r'$\lambda = 2\pi/k$ [Mpc/$h$]')
 
     def _plot_xi_panel(self, ax2):
@@ -406,7 +416,7 @@ class ICPlotter:
                     label += f' ±{d["nseeds_used"]}-seed'
                 ax2.errorbar(d["r_mid"][pos], d["xi"][pos], yerr=d["err"][pos],
                              fmt='s-', ms=4, lw=1.2, elinewidth=0.8, capsize=2,
-                             color='C1', label=label)
+                             color='C1', mfc='none', label=label)
 
         # CIC xi(r)
         if self.xi_cic is not None:
@@ -423,7 +433,7 @@ class ICPlotter:
         has_psi = (self.vel_cic is not None) or (self.theory_psi is not None)
         if has_psi:
             ax3 = ax2.twinx()
-            ax3.set_ylabel(r'$\psi(r)$ [(km/s)$^2$]', color='C5')
+            ax3.set_ylabel(r'$\psi(r)$ [$v_\mathrm{pec}$, (km/s)$^2$]', color='C5')
             ax3.tick_params(axis='y', labelcolor='C5')
             ax3.set_xscale('log')
             ax3.set_yscale('log')
@@ -448,9 +458,9 @@ class ICPlotter:
             lines2, labels2 = ax2.get_legend_handles_labels()
             lines3, labels3 = ax3.get_legend_handles_labels()
             ax2.legend(lines2 + lines3, labels2 + labels3,
-                       fontsize=7, loc='upper right')
+                       fontsize="medium", loc='lower left')
         else:
-            ax2.legend(fontsize=8)
+            ax2.legend(fontsize="medium", loc='lower left')
 
         # Reference lines
         if self.pk_runs:
@@ -467,7 +477,7 @@ class ICPlotter:
 
         ax2.set_xlabel(r'$r$ [Mpc/$h$]')
         ax2.set_ylabel(r'$\xi(r)$')
-        ax2.set_title(r'Correlation function $\xi(r)$')
+        ax2.set_title(r'Correlation functions $\xi(r)$ and $\psi(r)$')
 
     def save(self, outfile, dpi=150):
         """Save the figure to a PNG file."""
