@@ -126,6 +126,12 @@ def main():
                         help="Overplot xi(r) from Hankel transform of P(k) (default: off)")
     parser.add_argument("--interlace", action="store_true", default=False,
                         help="Use interlaced CIC (two grids offset by half a cell) to suppress aliasing (default: off)")
+    parser.add_argument("--show-nodeconv", action="store_true", default=False,
+                        help="Also plot the un-deconvolved P(k) curve (default: off)")
+    parser.add_argument("--xi-cic", default=None, metavar="FILE",
+                        help="xi_cic output file to overlay on the xi panel (optional)")
+    parser.add_argument("--nseeds", type=int, default=8,
+                        help="Number of random seeds for subsampling variance estimate (default: 8; set 1 to skip)")
     args = parser.parse_args()
 
     h = args.H0 / 100.0
@@ -286,31 +292,27 @@ def main():
     ax, ax2 = axes
 
     # ---- Left panel: P(k) ----
-    ax.loglog(k_cen, Pk_nodeconv_mean, 's--', ms=3, lw=1.0, color='C3', alpha=0.7,
-              label='no MAS deconv, no shot subtraction')
+    if getattr(args, 'show_nodeconv', False):
+        ax.loglog(k_cen, Pk_nodeconv_mean, 's--', ms=3, lw=1.0, color='C3', alpha=0.7,
+                  label='no MAS deconv')
     ax.loglog(k_cen, Pk_raw_mean, 'o-', ms=4, lw=1.2, color='C0',
-              label='MAS deconvolved, no shot subtraction')
+              label='MAS deconvolved')
     pos_shot_sub = Pk_mean > 0
     ax.loglog(k_cen[pos_shot_sub], Pk_mean[pos_shot_sub], '^-', ms=4, lw=1.2, color='C2',
-              label='MAS deconvolved + shot noise subtracted')
+              label='MAS deconvolved + shot subtracted')
 
     if args.theory:
         ax.loglog(kt, Pt, 'k-', lw=1.2, label='theory (CLASS)')
 
-    knyq_mpch   = knyq / h
-    kfund_mpch  = kf / h
-    kbragg_mpch = 2 * np.pi * npart_side / boxsize_mpch   # = 2*k_Ny
+    knyq_mpch  = knyq / h
+    kfund_mpch = kf / h
 
-    ax.axvline(kfund_mpch,  color='C2',   ls=':', lw=1.0,
+    ax.axvline(kfund_mpch, color='C2',   ls=':', lw=1.0,
                label=fr'$k_f = 2\pi/L$ = {kfund_mpch:.2g} $h$/Mpc')
-    ax.axvline(knyq_mpch,   color='gray', ls='--', lw=1.0,
+    ax.axvline(knyq_mpch,  color='gray', ls='--', lw=1.0,
                label=fr'$k_\mathrm{{Ny}}$ = {knyq_mpch:.2g} $h$/Mpc')
-    ax.axvline(kbragg_mpch, color='red',  ls=':', lw=1.0,
-               label=fr'$k_\mathrm{{Bragg}} = 2k_\mathrm{{Ny}}$ = {kbragg_mpch:.2g} $h$/Mpc (aliased)')
     ax.axhline(P_shot, color='orange', ls='--', lw=1.0,
                label=fr'$P_\mathrm{{shot}}$ = {P_shot:.2g} (Mpc/$h$)$^3$')
-    ax.axvline(k_BAO, color='purple', ls='-', lw=1.2,
-               label=fr'$k_\mathrm{{BAO}}$ (E&H) = {k_BAO:.3f} $h$/Mpc')
 
     ax.set_xlabel(r'$k$ [$h$ Mpc$^{-1}$]')
     ax.set_ylabel(r'$P(k)$ [(Mpc/$h$)$^3$]')
@@ -338,26 +340,75 @@ def main():
     xi_corrfunc_file = os.path.join(data_dir, f"xi_{stem}.txt")
     if os.path.exists(xi_corrfunc_file):
         cf = np.loadtxt(xi_corrfunc_file, comments='#')
-        r_low, r_high, xi_cf = cf[:, 1], cf[:, 2], cf[:, 3]
+        r_low, r_high, xi_cf, npairs = cf[:, 1], cf[:, 2], cf[:, 3], cf[:, 4]
         r_mid = np.sqrt(r_low * r_high) * h   # geometric mean, Mpc → Mpc/h
-        pos = xi_cf > 0
-        neg = xi_cf < 0
-        ax2.loglog(r_mid[pos], xi_cf[pos], 's-', ms=4, lw=1.2,
-                   color='C1', label='measured (Corrfunc)')
-        if neg.any():
-            ax2.loglog(r_mid[neg], np.abs(xi_cf[neg]), 's--', ms=4, lw=0.8,
-                       color='C1', alpha=0.4, label=r'measured (Corrfunc, $\xi<0$)')
+        xi_poisson_err = (1 + xi_cf) / np.sqrt(np.maximum(npairs, 1))
 
-    # Mark L/2 — maximum reliable separation
-    ax2.axvline(boxsize_mpch / 2, color='gray', ls='--', lw=1.0,
-                label=fr'$L/2$ = {boxsize_mpch/2:.4g} Mpc/$h$')
+        # Subsampling variance: re-run compute_xi with different random seeds
+        # and measure the scatter across runs.
+        xi_subsample_std = np.zeros_like(xi_cf)
+        nseeds = getattr(args, 'nseeds', 8)
+        rbins_file = os.path.join(data_dir, f"rbins_{stem}.txt")
+        repo_root = os.path.dirname(data_dir)
+        xi_binary = os.path.join(repo_root, 'compute_xi')
+        if nseeds > 1 and os.path.exists(xi_binary) and os.path.exists(rbins_file):
+            import subprocess
+            xi_runs = []
+            for seed in range(1, nseeds + 1):
+                result = subprocess.run(
+                    [xi_binary, args.hdf5, rbins_file, '4', '-s', str(seed)],
+                    capture_output=True, text=True
+                )
+                if result.returncode == 0:
+                    lines = [l for l in result.stdout.splitlines() if not l.startswith('#')]
+                    vals = np.array([list(map(float, l.split())) for l in lines if l.strip()])
+                    if vals.shape[0] == len(xi_cf):
+                        xi_runs.append(vals[:, 3])
+            if len(xi_runs) >= 2:
+                xi_subsample_std = np.std(xi_runs, axis=0, ddof=1)
+
+        xi_err = np.sqrt(xi_poisson_err**2 + xi_subsample_std**2)
+        pos = xi_cf > 0
+        # Only show Corrfunc if at least half the bins have positive ξ;
+        # otherwise the measurement is noise-dominated and misleading.
+        if pos.sum() >= len(xi_cf) / 2:
+            label = 'measured (Corrfunc)'
+            if xi_subsample_std.any():
+                label += f' ±{nseeds}-seed'
+            ax2.errorbar(r_mid[pos], xi_cf[pos],
+                         yerr=xi_err[pos],
+                         fmt='s-', ms=4, lw=1.2, elinewidth=0.8, capsize=2,
+                         color='C1', label=label)
+
+    # xi_cic overlay (grid autocorrelation estimator)
+    xi_cic_file = getattr(args, 'xi_cic', None)
+    if xi_cic_file is None:
+        # auto-detect: data/xi_cic_<stem>.txt alongside the IC file
+        xi_cic_auto = os.path.join(data_dir, f"xi_cic_{stem}.txt")
+        if os.path.exists(xi_cic_auto):
+            xi_cic_file = xi_cic_auto
+    if xi_cic_file is not None and os.path.exists(xi_cic_file):
+        cic = np.loadtxt(xi_cic_file, comments='#')
+        # columns: r_avg r_low r_high xi DD DR RR
+        r_cic_low  = cic[:, 1]
+        r_cic_high = cic[:, 2]
+        xi_cic     = cic[:, 3]
+        r_cic_mid  = np.sqrt(r_cic_low * r_cic_high) * h   # Mpc → Mpc/h
+        pos_c = xi_cic > 0
+        neg_c = xi_cic < 0
+        ax2.loglog(r_cic_mid[pos_c], xi_cic[pos_c], '^-', ms=4, lw=1.2,
+                   color='C4', label='measured (CIC grid, $\\xi>0$)')
+        if neg_c.any():
+            ax2.loglog(r_cic_mid[neg_c], np.abs(xi_cic[neg_c]), '^--', ms=4, lw=0.8,
+                       color='C4', alpha=0.4, label=r'measured (CIC grid, $\xi<0$)')
+
+    # Mark L/3 — maximum reliable separation for periodic box
+    ax2.axvline(boxsize_mpch / 3, color='gray', ls='--', lw=1.0,
+                label=fr'$L/3$ = {boxsize_mpch/3:.4g} Mpc/$h$')
     # Mark mean particle spacing
     dx_mpch = boxsize_mpch / npart_side
     ax2.axvline(dx_mpch, color='C2', ls=':', lw=1.0,
                 label=fr'$\Delta x$ = {dx_mpch:.2g} Mpc/$h$')
-    # BAO scale
-    ax2.axvline(r_d_mpch, color='purple', ls='-', lw=1.2,
-                label=fr'$r_d$ (E&H) = {r_d_mpch:.1f} Mpc/$h$')
 
     ax2.set_xlabel(r'$r$ [Mpc/$h$]')
     ax2.set_ylabel(r'$\xi(r)$')

@@ -52,12 +52,17 @@ CFLAGS := -O3 -std=c99 -Wall $(OMP_FLAG) \
 LDFLAGS := -L$(HDF5_LIB) -lhdf5 -lm $(OMP_FLAG)
 
 # --- Targets ---
-all: compute_xi
+all: compute_xi compute_xi_cic
 
 compute_xi: scripts/compute_xi.c $(CORRFUNC_LIB)
 	$(CC) $(CFLAGS) $< $(CORRFUNC_LIB) $(LDFLAGS) -o $@
 
+compute_xi_cic: scripts/compute_xi_cic.c
+	$(CC) -O3 -std=c99 -Wall $(OMP_FLAG) -I$(HDF5_INC) \
+	      -L$(HDF5_LIB) -lhdf5 -lm $(OMP_FLAG) \
+	      $< -o $@
+
 clean:
-	rm -f compute_xi
+	rm -f compute_xi compute_xi_cic
 
 .PHONY: all clean

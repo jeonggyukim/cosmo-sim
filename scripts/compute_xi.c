@@ -174,9 +174,9 @@ static void read_first_bin(const char *binfile, double *rlo, double *rhi)
  * unspecified order and are not used by the caller.
  */
 static void subsample(double *X, double *Y, double *Z,
-                      int64_t N, int64_t Nsub)
+                      int64_t N, int64_t Nsub, unsigned int seed)
 {
-    srand(42);  /* fixed seed for reproducibility */
+    srand(seed);
     for (int64_t i = 0; i < Nsub; i++) {
         /* pick a random index from [i, N) and swap it into position i */
         int64_t j = i + (int64_t)rand() % (N - i);
@@ -194,8 +194,9 @@ static void subsample(double *X, double *Y, double *Z,
 
 static void print_usage(const char *prog)
 {
-    fprintf(stderr, "Usage: %s <ics.hdf5> <binfile> [nthreads] [-n NSUB]\n", prog);
+    fprintf(stderr, "Usage: %s <ics.hdf5> <binfile> [nthreads] [-n NSUB] [-s SEED]\n", prog);
     fprintf(stderr, "  -n NSUB  subsample to NSUB particles (auto if omitted)\n");
+    fprintf(stderr, "  -s SEED  random seed for subsampling (default: 42)\n");
 }
 
 int main(int argc, char **argv)
@@ -206,11 +207,14 @@ int main(int argc, char **argv)
     const char *binfile  = argv[2];
     int      nthreads = 4;    /* default thread count */
     int64_t  nsub_arg = -1;   /* -1 = auto-size Nsub */
+    unsigned int seed = 42;   /* default seed for reproducibility */
 
-    /* Parse optional arguments: positional nthreads and -n NSUB */
+    /* Parse optional arguments: positional nthreads, -n NSUB, -s SEED */
     for (int i = 3; i < argc; i++) {
         if (strcmp(argv[i], "-n") == 0 && i+1 < argc) {
             nsub_arg = (int64_t)atoll(argv[++i]);
+        } else if (strcmp(argv[i], "-s") == 0 && i+1 < argc) {
+            seed = (unsigned int)atoi(argv[++i]);
         } else {
             nthreads = atoi(argv[i]);
         }
@@ -252,7 +256,8 @@ int main(int argc, char **argv)
             DD_pred, 1.0 / sqrt(DD_pred));
 
     /* --- Draw the random subsample (in-place partial shuffle) --- */
-    if (Nsub < N) subsample(X, Y, Z, N, Nsub);
+    fprintf(stderr, "Seed      : %u\n", seed);
+    if (Nsub < N) subsample(X, Y, Z, N, Nsub, seed);
 
     fprintf(stderr, "Threads   : %d\n", nthreads);
 

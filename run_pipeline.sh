@@ -196,8 +196,10 @@ fi
 # Note: ξ(r) is shot-noise dominated at high z; use P(k) for IC validation.
 # See CORRFUNC.md § "When ξ(r) is the wrong tool" for the quantitative argument.
 # ---------------------------------------------------------------------------
+XI_FILE="data/xi_${STEM}.txt"
 log "Measuring ξ(r) with compute_xi (${NTHREADS} threads)..."
-./compute_xi "$IC_FILE" "$RBINS_FILE" "$NTHREADS"
+./compute_xi "$IC_FILE" "$RBINS_FILE" "$NTHREADS" > "$XI_FILE"
+echo "    Saved: $XI_FILE"
 
 # ---------------------------------------------------------------------------
 # Step 8: Measure P(k) with compute_pk.py
