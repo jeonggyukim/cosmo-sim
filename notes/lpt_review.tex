@@ -325,22 +325,88 @@ directly in terms of the proper gravitational potential:
 This is the starting point for linear-theory peculiar-velocity
 statistics.
 
-\subsection{Shell crossing}
+\subsection{Shell crossing and the Zel'dovich pancake}
+\label{sec:pancake}
 
-The Jacobian in Eq.~(\ref{eq:jacobian}) vanishes when the smallest
-eigenvalue $\lambda_{\min}$ of the deformation tensor satisfies
-$\Dp\,\lambda_{\min} = 1$, i.e.\ when two fluid elements with the
-same $\bq$-plane coordinate arrive at the same Eulerian position.
-This \emph{shell crossing} signals the breakdown of single-stream flow
-and the onset of virialisation.  The ZA (being linear in $\bPsi$)
-extends particles through the caustic without stopping them; higher
-orders improve the accuracy but do not remove shell crossing.  For
-this reason ICs must be laid down at sufficiently high redshift that
-shell crossing has not yet occurred on any resolved scale.
+The deformation tensor $\partial\Psi^{(1)}_i/\partial q_j$ is
+symmetric in the irrotational case and can therefore be diagonalised
+at each point $\bq$.  Denote its eigenvalues by $-\alpha \leq -\beta
+\leq -\gamma$ (with $\alpha \geq \beta \geq \gamma$).  The Jacobian
+decomposes as
+%
+\begin{equation}
+  J = (1 - \Dp\alpha)(1 - \Dp\beta)(1 - \Dp\gamma),
+  \label{eq:J_eigen}
+\end{equation}
+%
+and the Eulerian density along the principal axes is
+%
+\begin{equation}
+  1 + \delta = \frac{1}{J}
+    = \frac{1}{(1-\Dp\alpha)(1-\Dp\beta)(1-\Dp\gamma)}.
+  \label{eq:delta_eigen}
+\end{equation}
+%
+\emph{Shell crossing} occurs when $J\to 0$, i.e.\ when the largest
+eigenvalue satisfies $\Dp\,\alpha = 1$.  Since collapse first occurs
+along the direction of largest compression, the first structure to
+form is a \emph{pancake}: a flattened sheet perpendicular to the
+eigenvector of $\alpha$.  As $\Dp$ grows further, $\Dp\beta=1$ and
+$\Dp\gamma=1$ are reached in succession, producing first filaments
+then point-like (halo) collapses.
+
+The ZA extends particles through the caustic without stopping them:
+once $J<0$ the single-stream assumption breaks down and the density
+formula~(\ref{eq:delta_eigen}) is no longer valid.  Higher-order LPT
+improves the pre-caustic accuracy but does not cure shell crossing.
+ICs must therefore be initialised at sufficiently high redshift that
+$\Dp(z_{\rm start})\,\alpha_{\max} < 1$ on all resolved scales.
 
 %----------------------------------------------------------------------
 \section{Second Order: 2LPT}
 \label{sec:2lpt}
+
+\subsection{Deriving the second-order source}
+\label{sec:2lpt_derive}
+
+To find the second-order displacement, expand the Jacobian
+determinant in Eq.~(\ref{eq:jacobian}) in powers of $\bPsi$.
+Writing $J_{ij} = \delta_{ij} + \Psi_{i,j}$ and using the identity
+$\det(1+\epsilon M) = 1 + \epsilon\,\mathrm{tr}M +
+\tfrac{1}{2}\epsilon^2[(\mathrm{tr}M)^2 - \mathrm{tr}(M^2)] +
+\mathcal{O}(\epsilon^3)$, we get
+%
+\begin{equation}
+  J = 1
+    + \underbrace{\Psi_{i,i}^{(1)}}_{J^{(1)}}
+    + \underbrace{\Psi_{i,i}^{(2)}
+      + \tfrac{1}{2}\bigl[(\Psi_{i,i}^{(1)})^2
+        - \Psi_{i,j}^{(1)}\Psi_{j,i}^{(1)}\bigr]}_{J^{(2)}}
+    + \cdots,
+  \label{eq:J_expand}
+\end{equation}
+%
+where commas denote partial derivatives with respect to Lagrangian
+coordinates $q_j$, and repeated indices are summed.  Mass
+conservation requires $\rho\,dV = \bar\rho\,dV_q$, i.e.\
+$1+\delta = J^{-1} \approx 1 - J^{(1)} - J^{(2)} + (J^{(1)})^2 + \cdots$.
+At first order, $\delta^{(1)} = -\Psi^{(1)}_{i,i} = \nabla^2_\bq\phi^{(1)} = \delta_{\rm lin}$,
+as expected.  At second order the equation of motion yields a
+sourced Poisson equation for the second-order potential
+$\phi^{(2)}$, whose source is precisely the quadratic part:
+%
+\begin{equation}
+  \tfrac{1}{2}\bigl[(\Psi^{(1)}_{i,i})^2
+    - \Psi^{(1)}_{i,j}\Psi^{(1)}_{j,i}\bigr]
+  = \sum_{i<j}
+    \left[\phi^{(1)}_{,ii}\phi^{(1)}_{,jj}
+          - \bigl(\phi^{(1)}_{,ij}\bigr)^2\right],
+  \label{eq:source_id}
+\end{equation}
+%
+which is the sum of $2\!\times\!2$ minors of the Hessian of
+$\phi^{(1)}$, measuring the coupling between different tidal
+components.
 
 \subsection{Second-order displacement}
 
@@ -432,6 +498,129 @@ where $\Phi^{(n)}$ is the $n$-th-order proper gravitational potential
 and $f^{(1)} \equiv f$.  In MUSIC2 the factor
 $(6/7)/v_{\rm fac2lpt}$ in \texttt{main.cc} implements the ratio
 $\Dpp/\Dp^2 = -3/7$ and the corresponding velocity coefficient.
+
+%----------------------------------------------------------------------
+\section{IC Generation Procedure}
+\label{sec:icgen}
+
+Given a linear power spectrum $P_{\rm lin}(k)$ from CLASS and a box
+of side $L$ sampled on an $N^3$ grid, the standard FFT-based algorithm
+for generating 2LPT initial conditions proceeds as follows
+\citep{Jeong2010}.
+
+\subsection{First-order (ZA) step}
+
+\begin{enumerate}
+  \item \textbf{Draw the density field.}  For each Fourier mode
+    $\bk = (2\pi/L)\,\mathbf{n}$ with $|\mathbf{n}| \leq N/2$,
+    draw a complex Gaussian random number $\delta_{\rm lin}(\bk)$
+    with variance $\langle|\delta_{\rm lin}(\bk)|^2\rangle =
+    P_{\rm lin}(k)/V$ (where $V=L^3$).  Enforce the Hermitian
+    condition $\delta_{\rm lin}(-\bk)=\delta_{\rm lin}^*(\bk)$ so
+    that the real-space field is real (see Appendix~\ref{app:fft}).
+
+  \item \textbf{Compute the first-order potential.}  In Fourier space,
+    Eq.~(\ref{eq:poisson1}) is trivially inverted:
+    %
+    \begin{equation}
+      \phi^{(1)}(\bk) = -\frac{\delta_{\rm lin}(\bk)}{k^2}.
+      \label{eq:phi1_fourier}
+    \end{equation}
+
+  \item \textbf{Compute the displacement components.}  The six
+    second-derivative fields $\phi^{(1)}_{,ij}$ needed for the
+    source (Eq.~\ref{eq:poisson2}) are obtained by multiplying
+    $\phi^{(1)}(\bk)$ by $-k_ik_j$ in Fourier space and
+    transforming back.  The three displacement components are
+    $\Psi^{(1)}_i(\bk) = ik_i\phi^{(1)}(\bk)$, each obtained by
+    a single IFFT.
+\end{enumerate}
+
+\subsection{Second-order step}
+
+\begin{enumerate}
+  \item \textbf{Build the source in real space.}  From the six
+    real-space fields $\phi^{(1)}_{,ij}(\bq)$ obtained above,
+    compute
+    %
+    \begin{equation}
+      F(\bq) = \sum_{i<j}
+        \Bigl[\phi^{(1)}_{,ii}(\bq)\,\phi^{(1)}_{,jj}(\bq)
+              - \bigl(\phi^{(1)}_{,ij}(\bq)\bigr)^2\Bigr].
+      \label{eq:F_source}
+    \end{equation}
+    %
+    This requires no additional FFTs once the $\phi^{(1)}_{,ij}$
+    fields are available.
+
+  \item \textbf{Solve for $\phi^{(2)}$.}  FFT $F(\bq)$ to Fourier
+    space and divide by $-k^2$:
+    %
+    \begin{equation}
+      \phi^{(2)}(\bk) = -\frac{F(\bk)}{k^2}.
+      \label{eq:phi2_fourier}
+    \end{equation}
+    %
+    The $\Omm^{-1/143}$ correction (Eq.~\ref{eq:D2}) is applied
+    when multiplying by the growth factor $\Dpp$.
+
+  \item \textbf{Compute $\bPsi^{(2)}$.}  Multiply by $i\bk$ in
+    Fourier space and IFFT to get the three components of
+    $\bPsi^{(2)}(\bq) = -\nabla_\bq\phi^{(2)}(\bq)$.
+\end{enumerate}
+
+\subsection{Assigning positions and velocities}
+
+At redshift $z_{\rm start}$ (scale factor $a$), the particle
+positions and peculiar velocities are:
+%
+\begin{align}
+  \bx &= \bq
+       + \Dp(z)\,\bPsi^{(1)}(\bq)
+       + \Dpp(z)\,\bPsi^{(2)}(\bq),
+  \label{eq:x_ic}\\[4pt]
+  \bv_{\rm pec} &= \calH(a)\Bigl[
+       f_1(z)\,\Dp(z)\,\bPsi^{(1)}(\bq)
+     + f_2(z)\,\Dpp(z)\,\bPsi^{(2)}(\bq)\Bigr],
+  \label{eq:v_ic}
+\end{align}
+%
+where $\calH = aH$ is the conformal Hubble parameter,
+$f_1 \approx \Omm(z)^{0.55}$ and $f_2 \approx 2\Omm(z)^{4/7}$.
+SWIFT stores $\bv_{\rm int} = a\,\bv_{\rm pec}$, so the stored
+quantity is $\calH(f_1\Dp\bPsi^{(1)} + f_2\Dpp\bPsi^{(2)})$.
+
+%----------------------------------------------------------------------
+\section{Starting Redshifts and Convergence}
+\label{sec:zstart}
+
+A practical question is: how early must ICs be generated?
+\citet{Crocce2006} showed that ZA-only ICs excite decaying modes
+that decay only as $a^{-1}$, causing an artificial \emph{suppression}
+of power that persists to low redshift.  Concretely, even starting at
+$z_{\rm start}=400$, ZA ICs leave a $\sim\!1\%$ power deficit relative
+to 2LPT ICs at all $z=1$--6 \citep{Jeong2010}.
+
+2LPT ICs also excite transients (with the opposite sign: a small
+\emph{amplification} of power), but these decay much more rapidly
+with $a$.  Simulations starting from 2LPT at $z_{\rm start}=300$
+agree with those at $z_{\rm start}=400$ to better than $1\%$ at
+$z<6$, demonstrating convergence.
+
+\medskip
+In summary:
+\begin{itemize}
+  \item \textbf{ZA}: transients $\propto a^{-1}$; convergence
+    requires $z_{\rm start} \gg 1000$, which is impractical.
+    At $z_{\rm start}=50$--$400$ a $\sim\!1$--$10\%$ power
+    suppression remains at $z \lesssim 6$.
+  \item \textbf{2LPT}: transients decay rapidly.
+    $z_{\rm start} \gtrsim 50$ gives $<1\%$ error at $z<6$;
+    $z_{\rm start} \approx 300$ is effectively converged.
+  \item For most IC codes (including \textsc{music2}) using 2LPT
+    with $z_{\rm start} \approx 50$--$100$ is standard for
+    large-scale structure simulations.
+\end{itemize}
 
 %----------------------------------------------------------------------
 \section{Relation to the Power Spectrum}
@@ -560,5 +749,162 @@ the growth factor is small enough that ZA suffices.
 
 %----------------------------------------------------------------------
 \bibliography{lpt_review}
+
+%======================================================================
+\appendix
+
+\section{Fourier Transforms}
+\label{app:fft}
+
+This appendix collects the Fourier conventions used throughout these
+notes and derives the relation between the continuous transform, the
+Fourier series in a periodic box, and the Discrete Fourier Transform
+(DFT) implemented by FFTW \citep{Jeong2010}.
+
+%----------------------------------------------------------------------
+\subsection{Continuous Fourier transform}
+\label{app:fft_cont}
+
+We adopt the convention
+%
+\begin{align}
+  f(\bk) &= \int d^3x\, f(\bx)\,e^{-i\bk\cdot\bx},
+  \label{eq:ft_fwd}\\
+  f(\bx) &= \int \frac{d^3k}{(2\pi)^3}\, f(\bk)\,e^{i\bk\cdot\bx}.
+  \label{eq:ft_inv}
+\end{align}
+%
+The asymmetric $(2\pi)^3$ factor appears only in the inverse
+transform.  Consistency of Eqs.~(\ref{eq:ft_fwd})--(\ref{eq:ft_inv})
+requires the Dirac delta representation
+%
+\begin{equation}
+  \delta^D(\bx - \bx') \equiv
+    \int \frac{d^3k}{(2\pi)^3}\,e^{i\bk\cdot(\bx-\bx')}.
+  \label{eq:dirac}
+\end{equation}
+
+The convolution theorem states that for the convolution
+$h(\bx) = \int d^3x_1\,f(\bx_1)g(\bx-\bx_1)$, the Fourier transform
+factorises: $h(\bk) = f(\bk)g(\bk)$.
+Conversely, the Fourier transform of a product $h(\bx) = f(\bx)g(\bx)$
+is a convolution in $\bk$-space:
+%
+\begin{equation}
+  h(\bk) = \int \frac{d^3k_1}{(2\pi)^3}\,f(\bk_1)\,g(\bk-\bk_1).
+  \label{eq:conv}
+\end{equation}
+%
+With the power-spectrum convention
+$\langle\delta(\bk)\delta^*(\bk')\rangle =
+(2\pi)^3P(k)\delta^D(\bk-\bk')$,
+Eq.~(\ref{eq:ft_fwd}) gives $\langle|\delta(\bk)|^2\rangle = P(k)$
+in the limit of a continuous spectrum.
+
+%----------------------------------------------------------------------
+\subsection{Fourier series in a periodic box}
+\label{app:fft_series}
+
+Consider a field $f(\bx)$ that is periodic in a cube of side $L$
+(volume $V = L^3$).  Periodicity forces the Fourier transform to be
+non-zero only at discrete wavevectors
+$\bk = k_F\mathbf{n}_k$, where $k_F \equiv 2\pi/L$ is the
+\emph{fundamental frequency} and $\mathbf{n}_k\in\mathbb{Z}^3$.
+The transform pair becomes
+%
+\begin{align}
+  f(\bk_p) &= \int_V d^3x\, f(\bx)\,e^{-i\bk_p\cdot\bx},
+  \label{eq:fs_fwd}\\
+  f(\bx)   &= \frac{1}{L^3}\sum_{\bk_p} f(\bk_p)\,e^{i\bk_p\cdot\bx}.
+  \label{eq:fs_inv}
+\end{align}
+%
+The continuous density contrast satisfies
+$\langle|\delta(\bk_p)|^2\rangle = V\,P(k_p)$,
+so drawing complex Gaussian modes with variance $V\,P(k)$ reproduces
+the correct continuous-limit statistics.
+
+%----------------------------------------------------------------------
+\subsection{Discrete Fourier transform}
+\label{app:fft_dft}
+
+Sample $f(\bx)$ at $N^3$ equally spaced points $\bx_p = H\mathbf{n}_r$
+with $\mathbf{n}_r\in\{0,\ldots,N-1\}^3$ and grid spacing $H = L/N$.
+The DFT pair is
+%
+\begin{align}
+  \delta(\bk_p) &= H^3 \sum_{\mathbf{n}_r}
+      \delta(\bx_p)\,e^{-i\bk_p\cdot\bx_p},
+  \label{eq:dft_fwd}\\
+  \delta(\bx_p) &= \frac{1}{L^3}\sum_{\mathbf{n}_k}
+      \delta(\bk_p)\,e^{i\bk_p\cdot\bx_p}.
+  \label{eq:dft_inv}
+\end{align}
+%
+The factor $H^3$ in Eq.~(\ref{eq:dft_fwd}) is the volume element; it
+ensures that the DFT approximates the integral
+Eq.~(\ref{eq:fs_fwd}) when $H$ is small.  The orthogonality condition
+%
+\begin{equation}
+  \sum_{\mathbf{n}_r}
+    e^{-2\pi i\mathbf{n}_k\cdot\mathbf{n}_r/N}
+    e^{2\pi i\mathbf{n}_{k'}\cdot\mathbf{n}_r/N}
+    = N^3\,\delta^K_{\mathbf{n}_k,\mathbf{n}_{k'}\pm N\mathbf{m}}
+  \label{eq:dft_orth}
+\end{equation}
+%
+(for any integer vector $\mathbf{m}$) guarantees that
+Eq.~(\ref{eq:dft_inv}) is the exact inverse of Eq.~(\ref{eq:dft_fwd}).
+
+%----------------------------------------------------------------------
+\subsection{Hermitian condition for real fields}
+\label{app:fft_hermitian}
+
+When $f(\bx)$ is real-valued, its Fourier transform satisfies the
+\emph{Hermitian symmetry} condition
+%
+\begin{equation}
+  \delta(-\bk) = \delta^*(\bk),
+  \qquad\text{equivalently}\qquad
+  \delta_k(-\mathbf{n}_k) = \delta_k^*(\mathbf{n}_k).
+  \label{eq:hermitian}
+\end{equation}
+%
+This halves the number of independent complex modes.  When drawing
+a Gaussian random field to serve as initial conditions, one must
+impose Eq.~(\ref{eq:hermitian}) explicitly.
+
+The Nyquist frequency $k_{\rm Ny} = \pi/H = \pi N/L$ is the maximum
+unaliased wavenumber.  Modes with $|\bk| > k_{\rm Ny}$ are aliased
+onto lower-frequency modes; the IC grid should be chosen large enough
+that the linear power spectrum is negligible at $k_{\rm Ny}$.
+
+%----------------------------------------------------------------------
+\subsection{FFTW conventions}
+\label{app:fft_fftw}
+
+FFTW implements the \emph{unnormalised} DFT
+%
+\begin{align}
+  \tilde f(\mathbf{n}_k) &= \sum_{\mathbf{n}_r}
+      f(\mathbf{n}_r)\,e^{-2\pi i\mathbf{n}_k\cdot\mathbf{n}_r/N},
+  \label{eq:fftw_fwd}\\
+  f(\mathbf{n}_r) &= \frac{1}{N^3}\sum_{\mathbf{n}_k}
+      \tilde f(\mathbf{n}_k)\,e^{2\pi i\mathbf{n}_k\cdot\mathbf{n}_r/N}.
+  \label{eq:fftw_inv}
+\end{align}
+%
+To match Eq.~(\ref{eq:dft_fwd}), identify $\delta(\bk_p) =
+H^3\,\tilde f(\mathbf{n}_k)$ and $f(\mathbf{n}_r) =
+\delta(\bx_p)$.  The normalisation factor $H^3$ must therefore be
+applied by the user after calling \texttt{fftw\_execute}.
+
+For a real input array of size $N\times N\times N$, the
+\texttt{dft\_r2c\_3d} routine exploits Hermitian symmetry and stores
+only the $N\times N\times(N/2+1)$ independent complex values.
+The full $k$-space array is recovered by the reflection
+$\delta(-\bk) = \delta^*(\bk)$.  In MUSIC2, the displacement
+components $\Psi^{(1)}_i$ and $\Psi^{(2)}_i$ are each computed via
+one forward ($r\to c$) and one backward ($c\to r$) FFTW call.
 
 \end{document}
