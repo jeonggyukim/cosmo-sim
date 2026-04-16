@@ -459,6 +459,19 @@ class ICPlotter:
                            ms=4, lw=0.8, color='C4', alpha=0.4,
                            label=r'measured ξ (CIC grid, $<0$)')
 
+        # Reference lines (added before legend so they appear in it)
+        if self.pk_runs:
+            run = self.pk_runs[0]
+            L   = run["boxsize_mpch"]
+            n   = run["npart_side"]
+            if L:
+                ax2.axvline(L / 3, color='gray', ls='--', lw=1.0,
+                            label=fr'$L/3 = {L/3:.4g}$ Mpc/$h$ (max reliable $r$)')
+            if L and n:
+                dx = L / n
+                ax2.axvline(dx, color='C2', ls=':', lw=1.0,
+                            label=fr'$\Delta x = {dx:.2g}$ Mpc/$h$ (mean particle spacing)')
+
         # ψ(r) on twin y-axis
         has_psi = (self.vel_cic is not None) or (self.theory_psi is not None)
         if has_psi:
@@ -491,19 +504,6 @@ class ICPlotter:
                        fontsize="medium", loc='lower left')
         else:
             ax2.legend(fontsize="medium", loc='lower left')
-
-        # Reference lines
-        if self.pk_runs:
-            run = self.pk_runs[0]
-            L   = run["boxsize_mpch"]
-            n   = run["npart_side"]
-            if L:
-                ax2.axvline(L / 3, color='gray', ls='--', lw=1.0,
-                            label=fr'$L/3$ = {L/3:.4g} Mpc/$h$')
-            if L and n:
-                dx = L / n
-                ax2.axvline(dx, color='C2', ls=':', lw=1.0,
-                            label=fr'$\Delta x$ = {dx:.2g} Mpc/$h$')
 
         ax2.set_ylabel(r'$\xi(r)$')
         ax2.set_title(r'Correlation functions $\xi(r)$ and $\psi(r)$')
