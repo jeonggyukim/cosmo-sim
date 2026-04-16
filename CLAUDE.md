@@ -192,3 +192,7 @@ Skips compilation if `music_build/MUSIC` already exists.
 2. `--corrfunc-dir` flag: `./run_pipeline.sh --corrfunc-dir /path/to/Corrfunc`
 3. `../Corrfunc` — sibling of the repo root (default)
 4. Clones from `https://github.com/manodeep/Corrfunc` into `../Corrfunc` and builds if not found
+
+## Maintenance Rules
+
+- **Always update `README.md` and `CLAUDE.md`** when making structural changes to the repo: new directories, moved or renamed files, added/removed tools. Update the directory layout block and any file references in the same commit as the structural change.
