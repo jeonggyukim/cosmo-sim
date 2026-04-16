@@ -73,6 +73,7 @@ class ICPlotter:
 
         # Figure handles (set by plot())
         self.fig = self.ax = self.ax2 = self.ax3 = None
+        self.ax_pk_ratio = self.ax_xi_ratio = None
 
     # ------------------------------------------------------------------ #
     # Static helpers
@@ -329,11 +330,14 @@ class ICPlotter:
 
     def plot(self, show_nodeconv=False, hankel=False, show_shot_sub=False):
         """
-        Create the two-panel P(k) + ξ(r)/ψ(r) figure.
+        Create the four-panel P(k) / ξ(r)/ψ(r) figure with fractional residual
+        panels below each main panel.
 
-        Left panel  : P(k), theory, shot noise level, k_fund, k_Ny
-        Right panel : ξ(r) from theory / Corrfunc / CIC grid;
-                      ψ(r) on a twin y-axis (right side) if velocity data loaded
+        Top-left    : P(k), theory, shot noise level, k_fund, k_Ny
+        Bottom-left : (P_meas/P_theory − 1) fractional residual
+        Top-right   : ξ(r) from theory / Corrfunc / CIC grid;
+                      ψ(r) on a twin y-axis if velocity data loaded
+        Bottom-right: (ξ_meas/ξ_theory − 1) fractional residual
 
         show_shot_sub : if True, also plot P_raw - V/N (shot-noise-subtracted).
                         Off by default: IC particles sit on a near-regular lattice,
@@ -341,13 +345,27 @@ class ICPlotter:
                         discreteness noise.  The raw P(k) with V/N shown as a
                         reference line is the correct display for lattice ICs.
         """
-        self.fig, (self.ax, self.ax2) = plt.subplots(1, 2, figsize=(13, 5))
-        ax, ax2 = self.ax, self.ax2
+        from matplotlib.gridspec import GridSpec
+        self.fig = plt.figure(figsize=(13, 8))
+        gs = GridSpec(2, 2, height_ratios=[4, 1], hspace=0.05, wspace=0.32,
+                      left=0.07, right=0.97, top=0.93, bottom=0.08)
 
-        self._plot_pk_panel(ax, show_nodeconv=show_nodeconv, hankel=hankel,
+        self.ax         = self.fig.add_subplot(gs[0, 0])
+        self.ax_pk_ratio = self.fig.add_subplot(gs[1, 0], sharex=self.ax)
+        self.ax2        = self.fig.add_subplot(gs[0, 1])
+        self.ax_xi_ratio = self.fig.add_subplot(gs[1, 1], sharex=self.ax2)
+
+        self._plot_pk_panel(self.ax, show_nodeconv=show_nodeconv, hankel=hankel,
                             show_shot_sub=show_shot_sub)
-        self._plot_xi_panel(ax2)
-        self.fig.tight_layout()
+        self._plot_pk_ratio_panel(self.ax_pk_ratio, show_shot_sub=show_shot_sub)
+        self._plot_xi_panel(self.ax2)
+        self._plot_xi_ratio_panel(self.ax_xi_ratio)
+
+        # Hide x tick labels on the main panels (shared with ratio panels below)
+        plt.setp(self.ax.get_xticklabels(), visible=False)
+        self.ax.set_xlabel('')
+        plt.setp(self.ax2.get_xticklabels(), visible=False)
+        self.ax2.set_xlabel('')
 
     def _plot_pk_panel(self, ax, show_nodeconv=False, hankel=False, show_shot_sub=False):
         """Populate the left P(k) panel."""
@@ -391,7 +409,6 @@ class ICPlotter:
                 ax.axvline(knyq, color='gray', ls='--', lw=1.0,
                            label=fr'$k_{{\rm Ny}}$ = {knyq:.2g} $h$/Mpc')
 
-        ax.set_xlabel(r'$k$ [$h$ Mpc$^{-1}$]')
         ax.set_ylabel(r'$P(k)$ [(Mpc/$h$)$^3$]')
         if self.pk_runs:
             run = self.pk_runs[0]
@@ -483,9 +500,82 @@ class ICPlotter:
                 ax2.axvline(dx, color='C2', ls=':', lw=1.0,
                             label=fr'$\Delta x$ = {dx:.2g} Mpc/$h$')
 
-        ax2.set_xlabel(r'$r$ [Mpc/$h$]')
         ax2.set_ylabel(r'$\xi(r)$')
         ax2.set_title(r'Correlation functions $\xi(r)$ and $\psi(r)$')
+
+    def _plot_pk_ratio_panel(self, ax, show_shot_sub=False):
+        """Fractional residual (P_meas/P_theory − 1) below the P(k) panel."""
+        ax.axhline(0.0,   color='k', lw=1.0)
+        ax.axhline( 0.05, color='k', lw=0.5, ls='--', alpha=0.4)
+        ax.axhline(-0.05, color='k', lw=0.5, ls='--', alpha=0.4)
+
+        if self.theory_k is not None:
+            for i, run in enumerate(self.pk_runs):
+                k     = run["k"]
+                color = f'C{i}'
+                Pt    = np.interp(k, self.theory_k, self.theory_P)
+                ax.semilogx(k, run["Pk_raw"] / Pt - 1.0,
+                            'o-', ms=3, lw=1.2, color=color)
+                if show_shot_sub:
+                    pos = run["Pk_ss"] > 0
+                    ax.semilogx(k[pos], run["Pk_ss"][pos] / Pt[pos] - 1.0,
+                                '^-', ms=3, lw=1.0, color=color, alpha=0.6)
+
+        # Repeat k_fund / k_Ny reference lines
+        if self.pk_runs:
+            run = self.pk_runs[0]
+            L, n = run["boxsize_mpch"], run["npart_side"] or 256
+            if L:
+                ax.axvline(2 * np.pi / L,    color='C2',   ls=':', lw=1.0)
+                ax.axvline(np.pi * n / L,    color='gray', ls='--', lw=1.0)
+
+        ax.set_xlabel(r'$k$ [$h$ Mpc$^{-1}$]')
+        ax.set_ylabel(r'$\Delta P/P_{\rm th}$', fontsize=9)
+        ax.set_ylim(-0.25, 0.25)
+        ax.grid(True, alpha=0.3, which='both')
+        ax.yaxis.set_major_formatter(
+            plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
+
+    def _plot_xi_ratio_panel(self, ax):
+        """Fractional residual (ξ_meas/ξ_theory − 1) below the ξ(r) panel."""
+        ax.axhline(0.0,   color='k', lw=1.0)
+        ax.axhline( 0.05, color='k', lw=0.5, ls='--', alpha=0.4)
+        ax.axhline(-0.05, color='k', lw=0.5, ls='--', alpha=0.4)
+
+        if self.theory_xi_r is not None:
+            if self.xi_cic is not None:
+                d   = self.xi_cic
+                pos = d["xi"] > 0
+                r   = d["r_mid"][pos]
+                xi_th = np.interp(r, self.theory_xi_r, self.theory_xi)
+                valid = xi_th > 0
+                ax.semilogx(r[valid], d["xi"][pos][valid] / xi_th[valid] - 1.0,
+                            '^-', ms=3, lw=1.2, color='C4')
+
+            if self.corrfunc_xi is not None:
+                d   = self.corrfunc_xi
+                pos = d["xi"] > 0
+                r   = d["r_mid"][pos]
+                xi_th = np.interp(r, self.theory_xi_r, self.theory_xi)
+                valid = xi_th > 0
+                ax.semilogx(r[valid], d["xi"][pos][valid] / xi_th[valid] - 1.0,
+                            's-', ms=3, lw=1.2, color='C1', mfc='none')
+
+        # Repeat L/3 and Δx reference lines
+        if self.pk_runs:
+            run = self.pk_runs[0]
+            L, n = run["boxsize_mpch"], run["npart_side"]
+            if L:
+                ax.axvline(L / 3, color='gray', ls='--', lw=1.0)
+            if L and n:
+                ax.axvline(L / n, color='C2',   ls=':', lw=1.0)
+
+        ax.set_xlabel(r'$r$ [Mpc/$h$]')
+        ax.set_ylabel(r'$\Delta\xi/\xi_{\rm th}$', fontsize=9)
+        ax.set_ylim(-0.5, 0.5)
+        ax.grid(True, alpha=0.3, which='both')
+        ax.yaxis.set_major_formatter(
+            plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
 
     def save(self, outfile, dpi=150):
         """Save the figure to a PNG file."""
