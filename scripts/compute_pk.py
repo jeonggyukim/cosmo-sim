@@ -4,12 +4,13 @@ compute_pk.py — Estimate the matter power spectrum P(k) from a SWIFT IC HDF5 f
 
 Method:
   1. Read PartType1 particle positions (in Mpc).
-  2. Assign particles to an Ngrid³ mesh using Cloud-in-Cell (CIC) interpolation.
+  2. Assign particles to an Ngrid³ mesh using interlaced CIC (two grids offset
+     by half a cell, averaged in Fourier space) to suppress aliasing to all orders
+     (Sefusatti et al. 2016). Use --no-interlace to disable.
   3. FFT the overdensity field delta(x) = rho(x)/rho_mean - 1.
   4. Correct for the CIC window function W(k).
-  5. Subtract the Poisson shot noise P_shot = V_box / N_particles.
-  6. Average |delta(k)|² in logarithmic k-shells to get P(k).
-  7. Output: ASCII table (pk_<stem>.txt).
+  5. Average |delta(k)|² in logarithmic k-shells to get P(k).
+  6. Output: ASCII table (pk_<stem>.txt).
 
 Use plot_pk.py to visualise the saved table and overlay xi(r), theory, etc.
 
@@ -22,7 +23,8 @@ Output units: k in h/Mpc, P(k) in (Mpc/h)³.
 
 References:
     Hockney & Eastwood (1981) — CIC assignment
-    Jing (2005) — interlaced CIC deconvolution
+    Jing (2005) — alias correction for CIC/TSC
+    Sefusatti et al. (2016) — interlaced CIC for alias-free P(k)
     Hahn & Abel (2011) — IC validation via P(k)
 """
 
@@ -118,8 +120,10 @@ def main():
                         help="Number of logarithmic k-bins (default: 30)")
     parser.add_argument("--H0", type=float, default=67.11,
                         help="H0 in km/s/Mpc for unit conversion (default: 67.11)")
-    parser.add_argument("--interlace", action="store_true", default=False,
-                        help="Use interlaced CIC (two grids offset by half a cell) to suppress aliasing")
+    parser.add_argument("--no-interlace", action="store_true", default=False,
+                        help="Disable interlaced CIC (default: interlacing on). "
+                             "Interlacing uses two grids offset by half a cell to suppress aliasing "
+                             "to all orders (Sefusatti et al. 2016).")
     parser.add_argument("-o", "--output", default=None,
                         help="Output txt filename (default: data/pk_<stem>.txt)")
     args = parser.parse_args()
@@ -163,8 +167,8 @@ def main():
     KX, KY, KZ = np.meshgrid(kx, ky, kz, indexing='ij')
     K = np.sqrt(KX**2 + KY**2 + KZ**2)   # |k| in Mpc⁻¹
 
-    # --- Interlacing (optional) ---
-    if args.interlace:
+    # --- Interlacing (default on; suppress with --no-interlace) ---
+    if not args.no_interlace:
         print("Interlacing: assigning shifted particles to second mesh...")
         dx = boxsize_mpc / ngrid
         coords_shifted = (coords + dx / 2) % boxsize_mpc
