@@ -17,6 +17,7 @@
 \newcommand{\Dp}{D_+}
 \newcommand{\Dpp}{D_+^{(2)}}
 \newcommand{\Omm}{\Omega_{\rm m}}
+\newcommand{\calH}{\mathcal{H}}
 
 \title{Lagrangian Perturbation Theory: Zel'dovich Approximation and 2LPT}
 \author{Notes on IC generation with MUSIC2}
@@ -49,9 +50,112 @@ initialising simulations at finite redshift.  \textsc{music2}
 \texttt{use\_2LPT = yes}.
 
 %----------------------------------------------------------------------
-\section{Lagrangian Perturbation Theory Setup}
+\section{Fluid Equations in an Expanding Universe}
+\label{sec:fluid}
 
-\subsection{Equations of motion}
+Before deriving the LPT displacement fields it is useful to record the
+governing fluid equations in a $\Lambda$CDM background and their
+linearised forms.
+
+\subsection{Continuity, Euler, and Poisson equations}
+
+In proper (physical) coordinates $\mathbf{r}$ the equations for a
+self-gravitating pressureless fluid are
+%
+\begin{align}
+  \frac{\partial\rho}{\partial t}
+    + \nabla_r\cdot(\rho\bv) &= 0,
+  \label{eq:continuity_proper}\\
+  \frac{d\bv}{dt} &= -\nabla_r\psi,
+  \label{eq:euler_proper}\\
+  \nabla_r^2\psi &= 4\pi G\rho,
+  \label{eq:poisson_proper}
+\end{align}
+%
+where $d/dt = \partial/\partial t + \bv\cdot\nabla_r$ is the
+convective derivative, $\psi$ is the Newtonian gravitational potential,
+and $\nabla_r$ denotes the gradient in proper coordinates.
+
+Switching to comoving coordinates $\bx = \mathbf{r}/a$ and splitting
+each field into a homogeneous background plus a small perturbation,
+$\bv = \bv_0 + \delta\bv$,
+$\rho = \rho_0 + \delta\rho$,
+$\psi = \psi_0 + \Phi$,
+with Hubble flow $\bv_0 = H\mathbf{r}$ and $\Phi \equiv \delta\psi$
+the perturbed gravitational potential, the linearised equations become
+%
+\begin{align}
+  \dot\delta
+    &= -\nabla\cdot\delta\bv,
+  \label{eq:continuity_lin}\\
+  \frac{d\,\delta\bv}{dt} + H\,\delta\bv
+    &= -\frac{1}{a}\nabla\Phi,
+  \label{eq:euler_lin}\\
+  \nabla^2\Phi
+    &= 4\pi G\rho_0\,a^2\,\delta
+     = \tfrac{3}{2}H^2\Omm(a)\,a^2\,\delta,
+  \label{eq:poisson_lin}
+\end{align}
+%
+where $\nabla$ now denotes the gradient in comoving coordinates, dots
+are derivatives with respect to cosmic time $t$, and we have used the
+Friedmann equation $4\pi G\rho_0 = \tfrac{3}{2}H^2\Omm(a)$.
+
+\subsection{Density contrast and linear growth equation}
+\label{sec:growth}
+
+The density contrast is defined as
+%
+\begin{equation}
+  \delta(\bx, t) \equiv \frac{\delta\rho(\bx,t)}{\rho_0(t)}.
+  \label{eq:delta_def}
+\end{equation}
+%
+Combining Eqs.~(\ref{eq:continuity_lin})--(\ref{eq:poisson_lin}) gives
+the second-order ODE for $\delta$ in a pressureless fluid:
+%
+\begin{equation}
+  \ddot{\delta} + 2H\dot{\delta}
+    = \tfrac{3}{2}H^2\Omm(a)\,\delta.
+  \label{eq:growth_eq}
+\end{equation}
+%
+The growing solution of Eq.~(\ref{eq:growth_eq}) defines the
+\emph{linear growth factor} $\Dp(a)$, normalised to $\Dp = 1$ at a
+chosen reference epoch:
+%
+\begin{equation}
+  \ddot\Dp + 2H\dot\Dp
+    = \tfrac{3}{2}H^2\Omm(a)\,\Dp.
+  \label{eq:growth_D}
+\end{equation}
+%
+In the matter-dominated limit $\Dp \propto a$.  The
+\emph{logarithmic growth rate} is
+%
+\begin{equation}
+  f(a) \equiv \frac{d\ln\Dp}{d\ln a} \approx \Omm(a)^{0.55}
+  \quad\text{\citep{Linder2005}},
+  \label{eq:fgrowth}
+\end{equation}
+%
+where
+%
+\begin{equation}
+  \Omm(a) = \frac{\Omm^0\,a^{-3}}{\Omm^0\,a^{-3}
+    + \Omega_\Lambda + \Omega_k^0\,a^{-2}}.
+  \label{eq:Omm_a}
+\end{equation}
+%
+It is also convenient to define the \emph{conformal Hubble parameter}
+$\calH(a) \equiv aH(a) = \dot{a}$, so that
+$\dot\Dp = H f \Dp = (\calH/a) f \Dp$.
+
+%----------------------------------------------------------------------
+\section{Lagrangian Perturbation Theory Framework}
+\label{sec:lpt}
+
+\subsection{Displacement ansatz}
 
 In comoving coordinates the position of a fluid element initially at
 $\bq$ is
@@ -66,8 +170,11 @@ velocity is
 %
 \begin{equation}
   \bv_{\rm pec} = a\,\dot{\bx} = a\,\dot{\bPsi}.
+  \label{eq:vpec_def}
 \end{equation}
-%
+
+\subsection{Mass conservation and the Jacobian}
+
 The density field follows from mass conservation.  Each fluid element
 initially at $\bq$ carries fixed mass $\bar{\rho}\,d^3q$.  After
 displacement it occupies the Eulerian volume element
@@ -91,7 +198,7 @@ $\rho(\bx) = \bar{\rho}/|J|$, so
 %
 which is \emph{exact} (no perturbative expansion has been made).
 
-\subsection{Growth factor and perturbative expansion}
+\subsection{Perturbative expansion}
 
 In the matter-dominated limit the growing mode scales as $\Dp(t)
 \propto a(t)$, and one expands the displacement as a series in
@@ -130,7 +237,7 @@ with $\phi^{(1)}$ satisfying the Poisson equation in Lagrangian space:
 \end{equation}
 %
 where $\delta_{\rm lin}$ is the linear density contrast at the
-reference time at which the growth factor is normalised ($\Dp = 1$).
+reference epoch at which $\Dp = 1$.
 In Fourier space this is solved trivially:
 %
 \begin{equation}
@@ -147,20 +254,21 @@ Eq.~(\ref{eq:psi1_fourier}) to compute particle displacements.
 \subsection{Velocity field}
 
 Differentiating Eq.~(\ref{eq:displacement}) with respect to time and
-using $\Dp = \Dp(t)$:
+using $\bPsi = \Dp\bPsi^{(1)}$:
 %
 \begin{align}
   \bv_{\rm pec}^{(1)}
-    &= a\,\dot{\bPsi}^{(1)}
-     = a\,\dot{\Dp}\,\bPsi^{(1)} \notag\\
-    &= a\,H(a)\,f(a)\,\Dp\,\bPsi^{(1)},
+    &= a\,\dot{\Dp}\,\bPsi^{(1)}
+     = a\,Hf\Dp\,\bPsi^{(1)}
+     = \calH(a)\,f(a)\,\Dp\,\bPsi^{(1)},
   \label{eq:vel1}
 \end{align}
 %
-where the logarithmic growth rate is $f \equiv d\ln\Dp/d\ln a \approx
-\Omm(a)^{0.55}$ \citep{Linder2005}.  At the IC redshift this is the
-conversion MUSIC2 applies via \texttt{cosmo\_vfact} $= a H f / h$ to
-convert displacements to velocities.
+where $\calH \equiv aH$ is the conformal Hubble parameter and $f$ is
+the logarithmic growth rate from Eq.~(\ref{eq:fgrowth}).  At the IC
+redshift this is the conversion MUSIC2 applies via
+\texttt{cosmo\_vfact} $= \calH f / h$ to convert displacements to
+velocities.
 
 \subsection{Density field}
 
@@ -174,6 +282,48 @@ Linearising the Jacobian determinant in Eq.~(\ref{eq:jacobian}),
 %
 At first order the density contrast is simply the linear field scaled
 by the growth factor.
+
+\subsection{Relation between the displacement potential and the
+  gravitational potential}
+\label{sec:phi_Phi}
+
+The displacement potential $\phi^{(1)}$ satisfies
+$\nabla^2\phi^{(1)} = \delta_{\rm lin}$.  On the other hand, the
+linearised Poisson equation~(\ref{eq:poisson_lin}) gives
+$\nabla^2\Phi = \tfrac{3}{2}H^2\Omm\,a^2\,\delta = \tfrac{3}{2}H^2\Omm\,a^2\Dp\,\delta_{\rm lin}$.
+Comparing the two:
+%
+\begin{equation}
+  \phi^{(1)}(\bq; z)
+    = \frac{2}{3}\,\frac{\Dp(z)^{-1}}{H^2(z)\,\Omm(z)\,a^2}\,\Phi(\bq; z).
+  \label{eq:phi_Phi}
+\end{equation}
+%
+In practice, when $\Phi$ is evaluated at the same epoch as $\Dp$ (so
+$\delta = \Dp\delta_{\rm lin}$ with the normalization
+$\Phi = \frac{3}{2}H^2\Omm a^2\Dp\phi^{(1)}$), the factor $\Dp^{-1}$
+cancels and the relation simplifies to
+%
+\begin{equation}
+  \phi^{(1)}(\bq)
+    = \frac{2}{3}\,\frac{1}{H^2(z)\,\Omm(z)\,a^2}\,\Phi(\bq; z),
+  \label{eq:phi_Phi_simple}
+\end{equation}
+%
+where $\phi^{(1)}(\bq)$ is the reference-epoch potential (at $\Dp=1$).
+Substituting Eqs.~(\ref{eq:psi1}) and (\ref{eq:phi_Phi_simple}) into
+Eq.~(\ref{eq:vel1}), the first-order peculiar velocity can be written
+directly in terms of the proper gravitational potential:
+%
+\begin{equation}
+  \bv_{\rm pec}^{(1)}(\bq; z)
+    = -\frac{2}{3}\,\frac{f(z)}{a\,H(z)\,\Omm(z)}\,
+      \nabla_\bq\Phi(\bq; z).
+  \label{eq:vpec_Phi}
+\end{equation}
+%
+This is the starting point for linear-theory peculiar-velocity
+statistics.
 
 \subsection{Shell crossing}
 
@@ -220,31 +370,40 @@ potential:
 \end{equation}
 %
 The right-hand side is the sum of $2\times 2$ minors of the Hessian
-of $\phi^{(1)}$, i.e.\ it measures the coupling between different
-components of the tidal field.  In Fourier space this is a
-mode-coupling integral (convolution), so $\bPsi^{(2)}$ mixes modes
-that are independent at first order.
+of $\phi^{(1)}$, measuring the coupling between different components
+of the tidal field.  In Fourier space this is a mode-coupling integral
+(convolution), so $\bPsi^{(2)}$ mixes modes that are independent at
+first order.
 
 \subsection{Growth factor at second order}
 \label{sec:2lpt_growth}
 
 The second-order growing mode satisfies a separate ODE.  In the
 matter-dominated ($\Omm = 1$) limit $\Dpp = -\tfrac{3}{7}\Dp^2$
-exactly.  For $\Lambda$CDM this is only approximate; a fitting formula
-accurate to $\lesssim 0.3\%$ is \citep{Crocce2006}
+exactly.  For $\Lambda$CDM a fitting formula accurate to
+$\lesssim 0.3\%$ is \citep{Crocce2006}
 %
 \begin{equation}
   \Dpp(a) \approx -\frac{3}{7}\,\Dp^2(a)\,\Omm(a)^{-1/143}.
   \label{eq:D2}
 \end{equation}
 %
-The corresponding growth rate is $f^{(2)} \equiv d\ln|\Dpp|/d\ln a
-\approx 2f$ (exactly $2$ in matter domination), so the 2LPT velocity
-correction is
+The corresponding logarithmic growth rate
+$f^{(2)} \equiv d\ln|\Dpp|/d\ln a$ is well approximated by
+\citep{Bouchet1995}
+%
+\begin{equation}
+  f^{(2)}(a) \approx 2\,\Omm(a)^{4/7},
+  \label{eq:f2}
+\end{equation}
+%
+where $\Omm(a)$ is given by Eq.~(\ref{eq:Omm_a}).  In matter
+domination $\Omm\to 1$ so $f^{(2)}\to 2$, exactly twice the
+first-order rate $f\to 1$.  The 2LPT velocity correction is
 %
 \begin{equation}
   \bv_{\rm pec}^{(2)}
-    = a\,H\,f^{(2)}\,\Dpp\,\bPsi^{(2)}.
+    = \calH(a)\,f^{(2)}(a)\,\Dpp\,\bPsi^{(2)}.
   \label{eq:vel2}
 \end{equation}
 
@@ -253,14 +412,26 @@ correction is
 Combining both orders:
 %
 \begin{align}
-  \bx &= \bq + \Dp\,\bPsi^{(1)} + \Dpp\,\bPsi^{(2)}, \label{eq:x_total}\\
-  \bv_{\rm pec} &= a H\bigl(f\,\Dp\,\bPsi^{(1)}
-                   + f^{(2)}\Dpp\,\bPsi^{(2)}\bigr). \label{eq:v_total}
+  \bx &= \bq + \Dp\,\bPsi^{(1)} + \Dpp\,\bPsi^{(2)},
+  \label{eq:x_total}\\
+  \bv_{\rm pec} &= \calH(a)\bigl(f\,\Dp\,\bPsi^{(1)}
+                   + f^{(2)}\Dpp\,\bPsi^{(2)}\bigr).
+  \label{eq:v_total}
 \end{align}
 %
-In MUSIC2 the factor $(6/7)/v_{\rm fac2lpt}$ in \texttt{main.cc} implements
-the ratio $\Dpp/\Dp^2 = -3/7$ and the corresponding velocity
-coefficient.
+The generalisation of Eq.~(\ref{eq:vpec_Phi}) to 2LPT is
+%
+\begin{equation}
+  \bv_{\rm pec}(\bq; z)
+    = -\frac{2}{3}\,\frac{1}{a\,H(z)\,\Omm(z)}\,
+      \sum_{n=1}^{2} f^{(n)}(z)\,\nabla_\bq\Phi^{(n)}(\bq; z),
+  \label{eq:vpec_2lpt}
+\end{equation}
+%
+where $\Phi^{(n)}$ is the $n$-th-order proper gravitational potential
+and $f^{(1)} \equiv f$.  In MUSIC2 the factor
+$(6/7)/v_{\rm fac2lpt}$ in \texttt{main.cc} implements the ratio
+$\Dpp/\Dp^2 = -3/7$ and the corresponding velocity coefficient.
 
 %----------------------------------------------------------------------
 \section{Relation to the Power Spectrum}
@@ -293,10 +464,10 @@ where the one-loop terms involve convolutions of $P_{\rm lin}$:
 %
 \begin{align}
   P_{22}(k) &= 2\int\!\frac{d^3q}{(2\pi)^3}\,
-    \left[F_2(\bk-\bq,\,\bq)\right]^2
-    P_{\rm lin}(|\bk-\bq|)\,P_{\rm lin}(q), \\
+    \left[F_2(\bk-\mathbf{q},\,\mathbf{q})\right]^2
+    P_{\rm lin}(|\bk-\mathbf{q}|)\,P_{\rm lin}(q), \\
   P_{13}(k) &= 3\,P_{\rm lin}(k)\int\!\frac{d^3q}{(2\pi)^3}\,
-    F_3(\bk,\bq,-\bq)\,P_{\rm lin}(q),
+    F_3(\bk,\mathbf{q},-\mathbf{q})\,P_{\rm lin}(q),
 \end{align}
 %
 with $F_2$, $F_3$ the standard perturbation theory (SPT) mode-coupling
@@ -352,14 +523,27 @@ the growth factor is small enough that ZA suffices.
 \section{Summary}
 
 \begin{itemize}
+  \item \textbf{Fluid equations}: the linearised continuity, Euler, and
+        Poisson equations in an expanding background lead to the growth
+        equation~(\ref{eq:growth_D}).  The growing solution $\Dp(a)$
+        has logarithmic growth rate $f \approx \Omm(a)^{0.55}$
+        \citep{Linder2005}.
+
   \item \textbf{1LPT / ZA}: $\bPsi^{(1)} = -i(\bk/k^2)\delta_{\rm lin}(\bk)$,
-        velocity $\bv = aHf\Dp\bPsi^{(1)}$.  Exact for planar collapse;
-        breaks down at shell crossing.
+        velocity $\bv_{\rm pec}^{(1)} = \calH f\Dp\bPsi^{(1)}$.
+        The displacement potential is related to the proper gravitational
+        potential by $\phi^{(1)} = (2/3)(H^2\Omm a^2)^{-1}\Phi$,
+        giving $\bv_{\rm pec}^{(1)} = -(2/3)\,f/(aH\Omm)\,\nabla\Phi$.
+        Exact for planar collapse; breaks down at shell crossing.
 
   \item \textbf{2LPT}: adds $\bPsi^{(2)} = -\nabla\phi^{(2)}$ with source
-        Eq.~(\ref{eq:poisson2}).  Growth mode $\Dpp \approx -\tfrac{3}{7}\Dp^2$,
-        velocity $\bv^{(2)} = aHf^{(2)}\Dpp\bPsi^{(2)}$.  Eliminates
-        leading transients and is correct through one loop in $P(k)$.
+        Eq.~(\ref{eq:poisson2}).  Growth mode
+        $\Dpp \approx -\tfrac{3}{7}\Dp^2\,\Omm^{-1/143}$
+        \citep{Crocce2006}, growth rate $f^{(2)} \approx 2\Omm(a)^{4/7}$
+        \citep{Bouchet1995}, velocity
+        $\bv_{\rm pec}^{(2)} = \calH f^{(2)}\Dpp\bPsi^{(2)}$.
+        Eliminates leading transients and is correct through one loop
+        in $P(k)$.
 
   \item \textbf{CLASS vs.\ MUSIC2}: CLASS outputs linear $P_{\rm lin}(k)$
         (first order in $\delta$); the IC particle distribution has
