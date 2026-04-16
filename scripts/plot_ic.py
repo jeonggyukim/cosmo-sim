@@ -537,7 +537,7 @@ class ICPlotter:
                 ax.axvline(np.pi * n / L,    color='gray', ls='--', lw=1.0)
 
         ax.set_xlabel(r'$k$ [$h$ Mpc$^{-1}$]')
-        ax.set_ylabel(r'$P_{\rm meas}/P_{\rm theory} - 1$', fontsize=9)
+        ax.set_ylabel('Measured/Theory - 1', fontsize=9)
         ax.set_ylim(-0.55, 0.55)
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
@@ -575,7 +575,7 @@ class ICPlotter:
                 ax.axvline(L / n, color='C2',   ls=':', lw=1.0)
 
         ax.set_xlabel(r'$r$ [Mpc/$h$]')
-        ax.set_ylabel(r'$\xi_{\rm meas}/\xi_{\rm theory} - 1$', fontsize=9)
+        ax.set_ylabel('Measured/Theory - 1', fontsize=9)
         ax.set_ylim(-0.55, 0.55)
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
