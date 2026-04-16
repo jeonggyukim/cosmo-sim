@@ -503,11 +503,18 @@ class ICPlotter:
         ax2.set_ylabel(r'$\xi(r)$')
         ax2.set_title(r'Correlation functions $\xi(r)$ and $\psi(r)$')
 
+    _RATIO_LEVELS = [0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50]
+
+    def _draw_ratio_reflines(self, ax):
+        """Draw ±1/5/10/20/30/40/50 % horizontal reference lines."""
+        ax.axhline(0.0, color='k', lw=1.0)
+        for level in self._RATIO_LEVELS:
+            ax.axhline( level, color='gray', lw=0.5, ls='--', alpha=0.5)
+            ax.axhline(-level, color='gray', lw=0.5, ls='--', alpha=0.5)
+
     def _plot_pk_ratio_panel(self, ax, show_shot_sub=False):
         """Fractional residual (P_meas/P_theory − 1) below the P(k) panel."""
-        ax.axhline(0.0,   color='k', lw=1.0)
-        ax.axhline( 0.05, color='k', lw=0.5, ls='--', alpha=0.4)
-        ax.axhline(-0.05, color='k', lw=0.5, ls='--', alpha=0.4)
+        self._draw_ratio_reflines(ax)
 
         if self.theory_k is not None:
             for i, run in enumerate(self.pk_runs):
@@ -531,16 +538,13 @@ class ICPlotter:
 
         ax.set_xlabel(r'$k$ [$h$ Mpc$^{-1}$]')
         ax.set_ylabel(r'$P_{\rm meas}/P_{\rm theory} - 1$', fontsize=9)
-        ax.set_ylim(-0.25, 0.25)
-        ax.grid(True, alpha=0.3, which='major')
+        ax.set_ylim(-0.55, 0.55)
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
 
     def _plot_xi_ratio_panel(self, ax):
         """Fractional residual (ξ_meas/ξ_theory − 1) below the ξ(r) panel."""
-        ax.axhline(0.0,   color='k', lw=1.0)
-        ax.axhline( 0.05, color='k', lw=0.5, ls='--', alpha=0.4)
-        ax.axhline(-0.05, color='k', lw=0.5, ls='--', alpha=0.4)
+        self._draw_ratio_reflines(ax)
 
         if self.theory_xi_r is not None:
             if self.xi_cic is not None:
@@ -572,8 +576,7 @@ class ICPlotter:
 
         ax.set_xlabel(r'$r$ [Mpc/$h$]')
         ax.set_ylabel(r'$\xi_{\rm meas}/\xi_{\rm theory} - 1$', fontsize=9)
-        ax.set_ylim(-0.5, 0.5)
-        ax.grid(True, alpha=0.3, which='major')
+        ax.set_ylim(-0.55, 0.55)
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
 
