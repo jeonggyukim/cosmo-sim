@@ -163,6 +163,8 @@ if [ ! -f "$IC_FILE" ]; then
     log "Running MUSIC2..."
     "$MUSIC_BIN" "$CONF_FILE"
     mv input_class_parameters.ini "$CLASS_INI"
+    # MUSIC2 always writes wnoise_NNNN.bin to CWD (path is hardcoded); move to data/
+    for f in wnoise_*.bin; do [ -f "$f" ] && mv "$f" "data/$f" && echo "    Saved: data/$f"; done
     echo "    Saved: $IC_FILE"
     echo "    Saved: $CLASS_INI"
 else
