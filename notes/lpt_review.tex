@@ -6,6 +6,9 @@
 \usepackage{hyperref}
 \usepackage[margin=1in]{geometry}
 \usepackage{natbib}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,decorations.pathreplacing}
 \bibliographystyle{aasjournal}
 
 \newcommand{\bq}{\mathbf{q}}
@@ -150,6 +153,25 @@ where
 It is also convenient to define the \emph{conformal Hubble parameter}
 $\calH(a) \equiv aH(a) = \dot{a}$, so that
 $\dot\Dp = H f \Dp = (\calH/a) f \Dp$.
+
+Figure~\ref{fig:growth} shows $\Dp(z)$ and both growth rates for the
+CV\_22 cosmology ($\Omm = 0.3$, $\Omega_\Lambda = 0.7$).  Note that
+$f \to 1$ and $f^{(2)} \to 2$ in matter domination, while both
+decrease toward zero in the $\Lambda$-dominated regime.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{growth.pdf}
+  \caption{Left: linear growth factor $\Dp(z)$ normalized to
+  $\Dp(z=0)=1$ for flat $\Lambda$CDM ($\Omm=0.3$, $\Omega_\Lambda=0.7$).
+  The dashed line is the matter-domination limit $\Dp \propto (1+z)^{-1}$.
+  Right: first-order growth rate $f \approx \Omm(a)^{0.55}$ and
+  second-order growth rate $f^{(2)} \approx 2\Omm(a)^{4/7}$.
+  Dashed lines show the matter-domination limits $f\to 1$ and
+  $f^{(2)}\to 2$.  Both rates decrease at low $z$ as $\Lambda$
+  suppresses structure growth.}
+  \label{fig:growth}
+\end{figure}
 
 %----------------------------------------------------------------------
 \section{Lagrangian Perturbation Theory Framework}
@@ -361,6 +383,33 @@ formula~(\ref{eq:delta_eigen}) is no longer valid.  Higher-order LPT
 improves the pre-caustic accuracy but does not cure shell crossing.
 ICs must therefore be initialised at sufficiently high redshift that
 $\Dp(z_{\rm start})\,\alpha_{\max} < 1$ on all resolved scales.
+
+Figure~\ref{fig:pancake} illustrates this for the simplest case of a
+\emph{plane-wave} perturbation $\delta_{\rm lin}(q) = \cos q$, giving
+$\Psi^{(1)}(q) = -\sin q$ and $x(q) = q - \Dp\sin q$.  The density
+$1+\delta = 1/|1 - \Dp\cos q|$ diverges at the caustic ($\Dp = 1$);
+for $\Dp > 1$ the Eulerian map becomes multi-valued (three streams
+near $x=0$).  The dashed and dotted curves for $\Dp = 1.2$ show the
+regions where $J < 0$ (unphysical in single-stream theory).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pancake.pdf}
+  \caption{Zel'dovich pancake: plane-wave perturbation
+  $\delta_{\rm lin}(q) = \cos q$.
+  \textit{Left}: density profile $1+\delta = 1/|1-\Dp\cos q|$ as a
+  function of Eulerian position $x$, at several values of the growth
+  factor $\Dp$.  The density diverges at $\Dp = 1$ (caustic).  For
+  $\Dp = 1.2$ the solid curve shows the physical single-stream region
+  ($J>0$) and the dotted continuation is the unphysical multi-stream
+  interior.
+  \textit{Right}: particle trajectories $x(q) = q - \Dp\sin q$.  For
+  $\Dp > 1$ the map folds back at $|q| = \arccos(1/\Dp)$, creating
+  a purple-shaded multi-stream zone.  Collapse first occurs along
+  the direction of largest eigenvalue $\alpha$, producing a
+  flattened sheet (pancake).}
+  \label{fig:pancake}
+\end{figure}
 
 %----------------------------------------------------------------------
 \section{Second Order: 2LPT}
@@ -590,6 +639,96 @@ $f \approx \Omm(z)^{0.55}$ (Eq.~\ref{eq:fgrowth}) and
 $f^{(2)} \approx 2\Omm(z)^{4/7}$ (Eq.~\ref{eq:f2}).
 SWIFT stores $\bv_{\rm int} = a\,\bv_{\rm pec}$, so the stored
 quantity is $\calH(f\Dp\bPsi^{(1)} + f^{(2)}\Dpp\bPsi^{(2)})$.
+
+Figure~\ref{fig:icgen} summarises the complete 2LPT algorithm as
+a flowchart.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance = 0.55cm and 2.2cm,
+  box/.style  = {rectangle, rounded corners=4pt, draw=black!70,
+                 fill=#1, text width=4.2cm, align=center,
+                 font=\small, inner sep=5pt, minimum height=0.9cm},
+  box/.default = blue!8,
+  arrow/.style = {-{Stealth[length=5pt]}, thick, black!70},
+  label/.style = {font=\footnotesize\itshape, text=gray}
+]
+
+%% ─── Column A: first-order (ZA) ────────────────────────────────
+\node[box=green!12] (input)
+  {$P_{\rm lin}(k)$ from CLASS\\(linear power spectrum)};
+
+\node[box, below=of input] (draw)
+  {Draw $\delta_{\rm lin}(\bk)$\\
+   complex Gaussian,\\
+   variance $P_{\rm lin}(k)/V$};
+
+\node[box, below=of draw] (phi1k)
+  {$\phi^{(1)}(\bk) = -\delta_{\rm lin}(\bk)\,/\,k^2$};
+
+\node[box, below=of phi1k] (hess)
+  {IFFT $\to$ 6 Hessian fields\\
+   $\phi^{(1)}_{,ij}(\bq)$,\quad $i\!\leq\! j$};
+
+\node[box, below=of hess] (psi1)
+  {$\Psi^{(1)}_i(\bq) = \mathcal{F}^{-1}\!\left[ik_i\phi^{(1)}\right]$};
+
+%% ─── Column B: second-order (2LPT) ─────────────────────────────
+\node[box=orange!12, right=of hess] (source)
+  {Source $F(\bq) =$\\
+   $\displaystyle\sum_{i<j}\!\left[\phi^{(1)}_{,ii}\phi^{(1)}_{,jj}
+   -\!\left(\phi^{(1)}_{,ij}\right)^{\!2}\right]$};
+
+\node[box, below=of source] (phi2k)
+  {FFT $\to$ $\phi^{(2)}(\bk) = -F(\bk)\,/\,k^2$};
+
+\node[box, below=of phi2k] (psi2)
+  {$\Psi^{(2)}_i(\bq) = \mathcal{F}^{-1}\!\left[ik_i\phi^{(2)}\right]$};
+
+%% ─── Final step ─────────────────────────────────────────────────
+\node[box=green!12,
+      below=1.1cm of $(psi1)!0.5!(psi2)$,
+      text width=9.0cm] (final)
+  {$\bx = \bq + \Dp\bPsi^{(1)} + \Dpp\bPsi^{(2)}$\\[2pt]
+   $\bv_{\rm pec} = \calH\bigl[f\Dp\bPsi^{(1)} + f^{(2)}\Dpp\bPsi^{(2)}\bigr]$};
+
+%% ─── Arrows: column A ───────────────────────────────────────────
+\draw[arrow] (input)  -- (draw);
+\draw[arrow] (draw)   -- (phi1k);
+\draw[arrow] (phi1k)  -- (hess);
+\draw[arrow] (hess)   -- (psi1);
+
+%% ─── Arrow: Hessian → 2LPT source ──────────────────────────────
+\draw[arrow] (hess)   -- (source)
+  node[midway, above, label] {same fields};
+
+%% ─── Arrows: column B ───────────────────────────────────────────
+\draw[arrow] (source) -- (phi2k);
+\draw[arrow] (phi2k)  -- (psi2);
+
+%% ─── Merge arrows → final ───────────────────────────────────────
+\draw[arrow] (psi1) |- (final);
+\draw[arrow] (psi2) |- (final);
+
+%% ─── Side labels ────────────────────────────────────────────────
+\node[label, left=0.15cm of draw,   anchor=east] {1. draw IC};
+\node[label, left=0.15cm of phi1k,  anchor=east] {2. Poisson};
+\node[label, left=0.15cm of hess,   anchor=east] {3. IFFTs};
+\node[label, left=0.15cm of psi1,   anchor=east] {4. ZA};
+\node[label, right=0.15cm of source, anchor=west] {5. mode coupling};
+\node[label, right=0.15cm of phi2k, anchor=west] {6. Poisson};
+\node[label, right=0.15cm of psi2,  anchor=west] {7. 2LPT};
+
+\end{tikzpicture}
+\caption{Flowchart of the 2LPT IC generation algorithm
+(\S\ref{sec:icgen}).  Green boxes are inputs/outputs; blue boxes are
+first-order (ZA) steps; orange boxes are second-order (2LPT) steps.
+The six Hessian fields $\phi^{(1)}_{,ij}$ serve \emph{both} branches:
+the first-order displacement $\bPsi^{(1)}$ (left) and the 2LPT source
+$F(\bq)$ (right).  All IFFT steps are 3D FFTs.}
+\label{fig:icgen}
+\end{figure}
 
 %----------------------------------------------------------------------
 \section{Starting Redshifts and Convergence}

@@ -10,7 +10,7 @@ endif
 
 TIDY = rm -f *.aux *.log *.blg *.out *.toc
 
-FIGURES = box_window.pdf tophat_window.pdf pgrid_comparison.pdf
+FIGURES = box_window.pdf tophat_window.pdf pgrid_comparison.pdf pancake.pdf growth.pdf
 
 all : figures notes
 
@@ -24,6 +24,12 @@ tophat_window.pdf : plot_tophat_window.py
 	$(PYTHON) $<
 
 pgrid_comparison.pdf : plot_pgrid.py ../data/class_pk_z45_pk.dat
+	$(PYTHON) $<
+
+pancake.pdf : plot_pancake.py
+	$(PYTHON) $<
+
+growth.pdf : plot_growth.py
 	$(PYTHON) $<
 
 # --- LaTeX ---
