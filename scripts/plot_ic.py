@@ -346,9 +346,8 @@ class ICPlotter:
                         reference line is the correct display for lattice ICs.
         """
         from matplotlib.gridspec import GridSpec
-        self.fig = plt.figure(figsize=(13, 8))
-        gs = GridSpec(2, 2, height_ratios=[4, 1], hspace=0.05, wspace=0.32,
-                      left=0.07, right=0.97, top=0.93, bottom=0.08)
+        self.fig = plt.figure(figsize=(13, 8), constrained_layout=True)
+        gs = GridSpec(2, 2, figure=self.fig, height_ratios=[4, 1], hspace=0.05)
 
         self.ax         = self.fig.add_subplot(gs[0, 0])
         self.ax_pk_ratio = self.fig.add_subplot(gs[1, 0], sharex=self.ax)
@@ -503,7 +502,7 @@ class ICPlotter:
         ax2.set_ylabel(r'$\xi(r)$')
         ax2.set_title(r'Correlation functions $\xi(r)$ and $\psi(r)$')
 
-    _RATIO_LEVELS = [0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50]
+    _RATIO_LEVELS = [0.05, 0.10, 0.20, 0.30, 0.40, 0.50]
 
     def _draw_ratio_reflines(self, ax):
         """Draw ±1/5/10/20/30/40/50 % horizontal reference lines."""
