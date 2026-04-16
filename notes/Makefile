@@ -1,4 +1,4 @@
-NOTES  = ic_sampling_review
+NOTES  = ic_sampling_review lpt_review
 PYTHON = conda run -n cosmo python
 
 UNAME := $(shell uname)
@@ -27,10 +27,14 @@ pgrid_comparison.pdf : plot_pgrid.py ../data/class_pk_z45_pk.dat
 	$(PYTHON) $<
 
 # --- LaTeX ---
-notes : $(FIGURES) $(NOTES).tex
-	pdflatex -draftmode -synctex=1 $(NOTES).tex
-	pdflatex $(NOTES).tex
-	$(OPEN) $(NOTES).pdf &
+notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
+
+%.pdf : %.tex
+	pdflatex -draftmode -synctex=1 $<
+	-bibtex $(basename $<)
+	pdflatex -draftmode -synctex=1 $<
+	pdflatex $<
+	$(OPEN) $@ &
 	$(TIDY)
 
 clean :
