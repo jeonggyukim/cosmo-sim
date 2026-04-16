@@ -70,9 +70,10 @@ datasets = [
 
 colours = ["#2166ac", "#d6604d", "#1a9850", "#762a83"]
 
-fig = plt.figure(figsize=(9, 7))
-gs = GridSpec(4, 2, figure=fig, hspace=0.6, wspace=0.38,
-              left=0.09, right=0.97, top=0.96, bottom=0.06)
+fig = plt.figure(figsize=(9, 7.5))
+# leave extra top margin for column headers
+gs = GridSpec(4, 2, figure=fig, hspace=0.65, wspace=0.38,
+              left=0.09, right=0.97, top=0.91, bottom=0.06)
 
 for i, (f, F, lab, flab) in enumerate(datasets):
     ax_l = fig.add_subplot(gs[i, 0])
@@ -94,10 +95,11 @@ for i, (f, F, lab, flab) in enumerate(datasets):
     ax_r.axhline(0, color='k', lw=0.5)
     ax_r.tick_params(labelsize=7)
 
-fig.text(0.27, 0.985, "Real space  $f(x)$",
-         ha='center', va='top', fontsize=9, fontweight='bold')
-fig.text(0.73, 0.985, "Wavenumber space  $|\\hat{f}(k)|$",
-         ha='center', va='top', fontsize=9, fontweight='bold')
+# Column headers placed well above the top of the grid
+fig.text(0.27, 0.975, "Real space  $f(x)$",
+         ha='center', va='top', fontsize=10, fontweight='bold')
+fig.text(0.73, 0.975, "Wavenumber space  $|\\hat{f}(k)|$",
+         ha='center', va='top', fontsize=10, fontweight='bold')
 
 fig.savefig("cft_pairs.pdf", bbox_inches="tight")
 fig.savefig("cft_pairs.png", dpi=150, bbox_inches="tight")

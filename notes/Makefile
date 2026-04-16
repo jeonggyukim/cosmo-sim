@@ -11,7 +11,8 @@ endif
 TIDY = rm -f *.aux *.log *.blg *.out *.toc
 
 FIGURES = figures/box_window.pdf figures/tophat_window.pdf figures/pgrid_comparison.pdf \
-          figures/pancake.pdf figures/growth.pdf figures/dft_pairs.pdf figures/cft_pairs.pdf
+          figures/pancake.pdf figures/growth.pdf figures/dft_pairs.pdf figures/cft_pairs.pdf \
+          figures/aliasing.pdf
 
 all : figures notes
 
@@ -38,6 +39,9 @@ figures/dft_pairs.pdf : figures/plot_dft_pairs.py
 
 figures/cft_pairs.pdf : figures/plot_cft_pairs.py
 	cd figures && $(PYTHON) plot_cft_pairs.py
+
+figures/aliasing.pdf : figures/plot_aliasing.py
+	cd figures && $(PYTHON) plot_aliasing.py
 
 # --- LaTeX ---
 notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
