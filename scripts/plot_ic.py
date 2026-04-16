@@ -530,9 +530,9 @@ class ICPlotter:
                 ax.axvline(np.pi * n / L,    color='gray', ls='--', lw=1.0)
 
         ax.set_xlabel(r'$k$ [$h$ Mpc$^{-1}$]')
-        ax.set_ylabel(r'$\Delta P/P_{\rm th}$', fontsize=9)
+        ax.set_ylabel(r'$P_{\rm meas}/P_{\rm theory} - 1$', fontsize=9)
         ax.set_ylim(-0.25, 0.25)
-        ax.grid(True, alpha=0.3, which='both')
+        ax.grid(True, alpha=0.3, which='major')
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
 
@@ -571,9 +571,9 @@ class ICPlotter:
                 ax.axvline(L / n, color='C2',   ls=':', lw=1.0)
 
         ax.set_xlabel(r'$r$ [Mpc/$h$]')
-        ax.set_ylabel(r'$\Delta\xi/\xi_{\rm th}$', fontsize=9)
+        ax.set_ylabel(r'$\xi_{\rm meas}/\xi_{\rm theory} - 1$', fontsize=9)
         ax.set_ylim(-0.5, 0.5)
-        ax.grid(True, alpha=0.3, which='both')
+        ax.grid(True, alpha=0.3, which='major')
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
 
