@@ -1,4 +1,4 @@
-NOTES  = ic_sampling_review lpt_review
+NOTES  = ic_sampling_review lpt_review fft_review
 PYTHON = conda run -n cosmo python
 
 UNAME := $(shell uname)
