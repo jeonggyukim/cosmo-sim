@@ -32,6 +32,8 @@ Use `conda run -n cosmo python ...` for all Python scripts in this project.
 ./run_pipeline.sh --music2-dir /path/to/MUSIC2 --corrfunc-dir /path/to/Corrfunc
 ```
 
+**Thread count**: the MacBook has 8 logical CPUs. Use `--nthreads 8` (the default) for `compute_xi` and `compute_xi_cic` jobs. On a cluster adjust to match the job allocation.
+
 Pipeline steps (each skipped if output already exists):
 1. Build MUSIC2 binary
 2. Build `compute_xi` and `compute_xi_cic`
@@ -128,7 +130,13 @@ conda run -n cosmo python scripts/make_rbins.py --hdf5 data/ics_swift_n256_z2_L6
 
 At z ≳ 10 the cosmological signal in pair-counting ξ(r) is ~10⁻⁶ — undetectable.
 The CIC grid estimator can measure ξ(r) and ψ(r) at any z because it exploits
-sub-Poissonian lattice shot noise (σ_δ ≈ D(z)·σ₀ ≪ 1). See CORRFUNC.md § "When ξ(r) is the wrong tool".
+sub-Poissonian lattice shot noise (σ_δ ≈ D(z)·σ₀ ≪ 1). See CLAUDE_CORRFUNC.md § "When ξ(r) is the wrong tool".
+
+**Rbins**: SWIFT stores coordinates in **Mpc** (not Mpc/h); rbins must be in Mpc to match.
+Always generate rbins for each IC run with `make_rbins.py` — do not reuse a file from a different
+box size or resolution. The script sets rmin = 2 × mean particle spacing (d = BoxSize/N) and
+rmax = L/3; using smaller rmin gives empty bins (ξ = −1) and using larger rmax suffers periodic
+boundary artifacts.
 
 ## Notes / Documentation
 
@@ -137,7 +145,7 @@ Three LaTeX write-ups live in `notes/`:
 | File | Contents |
 |------|----------|
 | `ic_sampling_review.tex` | IC sampling methods (Pen 1997, Sirko 2005, Hahn & Abel 2011): P-sampled vs ξ-sampled, box window truncation errors |
-| `lpt_review.tex` | Lagrangian perturbation theory: fluid equations, ZA, 2LPT, Zel'dovich pancake, IC generation, starting redshifts, one-loop P(k). Appendix A: Fourier conventions, DFT/FFT algorithm, parallel MPI FFT. Appendix B: P(k) estimation (CIC window, deconvolution, shot noise) |
+| `lpt_review.tex` | Lagrangian perturbation theory: fluid equations, ZA, 2LPT, Zel'dovich pancake, IC generation, starting redshifts, one-loop P(k). Appendix A: Fourier conventions (CFT, Fourier series, DFT, Hermitian symmetry); see `fft_review.pdf` for implementation details. Appendix B: P(k) estimation (CIC window, deconvolution, shot noise, sub-Poissonian lattice ICs) |
 | `fft_review.tex` | FFT reference: DFT, Cooley–Tukey radix-2, FFTW mixed-radix, multi-D row-column algorithm, MPI slab vs. pencil decomposition, FFTW API, fftMPI (Plimpton 2019) and Tigris `BlockFFT` usage |
 
 ```bash
