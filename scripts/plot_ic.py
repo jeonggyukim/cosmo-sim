@@ -328,7 +328,7 @@ class ICPlotter:
     # Plotting
     # ------------------------------------------------------------------ #
 
-    def plot(self, show_nodeconv=False, hankel=False, show_shot_sub=False):
+    def plot(self, show_nodeconv=False, hankel=False, show_shot_sub=None):
         """
         Create the four-panel P(k) / ξ(r)/ψ(r) figure with fractional residual
         panels below each main panel.
@@ -339,12 +339,18 @@ class ICPlotter:
                       ψ(r) on a twin y-axis if velocity data loaded
         Bottom-right: (ξ_meas/ξ_theory − 1) fractional residual
 
-        show_shot_sub : if True, also plot P_raw - V/N (shot-noise-subtracted).
-                        Off by default: IC particles sit on a near-regular lattice,
-                        which is sub-Poissonian, so V/N over-estimates the true
-                        discreteness noise.  The raw P(k) with V/N shown as a
-                        reference line is the correct display for lattice ICs.
+        show_shot_sub : None (default) = auto: True when z ≤ 10, False at high z.
+                        At low z, Poisson shot noise is a reasonable approximation
+                        and the subtracted curve is useful.  At high z, IC particles
+                        sit on a near-regular lattice (sub-Poissonian), so V/N
+                        over-subtracts; only P_raw should be plotted there.
+                        Pass True/False to override the auto behaviour.
         """
+        # Auto-select show_shot_sub based on redshift of primary run
+        if show_shot_sub is None:
+            z = self.pk_runs[0].get("z") if self.pk_runs else None
+            show_shot_sub = (z is not None and z <= 10)
+
         from matplotlib.gridspec import GridSpec
         self.fig = plt.figure(figsize=(13, 8), constrained_layout=True)
         gs = GridSpec(2, 2, figure=self.fig, height_ratios=[4, 1], hspace=0.05)
@@ -610,10 +616,14 @@ def main():
                         help="Also plot the un-deconvolved P(k) curve")
     parser.add_argument("--hankel",  action="store_true",
                         help="Overplot xi(r) from Hankel transform of measured P(k)")
-    parser.add_argument("--show-shot-subtracted", action="store_true",
-                        help="Also plot P(k) - V/N (Poisson shot-noise subtracted). "
-                             "Off by default: IC particles sit on a near-regular lattice "
-                             "(sub-Poissonian), so V/N over-subtracts.")
+    grp = parser.add_mutually_exclusive_group()
+    grp.add_argument("--show-shot-subtracted", dest="show_shot_sub",
+                     action="store_true", default=None,
+                     help="Force-show P(k) - V/N (overrides auto-detect).")
+    grp.add_argument("--no-show-shot-subtracted", dest="show_shot_sub",
+                     action="store_false",
+                     help="Force-hide P(k) - V/N (overrides auto-detect). "
+                          "Default: shown automatically when z ≤ 10.")
     parser.add_argument("-o", "--output", default=None,
                         help="Output PNG (default: pk_<stem>.png or pk_comparison.png)")
     args = parser.parse_args()
@@ -633,7 +643,7 @@ def main():
     )
 
     plotter.plot(show_nodeconv=args.show_nodeconv, hankel=args.hankel,
-                 show_shot_sub=args.show_shot_subtracted)
+                 show_shot_sub=args.show_shot_sub)
 
     # Determine output filename
     if args.output:
