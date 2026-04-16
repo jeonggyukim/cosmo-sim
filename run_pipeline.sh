@@ -49,7 +49,8 @@ cd "$(dirname "$(readlink -f "$0")")"
 NGRID=256
 LBOX=687   # ≈ 1024 Mpc for h=0.6711
 ZSTART=2
-NTHREADS=8
+# Default to all logical CPUs; detect cross-platform (macOS: sysctl, Linux: nproc)
+NTHREADS=$(sysctl -n hw.logicalcpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 FIX_AMP=yes   # fix_mode_amplitude: yes = fixed amplitudes (CV); no = Gaussian draw
 MUSIC2_DIR=""     # optional: path to MUSIC2 source (default: ~/Dropbox/Projects/MUSIC2 or cloned)
 CORRFUNC_DIR=""   # optional: path to built Corrfunc (default: ~/Corrfunc or cloned)

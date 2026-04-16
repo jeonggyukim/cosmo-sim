@@ -32,7 +32,7 @@ Use `conda run -n cosmo python ...` for all Python scripts in this project.
 ./run_pipeline.sh --music2-dir /path/to/MUSIC2 --corrfunc-dir /path/to/Corrfunc
 ```
 
-**Thread count**: the MacBook has 8 logical CPUs. Use `--nthreads 8` (the default) for `compute_xi` and `compute_xi_cic` jobs. On a cluster adjust to match the job allocation.
+**Thread count**: `run_pipeline.sh` defaults `--nthreads` to all logical CPUs on the current machine (detected via `sysctl -n hw.logicalcpu` on macOS or `nproc` on Linux). Override with `--nthreads N` to match a cluster job allocation.
 
 Pipeline steps (each skipped if output already exists):
 1. Build MUSIC2 binary
