@@ -175,16 +175,20 @@ conda run -n cosmo python scripts/plot_dr_histogram.py \
 
 ## Notes
 
-`notes/ic_sampling_review.tex` reviews the IC sampling literature (Pen 1997, Sirko 2005,
-Hahn & Abel 2011): P-sampled vs ξ-sampled methods, box window truncation errors,
-and implications for MUSIC2/monofonIC.
+Three LaTeX write-ups live in `notes/`:
+
+| File | Contents |
+|------|----------|
+| `ic_sampling_review.tex` | IC sampling literature (Pen 1997, Sirko 2005, Hahn & Abel 2011): P-sampled vs ξ-sampled methods, box window truncation errors, implications for MUSIC2/monofonIC |
+| `lpt_review.tex` | Lagrangian perturbation theory: fluid equations, ZA, 2LPT derivation, Zel'dovich pancake, IC generation algorithm, starting redshifts, one-loop P(k). Appendix A: Fourier transform conventions, DFT, FFT algorithm (Cooley–Tukey, multi-D, parallel MPI). Appendix B: P(k) estimation from N-body (CIC window, deconvolution, shot noise). |
+| `fft_review.tex` | FFT reference: DFT definition, Cooley–Tukey radix-2, FFTW mixed-radix, multi-dimensional row–column algorithm, MPI slab vs. pencil decomposition, FFTW API, fftMPI (Plimpton 2019) API and Tigris `BlockFFT` usage |
 
 ```bash
 cd notes
-make            # regenerate figures + compile PDF (opens automatically)
+make            # regenerate figures + compile all PDFs (opens automatically)
 make figures    # regenerate figures only
-make notes      # compile PDF only (assumes figures exist)
-make clean      # remove figures, PDF, and LaTeX aux files
+make notes      # compile PDFs only (assumes figures exist)
+make clean      # remove figures, PDFs, and LaTeX aux files
 ```
 
 Figures are generated from `plot_box_window.py`, `plot_tophat_window.py`, and
