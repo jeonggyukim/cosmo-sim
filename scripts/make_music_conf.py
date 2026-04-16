@@ -79,6 +79,7 @@ def main():
         BOXLENGTH=fmt(args.boxlength),
         ZSTART=fmt(args.redshift),
         LEVEL=level,
+        LEVEL_PAD=f"{level:04d}",
         FILENAME=ic_filename,
     )
 
