@@ -65,8 +65,8 @@ Remove outputs with `./clean.sh` (or `--all` to also remove IC HDF5 files).
 - `scripts/compute_pk.py` — estimates P(k) from IC particles via CIC + FFT; saves `pk_*.txt` (no plotting)
 - `scripts/plot_ic.py` — IC diagnostics plotter: reads `pk_*.txt`, auto-detects `xi_*.txt` / `xi_cic_*.txt` / `vel_cic_*.txt`; overlays CLASS theory P(k), ξ(r), ψ(r); class-based (`ICPlotter`)
 - `scripts/make_rbins.py` — generates Corrfunc bin file appropriate for a given IC run (rmin=2×mean spacing, rmax=L/3)
-- `compute_xi.c` / `compute_xi` — measures ξ(r) from IC particles using Corrfunc (C, compiled via `make`)
-- `compute_xi_cic.c` / `compute_xi_cic` — measures ξ(r) and ψ(r) via CIC density/velocity grid autocorrelation (C, compiled via `make`); use `--vel` for velocity correlation
+- `src/compute_xi.c` / `compute_xi` — measures ξ(r) from IC particles using Corrfunc (C, compiled via `make`)
+- `src/compute_xi_cic.c` / `compute_xi_cic` — measures ξ(r) and ψ(r) via CIC density/velocity grid autocorrelation (C, compiled via `make`); use `--vel` for velocity correlation
 
 ### Utilities
 - `scripts/read_wnoise.py` — reads `wnoise_NNNN.bin` white noise binary into a numpy array

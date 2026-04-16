@@ -1,4 +1,4 @@
-# Makefile for cosmo-pipeline C programs
+# Makefile for cosmo-pipeline C programs (sources in src/, binaries output to repo root)
 # Platform detection follows the same pattern as ../tigris/prepare.sh
 
 UNAME_S := $(shell uname -s)
@@ -58,10 +58,10 @@ $(CORRFUNC_LIB):
 	git clone --depth=1 https://github.com/manodeep/Corrfunc.git $(CORRFUNCDIR)
 	$(MAKE) -C $(CORRFUNCDIR) CC=$(CC) theory
 
-compute_xi: scripts/compute_xi.c $(CORRFUNC_LIB)
+compute_xi: src/compute_xi.c $(CORRFUNC_LIB)
 	$(CC) $(CFLAGS) $< $(CORRFUNC_LIB) $(LDFLAGS) -o $@
 
-compute_xi_cic: scripts/compute_xi_cic.c
+compute_xi_cic: src/compute_xi_cic.c
 	$(CC) -O3 -std=c99 -Wall $(OMP_FLAG) -I$(HDF5_INC) \
 	      -L$(HDF5_LIB) -lhdf5 -lm $(OMP_FLAG) \
 	      $< -o $@
