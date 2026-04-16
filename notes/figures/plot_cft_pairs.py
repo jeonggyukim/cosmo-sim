@@ -2,13 +2,14 @@
 """
 plot_cft_pairs.py — Four illustrative continuous FT pairs for fft_review.tex.
 
-Panels (left = f(x), right = |f̂(ξ)|):
-  (a) Delta function at x0        → flat spectrum
-  (b) Gaussian (narrow σ)         → broad Gaussian in ξ (uncertainty principle)
-  (c) Top-hat / rect of width L   → sinc (ringing)
-  (d) Cosine at frequency ξ0      → two symmetric spikes
+Convention B (physics/cosmology):
+  f̂(k) = ∫ f(x) e^{-ikx} dx,   f(x) = ∫ dk/(2π) f̂(k) e^{ikx}
 
-Convention: f̂(ξ) = ∫ f(x) e^{-2πiξx} dx
+Panels (left = f(x), right = |f̂(k)|):
+  (a) Narrow Gaussian (≈ δ)      → flat spectrum |f̂(k)| ≈ 1
+  (b) Gaussian σ=0.7             → broader Gaussian (uncertainty principle)
+  (c) Top-hat width L=2          → |2sin(kL/2)/k|  (sinc-like, ringing)
+  (d) Windowed cosine at k₀=1.5  → two symmetric spikes at ±k₀
 """
 
 import numpy as np
@@ -17,52 +18,54 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
-# Common x and xi grids
+# Real-space grid
 x  = np.linspace(-6, 6, 4000)
-xi = np.linspace(-3, 3, 4000)
 dx = x[1] - x[0]
 
+# Wavenumber grid (Convention B: k in rad/unit)
+k = np.linspace(-10, 10, 4000)
 
-def cft(f, x, xi):
-    """Numerical continuous FT via trapezoidal rule."""
-    F = np.array([np.trapezoid(f * np.exp(-2j * np.pi * xiv * x), x) for xiv in xi])
+
+def cft(f, x, k):
+    """Numerical CFT: f̂(k) = ∫ f(x) e^{-ikx} dx  (trapezoidal rule)."""
+    F = np.array([np.trapezoid(f * np.exp(-1j * kv * x), x) for kv in k])
     return F
 
 
-# ---- (a) delta function approximated by narrow Gaussian ----
+# ---- (a) delta: narrow Gaussian normalised to unit area ----
 sigma_d = 0.15
-f_a = np.exp(-np.pi * x**2 / sigma_d**2)
-f_a /= np.trapezoid(f_a, x)          # normalise to unit area
-F_a = np.abs(cft(f_a, x, xi))
+f_a = np.exp(-x**2 / (2 * sigma_d**2))
+f_a /= np.trapezoid(f_a, x)          # unit area → f̂(k) ≈ 1
+F_a = np.abs(cft(f_a, x, k))
 
-# ---- (b) Gaussian: narrow in x → broad in ξ ----
+# ---- (b) Gaussian: narrow in x → broad in k ----
 sigma_b = 0.7
-f_b = np.exp(-np.pi * x**2 / sigma_b**2)
-F_b = np.abs(cft(f_b, x, xi))    # should be σ_b * exp(-π σ_b^2 ξ^2)
+f_b = np.exp(-x**2 / (2 * sigma_b**2))
+F_b = np.abs(cft(f_b, x, k))        # ≈ σ√(2π) e^{−k²σ²/2}
 
 # ---- (c) Top-hat of width L ----
 L = 2.0
-f_c = np.where(np.abs(x) <= L/2, 1.0, 0.0)
-F_c = np.abs(cft(f_c, x, xi))    # should be L sinc(L ξ)
+f_c = np.where(np.abs(x) <= L / 2, 1.0, 0.0)
+F_c = np.abs(cft(f_c, x, k))        # ≈ 2sin(kL/2)/k
 
-# ---- (d) Cosine at ξ0 ----
-xi0 = 1.0
-f_d = np.cos(2 * np.pi * xi0 * x) * np.exp(-x**2 / 8)  # windowed for display
-F_d = np.abs(cft(f_d, x, xi))
+# ---- (d) Windowed cosine at k₀ ----
+k0 = 1.5
+f_d = np.cos(k0 * x) * np.exp(-x**2 / 8)   # Gaussian window
+F_d = np.abs(cft(f_d, x, k))
 
 datasets = [
     (f_a, F_a,
      r"(a) $f(x) \approx \delta(x)$  (narrow Gaussian)",
-     r"$|\hat{f}(\xi)| \approx 1$  (flat)"),
+     r"$|\hat{f}(k)| \approx 1$  (flat)"),
     (f_b, F_b,
-     r"(b) $f(x) = e^{-\pi x^2/\sigma^2}$,  $\sigma=0.7$",
-     r"$|\hat{f}(\xi)| = \sigma\,e^{-\pi\sigma^2\xi^2}$  (broader Gaussian)"),
+     r"(b) $f(x) = e^{-x^2/(2\sigma^2)}$,  $\sigma=0.7$",
+     r"$|\hat{f}(k)| = \sigma\sqrt{2\pi}\,e^{-k^2\sigma^2/2}$"),
     (f_c, F_c,
      r"(c) $f(x) = \mathrm{rect}(x/L)$,  $L=2$",
-     r"$|\hat{f}(\xi)| = L|\mathrm{sinc}(L\xi)|$"),
+     r"$|\hat{f}(k)| = |2\sin(kL/2)/k|$"),
     (f_d, F_d,
-     r"(d) $f(x) = \cos(2\pi\xi_0 x)$ (windowed), $\xi_0=1$",
-     r"$|\hat{f}(\xi)|$: two spikes at $\pm\xi_0$"),
+     r"(d) $f(x) = \cos(k_0 x)$ (windowed), $k_0=1.5$",
+     r"$|\hat{f}(k)|$: two spikes at $\pm k_0$"),
 ]
 
 colours = ["#2166ac", "#d6604d", "#1a9850", "#762a83"]
@@ -83,17 +86,17 @@ for i, (f, F, lab, flab) in enumerate(datasets):
     ax_l.axhline(0, color='k', lw=0.5)
     ax_l.tick_params(labelsize=7)
 
-    ax_r.plot(xi, F, color=colours[i], lw=1.3)
-    ax_r.set_xlim(-3, 3)
-    ax_r.set_xlabel(r"$\xi$", fontsize=8)
-    ax_r.set_ylabel(r"$|\hat{f}(\xi)|$", fontsize=8)
+    ax_r.plot(k, F, color=colours[i], lw=1.3)
+    ax_r.set_xlim(-8, 8)
+    ax_r.set_xlabel(r"$k$", fontsize=8)
+    ax_r.set_ylabel(r"$|\hat{f}(k)|$", fontsize=8)
     ax_r.set_title(flab, fontsize=8, loc='left')
     ax_r.axhline(0, color='k', lw=0.5)
     ax_r.tick_params(labelsize=7)
 
 fig.text(0.27, 0.985, "Real space  $f(x)$",
          ha='center', va='top', fontsize=9, fontweight='bold')
-fig.text(0.73, 0.985, "Frequency space  $|\\hat{f}(\\xi)|$",
+fig.text(0.73, 0.985, "Wavenumber space  $|\\hat{f}(k)|$",
          ha='center', va='top', fontsize=9, fontweight='bold')
 
 fig.savefig("cft_pairs.pdf", bbox_inches="tight")
