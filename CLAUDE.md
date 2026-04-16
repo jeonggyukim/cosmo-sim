@@ -6,6 +6,7 @@ This repo contains scripts and configuration files for running cosmological simu
 
 ```
 cosmo-pipeline/
+  src/         — C source files (compute_xi.c, compute_xi_cic.c)
   scripts/     — Python scripts (compute_pk.py, plot_ic.py, make_rbins.py, make_music_conf.py, ...)
   data/        — IC HDF5 files, CLASS P(k) outputs, rbins files, wnoise binaries, measured P/xi tables
   plots/       — PNG/PDF figures (pk_*.png, xi_*.png, ...)

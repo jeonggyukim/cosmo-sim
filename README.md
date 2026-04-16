@@ -5,6 +5,7 @@ Scripts and configuration for cosmological IC generation with MUSIC2 and IC vali
 ## Directory layout
 
 ```
+src/        — C source files (compute_xi.c, compute_xi_cic.c)
 scripts/   — Python scripts
 conf/      — MUSIC2 config files
 data/      — CLASS outputs, rbins, measured P(k)/ξ/ψ tables  (HDF5/bin files gitignored)
