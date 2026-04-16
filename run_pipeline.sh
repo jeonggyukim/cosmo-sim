@@ -15,10 +15,12 @@
 # Usage:
 #   ./run_pipeline.sh [--ngrid NGRID] [--lbox LBOX] [--zstart ZSTART] [--nthreads NTHREADS]
 #
-#   --ngrid    particles per side (default: 256)
-#   --lbox     box side length in Mpc/h (default: 1000)
-#   --zstart   IC starting redshift (default: 45)
-#   --nthreads OpenMP threads for compute_xi (default: 8)
+#   --ngrid          particles per side (default: 256)
+#   --lbox           box side length in Mpc/h (default: 687)
+#   --zstart         IC starting redshift (default: 2)
+#   --nthreads       OpenMP threads for compute_xi (default: 8)
+#   --fix-amplitude  yes|no — fix Fourier mode amplitudes to sqrt(P(k)) (default: yes)
+#                    When no, '_nofix' is appended to all output stems.
 #
 # Examples:
 #   ./run_pipeline.sh
@@ -48,14 +50,18 @@ NGRID=256
 LBOX=687   # ≈ 1024 Mpc for h=0.6711
 ZSTART=2
 NTHREADS=8
+FIX_AMP=yes   # fix_mode_amplitude: yes = fixed amplitudes (CV); no = Gaussian draw
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --ngrid)    NGRID="$2";    shift 2 ;;
-        --lbox)     LBOX="$2";     shift 2 ;;
-        --zstart)   ZSTART="$2";   shift 2 ;;
-        --nthreads) NTHREADS="$2"; shift 2 ;;
-        *) echo "Unknown argument: $1"; echo "Usage: $0 [--ngrid N] [--lbox L] [--zstart Z] [--nthreads T]"; exit 1 ;;
+        --ngrid)         NGRID="$2";    shift 2 ;;
+        --lbox)          LBOX="$2";     shift 2 ;;
+        --zstart)        ZSTART="$2";   shift 2 ;;
+        --nthreads)      NTHREADS="$2"; shift 2 ;;
+        --fix-amplitude) FIX_AMP="$2";  shift 2 ;;
+        *) echo "Unknown argument: $1"
+           echo "Usage: $0 [--ngrid N] [--lbox L] [--zstart Z] [--nthreads T] [--fix-amplitude yes|no]"
+           exit 1 ;;
     esac
 done
 
@@ -67,7 +73,8 @@ OMEGA_B=0.049
 # ---------------------------------------------------------------------------
 # Derived paths — all keyed by STEM so multiple runs coexist without collision
 # ---------------------------------------------------------------------------
-STEM="n${NGRID}_z${ZSTART}_L${LBOX}"
+AMP_SUFFIX=$([ "$FIX_AMP" = "no" ] && echo "_nofix" || echo "")
+STEM="n${NGRID}_z${ZSTART}_L${LBOX}${AMP_SUFFIX}"
 IC_FILE="data/ics_swift_${STEM}.hdf5"
 CONF_FILE="conf/CV_22_MUSIC_${STEM}.conf"
 # input_class_parameters.ini is written by MUSIC2 to CWD during the IC run;
@@ -121,7 +128,7 @@ fi
 # ---------------------------------------------------------------------------
 if [ ! -f "$CONF_FILE" ]; then
     log "Generating MUSIC2 config..."
-    conda run -n cosmo python scripts/make_music_conf.py -N "$NGRID" -z "$ZSTART" -L "$LBOX"
+    conda run -n cosmo python scripts/make_music_conf.py -N "$NGRID" -z "$ZSTART" -L "$LBOX" --fix-amplitude "$FIX_AMP"
 else
     log "MUSIC2 config already exists — skipping ($CONF_FILE)"
 fi

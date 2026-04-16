@@ -10,27 +10,28 @@ endif
 
 TIDY = rm -f *.aux *.log *.blg *.out *.toc
 
-FIGURES = box_window.pdf tophat_window.pdf pgrid_comparison.pdf pancake.pdf growth.pdf
+FIGURES = figures/box_window.pdf figures/tophat_window.pdf figures/pgrid_comparison.pdf \
+          figures/pancake.pdf figures/growth.pdf
 
 all : figures notes
 
 # --- Figures ---
 figures : $(FIGURES)
 
-box_window.pdf : plot_box_window.py
-	$(PYTHON) $<
+figures/box_window.pdf : figures/plot_box_window.py
+	cd figures && $(PYTHON) plot_box_window.py
 
-tophat_window.pdf : plot_tophat_window.py
-	$(PYTHON) $<
+figures/tophat_window.pdf : figures/plot_tophat_window.py
+	cd figures && $(PYTHON) plot_tophat_window.py
 
-pgrid_comparison.pdf : plot_pgrid.py ../data/class_pk_z45_pk.dat
-	$(PYTHON) $<
+figures/pgrid_comparison.pdf : figures/plot_pgrid.py ../data/class_pk_z45_pk.dat
+	cd figures && $(PYTHON) plot_pgrid.py
 
-pancake.pdf : plot_pancake.py
-	$(PYTHON) $<
+figures/pancake.pdf : figures/plot_pancake.py
+	cd figures && $(PYTHON) plot_pancake.py
 
-growth.pdf : plot_growth.py
-	$(PYTHON) $<
+figures/growth.pdf : figures/plot_growth.py
+	cd figures && $(PYTHON) plot_growth.py
 
 # --- LaTeX ---
 notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
@@ -45,4 +46,4 @@ notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
 
 clean :
 	rm -f *.aux *.log *.bbl *.blg *.out *.toc *.fls *.synctex.gz
-	rm -f *.png $(FIGURES) $(NOTES).pdf
+	rm -f figures/*.png $(FIGURES) $(NOTES).pdf

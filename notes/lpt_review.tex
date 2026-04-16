@@ -3,12 +3,15 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{graphicx}
+\graphicspath{{figures/}}
 \usepackage{hyperref}
 \usepackage[margin=1in]{geometry}
 \usepackage{natbib}
 \usepackage{xcolor}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,decorations.pathreplacing}
+\usepackage{tcolorbox}
+\tcbuselibrary{breakable,skins}
 \bibliographystyle{aasjournal}
 
 \newcommand{\bq}{\mathbf{q}}
@@ -23,7 +26,7 @@
 \newcommand{\calH}{\mathcal{H}}
 
 \title{Lagrangian Perturbation Theory: Zel'dovich Approximation and 2LPT}
-\author{Notes on IC generation with MUSIC2}
+\author{Theory and practice of cosmological initial conditions}
 \date{\today}
 
 \begin{document}
@@ -604,6 +607,7 @@ for generating 2LPT initial conditions proceeds as follows
     P_{\rm lin}(k)/V$ (where $V=L^3$).  Enforce the Hermitian
     condition $\delta_{\rm lin}(-\bk)=\delta_{\rm lin}^*(\bk)$ so
     that the real-space field is real (see Appendix~\ref{app:fft}).
+    An optional fixed-amplitude mode is discussed in the box below.
 
   \item \textbf{Compute the first-order potential.}  In Fourier space,
     Eq.~(\ref{eq:poisson1}) is trivially inverted:
@@ -621,6 +625,80 @@ for generating 2LPT initial conditions proceeds as follows
     $\Psi^{(1)}_i(\bk) = ik_i\phi^{(1)}(\bk)$, each obtained by
     a single IFFT.
 \end{enumerate}
+
+% ---------------------------------------------------------------------------
+\begin{tcolorbox}[
+  title={Fixed-amplitude (``paired-and-fixed'') ICs \citep{Angulo2016}},
+  colback=gray!5,
+  colframe=gray!55!black,
+  coltitle=white,
+  fonttitle=\bfseries,
+  breakable,
+  before skip=1.2em,
+  after skip=1.2em
+]
+
+\textbf{Standard draw and cosmic variance.}
+In the standard algorithm the real and imaginary parts of each mode are drawn
+independently,
+$\mathrm{Re}[\delta(\bk)],\,\mathrm{Im}[\delta(\bk)]
+ \sim \mathcal{N}(0,\,P(k)/2V)$.
+The amplitude $|\delta(\bk)|$ therefore follows a \emph{Rayleigh
+distribution} — it is the magnitude of a 2D Gaussian vector — and the
+power per mode $|\delta(\bk)|^2$ is exponentially distributed with mean
+$P(k)/V$ and 100\,\% fractional scatter.
+Averaging $N_k$ independent modes in a wavenumber bin yields the estimator
+$\hat{P}(k) = (V/N_k)\sum_{|\bk|\approx k}|\delta(\bk)|^2$ with cosmic
+variance
+%
+\begin{equation*}
+  \frac{\sigma[\hat{P}(k)]}{P(k)} \simeq \sqrt{\frac{2}{N_k}}.
+\end{equation*}
+
+\textbf{Fixed-amplitude technique.}
+\citet{Angulo2016} proposed replacing the Rayleigh draw with a deterministic
+amplitude $|\delta(\bk)| = \sqrt{P(k)/V}$ exactly, while keeping the
+phase $\theta_\bk \sim \mathrm{Uniform}[0,2\pi)$ random.
+Each mode now matches the target power spectrum precisely, so
+$\hat{P}(k) = P(k)$ mode-by-mode and the amplitude contribution to
+cosmic variance is eliminated.
+MUSIC2 implements this via \texttt{fix\_mode\_amplitude = yes}
+(the default in this pipeline).
+
+\textbf{Paired simulations.}
+A complementary technique is to generate a \emph{partner} IC with
+$\delta'(\bk) = -\delta(\bk)$, i.e.\ all phases shifted by $\pi$, which
+in real space gives $\delta'(\bx) = -\delta(\bx)$.
+For any observable $f$ that admits a perturbative expansion in $\delta$,
+%
+\begin{equation*}
+  \frac{f[\delta]+f[-\delta]}{2}
+  = f^{(0)} + f^{(2)}[\delta,\delta] + f^{(4)}[\delta,\delta,\delta,\delta]
+  + \cdots
+\end{equation*}
+%
+all odd-order contributions cancel exactly.
+Because sample variance is dominated by the linear term $f^{(1)}$,
+averaging a pair of simulations dramatically reduces cosmic variance
+for two-point statistics ($P(k)$, $\xi(r)$, $\sigma_8$).
+The fixed-amplitude and pairing techniques are independent and can be
+combined for maximum variance suppression.
+
+\textbf{Why the field is no longer Gaussian.}
+A Gaussian random field (GRF) requires that the real and imaginary parts of
+every mode are \emph{independently} Gaussian-distributed, so $|\delta(\bk)|$
+must be free to fluctuate (Rayleigh-distributed).
+Fixing $|\delta(\bk)|$ to a constant removes this degree of freedom:
+the joint distribution of all modes is no longer multivariate Gaussian.
+In real space, the one-point PDF of $\delta(\bx)$ still looks approximately
+Gaussian (central limit theorem over many modes), but higher-order connected
+correlators such as the bispectrum $\langle\delta\delta\delta\rangle_c$ and
+trispectrum $\langle\delta\delta\delta\delta\rangle_c$ are suppressed
+relative to a true GRF.
+Fixed-amplitude ICs are therefore \emph{unsuitable} for studies of primordial
+non-Gaussianity ($f_{\rm NL}$) or any statistic sensitive to higher-order
+correlations.
+\end{tcolorbox}
 
 \subsection{Second-order step}
 
@@ -879,15 +957,112 @@ requires a one-loop prediction from a code such as \textsc{PyBird},
 
 %----------------------------------------------------------------------
 \section{Why 2LPT Matters for ICs}
+\label{sec:why2lpt}
 
-Even when the one-loop correction to $P(k)$ is small, starting
-simulations with ZA-only ICs introduces \emph{transients}: spurious
-mode-coupling terms that take several dynamical times to die away
-\citep{Crocce2006}.  These arise because ZA misplaces particles at
-second order, and the $N$-body force then has to ``correct'' this
-error.  2LPT removes the leading transient and is standard practice
-for $z_{\rm start} \lesssim 100$.  For $z_{\rm start} \gtrsim 100$
-the growth factor is small enough that ZA suffices.
+\subsection{Transients from ZA initial conditions}
+
+ZA sets the second-order displacement $\bPsi^{(2)}$ to zero, so the
+initial particle distribution is misplaced relative to the exact
+second-order solution.  The $N$-body gravity then has to supply the
+missing $\bPsi^{(2)}$ as the simulation evolves.  During this
+``catch-up'' phase, spurious mode-coupling terms are excited that
+decay only as $a^{-1}$ \citep{Crocce2006} — taking many dynamical
+times to die away and leaving a residual suppression of power at
+$z \lesssim 6$ even when starting at $z_{\rm start}=400$.
+2LPT encodes $\bPsi^{(2)}$ in the ICs from the start, removing the
+leading transient.
+
+\subsection{The spherical top-hat: an analytic test}
+\label{sec:tophat_timing}
+
+\citet{Jenkins2010} provides a precise, quantitative picture using
+the spherical top-hat as an analytic benchmark.
+The top-hat is the worst-case for initial condition errors for two
+reasons:
+%
+\begin{enumerate}
+  \item The first structures to collapse are the density peaks with
+        the highest linear overdensity — exactly the regions most
+        sensitive to whether the ICs are accurate at second order.
+  \item The second-order overdensity satisfies
+        $\delta^{(2)} \le \tfrac{1}{2}|\delta^{(1)}|$,
+        with equality for isotropic compression.  The spherical top-hat
+        is the limiting case, so it maximises the second-order correction
+        and thereby maximises the error from using ZA ICs.
+\end{enumerate}
+
+The exact collapse of a spherical top-hat in an Einstein–de Sitter
+(EdS) universe is described by the parametric solution
+%
+\begin{equation}
+  r = \frac{R_0}{2}(1-\cos\eta), \qquad
+  t = \frac{t_c}{2\pi}(\eta - \sin\eta),
+  \label{eq:tophat_param}
+\end{equation}
+%
+where $R_0$ is the initial radius and $t_c$ is the collapse time
+($r=0$ at $\eta=2\pi$).
+Expanding for small $t/t_c$ gives a power series in which the ZA
+initial conditions use only the leading (first-order) term, while
+2LPT initial conditions include the next (second-order) correction
+\citep{Jenkins2010}.
+The discrepancy between the initial condition and the exact solution
+at $t=t_s$ is what drives the subsequent timing error.
+
+\subsection{Timing error scaling}
+
+Let $a_s$ and $a_c$ be the expansion factors at the start of the
+simulation and at collapse, respectively.  In an EdS universe the
+fractional timing error scales as \citep{Jenkins2010}
+%
+\begin{align}
+  \frac{\Delta t_{\rm ZA}}{t_c}   &\;\propto\; \frac{a_s}{a_c}
+      = \frac{1+z_c}{1+z_s},
+      \label{eq:timing_za} \\[4pt]
+  \frac{\Delta t_{\rm 2LPT}}{t_c} &\;\propto\; \left(\frac{a_s}{a_c}\right)^{\!2}
+      = \left(\frac{1+z_c}{1+z_s}\right)^{\!2}.
+      \label{eq:timing_2lpt}
+\end{align}
+%
+The 2LPT timing error is suppressed by an additional factor of
+$a_s/a_c = (1+z_c)/(1+z_s)$ relative to ZA.
+For typical values — say $z_c \approx 0$ (structure collapsing today)
+and $z_s = 127$ — ZA has a timing error $\sim 1/(1+z_s) \approx 0.8\%$
+of the Hubble time, while 2LPT reduces this to $\sim (1/(1+z_s))^2
+\lesssim 0.006\%$.
+
+A direct consequence is that to achieve the same timing accuracy as
+2LPT starting at $z_s$, Zel'dovich ICs would need to start at a
+redshift satisfying $a_s^{\rm ZA}/a_c \approx (a_s^{\rm 2LPT}/a_c)^2$
+— roughly a factor of $(1+z_s)$ earlier in expansion, which translates
+to a factor of $(1+z_s)^{3/2}$ earlier in cosmic time.
+In practice, if 2LPT starts at a factor of 10 in expansion before
+the first output, the equivalent Zel'dovich run would need to start
+a factor of $\sim\!100$ earlier \citep{Jenkins2010}, an entirely
+impractical requirement.
+
+\subsection{N-body confirmation}
+
+\citet{Jenkins2010} verified these predictions with full $N$-body
+simulations.
+For a spherically symmetric test perturbation, the collapse curves from
+2LPT ICs at different starting redshifts ($z_s = 399$ and $599$) are
+virtually indistinguishable, while ZA ICs show a systematically
+\emph{delayed} collapse whose magnitude grows with decreasing $z_s$,
+in quantitative agreement with the timing-error formula above.
+
+For the Aquarius halo \citep{Springel2008}, which collapsed at
+$z \approx 0$, the circular velocity profiles from eight 2LPT
+resimulations started at $z_s = 15$--$127$ lie on top of one another
+within the scatter, while those from ZA ICs show a noticeably
+larger spread.
+The cumulative subhalo abundance also converges much better across
+starting redshifts with 2LPT ICs.
+
+These results confirm that 2LPT ICs are more accurate and allow
+simulations to start at a later (lower) redshift without loss of
+fidelity — saving significant computational cost, particularly
+for zoom resimulations of high-redshift structure.
 
 %----------------------------------------------------------------------
 \section{Summary}
