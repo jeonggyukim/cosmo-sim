@@ -327,22 +327,29 @@ class ICPlotter:
     # Plotting
     # ------------------------------------------------------------------ #
 
-    def plot(self, show_nodeconv=False, hankel=False):
+    def plot(self, show_nodeconv=False, hankel=False, show_shot_sub=False):
         """
         Create the two-panel P(k) + ξ(r)/ψ(r) figure.
 
         Left panel  : P(k), theory, shot noise level, k_fund, k_Ny
         Right panel : ξ(r) from theory / Corrfunc / CIC grid;
                       ψ(r) on a twin y-axis (right side) if velocity data loaded
+
+        show_shot_sub : if True, also plot P_raw - V/N (shot-noise-subtracted).
+                        Off by default: IC particles sit on a near-regular lattice,
+                        which is sub-Poissonian, so V/N over-estimates the true
+                        discreteness noise.  The raw P(k) with V/N shown as a
+                        reference line is the correct display for lattice ICs.
         """
         self.fig, (self.ax, self.ax2) = plt.subplots(1, 2, figsize=(13, 5))
         ax, ax2 = self.ax, self.ax2
 
-        self._plot_pk_panel(ax, show_nodeconv=show_nodeconv, hankel=hankel)
+        self._plot_pk_panel(ax, show_nodeconv=show_nodeconv, hankel=hankel,
+                            show_shot_sub=show_shot_sub)
         self._plot_xi_panel(ax2)
         self.fig.tight_layout()
 
-    def _plot_pk_panel(self, ax, show_nodeconv=False, hankel=False):
+    def _plot_pk_panel(self, ax, show_nodeconv=False, hankel=False, show_shot_sub=False):
         """Populate the left P(k) panel."""
         # Theory
         if self.theory_k is not None:
@@ -361,10 +368,11 @@ class ICPlotter:
 
             ax.loglog(k, run["Pk_raw"], 'o-', ms=4, lw=1.2, color=color,
                       label=f'CIC-corrected ({label})')
-            pos = run["Pk_ss"] > 0
-            ax.loglog(k[pos], run["Pk_ss"][pos], '^-', ms=4, lw=1.2,
-                      color=color, alpha=0.6,
-                      label=f'CIC-corrected − shot noise ({label})')
+            if show_shot_sub:
+                pos = run["Pk_ss"] > 0
+                ax.loglog(k[pos], run["Pk_ss"][pos], '^-', ms=4, lw=1.2,
+                          color=color, alpha=0.6,
+                          label=f'− shot noise ({label})')
 
             if run["P_shot"] is not None:
                 ax.axhline(run["P_shot"], color=color, ls='--', lw=0.8, alpha=0.6,
@@ -510,6 +518,10 @@ def main():
                         help="Also plot the un-deconvolved P(k) curve")
     parser.add_argument("--hankel",  action="store_true",
                         help="Overplot xi(r) from Hankel transform of measured P(k)")
+    parser.add_argument("--show-shot-subtracted", action="store_true",
+                        help="Also plot P(k) - V/N (Poisson shot-noise subtracted). "
+                             "Off by default: IC particles sit on a near-regular lattice "
+                             "(sub-Poissonian), so V/N over-subtracts.")
     parser.add_argument("-o", "--output", default=None,
                         help="Output PNG (default: pk_<stem>.png or pk_comparison.png)")
     args = parser.parse_args()
@@ -528,7 +540,8 @@ def main():
         vel_cic_file=args.vel_cic,
     )
 
-    plotter.plot(show_nodeconv=args.show_nodeconv, hankel=args.hankel)
+    plotter.plot(show_nodeconv=args.show_nodeconv, hankel=args.hankel,
+                 show_shot_sub=args.show_shot_subtracted)
 
     # Determine output filename
     if args.output:

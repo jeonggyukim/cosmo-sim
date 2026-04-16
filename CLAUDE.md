@@ -152,7 +152,7 @@ Figures are generated from `plot_box_window.py`, `plot_tophat_window.py`, and `p
 
 ## MUSIC2
 
-See [MUSIC2_CLAUDE.md](MUSIC2_CLAUDE.md) for full details on the MUSIC2 code structure, build
+See [CLAUDE_MUSIC2.md](CLAUDE_MUSIC2.md) for full details on the MUSIC2 code structure, build
 instructions, IC generation pipeline, transfer function internals, and file formats.
 
 ### Quick usage

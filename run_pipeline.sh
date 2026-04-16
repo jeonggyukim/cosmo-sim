@@ -218,14 +218,19 @@ fi
 
 # ---------------------------------------------------------------------------
 # Step 7: Measure ξ(r) with compute_xi
-# Not skipped — always re-runs (fast, and output is overwritten each time).
-# Note: ξ(r) is shot-noise dominated at high z; use P(k) for IC validation.
-# See CORRFUNC.md § "When ξ(r) is the wrong tool" for the quantitative argument.
+# Skipped at high z (z > 10): at high redshift the linear power spectrum is
+# suppressed by D²(z) ≪ 1, so P_signal(k) ≪ P_shot = V/N for nearly all k,
+# and Corrfunc pair-counting ξ(r) is completely shot-noise dominated.
+# The CIC estimator (step 8) is preferred at any z.
 # ---------------------------------------------------------------------------
 XI_FILE="data/xi_${STEM}.txt"
-log "Measuring ξ(r) with compute_xi (${NTHREADS} threads)..."
-./compute_xi "$IC_FILE" "$RBINS_FILE" "$NTHREADS" > "$XI_FILE"
-echo "    Saved: $XI_FILE"
+if (( $(echo "$ZSTART > 10" | bc -l) )); then
+    log "Skipping Corrfunc ξ(r) — z=${ZSTART} > 10 (shot-noise dominated; use CIC P(k))"
+else
+    log "Measuring ξ(r) with compute_xi (${NTHREADS} threads)..."
+    ./compute_xi "$IC_FILE" "$RBINS_FILE" "$NTHREADS" > "$XI_FILE"
+    echo "    Saved: $XI_FILE"
+fi
 
 # ---------------------------------------------------------------------------
 # Step 8: Measure ξ(r) and ψ(r) on a CIC grid with compute_xi_cic

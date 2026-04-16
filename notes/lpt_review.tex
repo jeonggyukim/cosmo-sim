@@ -1235,189 +1235,10 @@ unaliased wavenumber.  Modes with $|\bk| > k_{\rm Ny}$ are aliased
 onto lower-frequency modes; the IC grid should be chosen large enough
 that the linear power spectrum is negligible at $k_{\rm Ny}$.
 
-%----------------------------------------------------------------------
-\subsection{FFTW conventions}
-\label{app:fft_fftw}
-
-FFTW implements the \emph{unnormalised} DFT
-%
-\begin{align}
-  \tilde f(\mathbf{n}_k) &= \sum_{\mathbf{n}_r}
-      f(\mathbf{n}_r)\,e^{-2\pi i\mathbf{n}_k\cdot\mathbf{n}_r/N},
-  \label{eq:fftw_fwd}\\
-  f(\mathbf{n}_r) &= \frac{1}{N^3}\sum_{\mathbf{n}_k}
-      \tilde f(\mathbf{n}_k)\,e^{2\pi i\mathbf{n}_k\cdot\mathbf{n}_r/N}.
-  \label{eq:fftw_inv}
-\end{align}
-%
-To match Eq.~(\ref{eq:dft_fwd}), identify $\delta(\bk_p) =
-H^3\,\tilde f(\mathbf{n}_k)$ and $f(\mathbf{n}_r) =
-\delta(\bx_p)$.  The normalisation factor $H^3$ must therefore be
-applied by the user after calling \texttt{fftw\_execute}.
-
-For a real input array of size $N\times N\times N$, the
-\texttt{dft\_r2c\_3d} routine exploits Hermitian symmetry and stores
-only the $N\times N\times(N/2+1)$ independent complex values.
-The full $k$-space array is recovered by the reflection
-$\delta(-\bk) = \delta^*(\bk)$.  In MUSIC2, the displacement
-components $\Psi^{(1)}_i$ and $\Psi^{(2)}_i$ are each computed via
-one forward ($r\to c$) and one backward ($c\to r$) FFTW call.
-
-%----------------------------------------------------------------------
-\subsection{The FFT algorithm: why $\mathcal{O}(N\log N)$}
-\label{app:fft_algorithm}
-
-A naive evaluation of the 1D DFT of $N$ points,
-$\tilde{f}(k) = \sum_{n=0}^{N-1} f(n)\,e^{-2\pi i kn/N}$,
-requires $\mathcal{O}(N^2)$ operations: $N$ output modes, each
-needing a sum of $N$ terms.  The \emph{Fast Fourier Transform}
-(FFT) reduces this to $\mathcal{O}(N\log_2 N)$ by exploiting the
-periodicity of the \emph{twiddle factor}
-$W_N \equiv e^{-2\pi i/N}$.
-
-\subsubsection*{Cooley--Tukey radix-2 algorithm}
-
-When $N = 2^m$ the Cooley--Tukey algorithm \citep{CooleyTukey1965}
-splits the $N$-point DFT into two $N/2$-point DFTs by separating
-even- and odd-indexed inputs:
-%
-\begin{align}
-  \tilde{f}(k) &= \sum_{n=0}^{N/2-1} f(2n)\,W_N^{2nk}
-                 + W_N^k \sum_{n=0}^{N/2-1} f(2n+1)\,W_N^{2nk}
-               \notag\\
-               &= \tilde{f}_{\rm even}(k) + W_N^k\,\tilde{f}_{\rm odd}(k),
-  \label{eq:fft_split}
-\end{align}
-%
-where $W_N^2 = W_{N/2}$, so both sub-sums are $(N/2)$-point DFTs.
-The phase factor $W_N^k$ is called the \emph{butterfly} weight.
-Using $W_N^{k+N/2} = -W_N^k$ (periodicity), both halves of
-$\tilde{f}$ are obtained from a single pair of half-length DFTs:
-%
-\begin{equation}
-  \tilde{f}(k)     = \tilde{f}_{\rm even}(k) + W_N^k\,\tilde{f}_{\rm odd}(k),
-  \qquad
-  \tilde{f}(k+N/2) = \tilde{f}_{\rm even}(k) - W_N^k\,\tilde{f}_{\rm odd}(k).
-  \label{eq:butterfly}
-\end{equation}
-%
-This \emph{butterfly} operation costs $\mathcal{O}(1)$ per mode
-pair.  Applying the same trick recursively to each half-length
-DFT gives a binary recursion tree of depth $\log_2 N$, with $N$
-butterfly operations at every level.  The total operation count is
-therefore $\mathcal{O}(N\log_2 N)$.
-
-FFTW extends this to arbitrary sizes using \emph{mixed-radix}
-factorisation: $N = r_1 r_2 \cdots r_k$ with radices $r_i$ chosen
-from a set of highly optimised ``codelets'' (radix-2, 3, 4, 5, 7,
-\ldots).  Before execution, FFTW's \texttt{fftw\_plan} stage
-searches for the optimal sequence of radices for the given $N$ and
-machine.  For prime $N$ (worst case), FFTW falls back to an
-$\mathcal{O}(N^2)$ direct DFT, so simulation boxes are always
-chosen to have highly composite sizes (typically powers of 2, or
-$2^a 3^b 5^c$).
-
-%----------------------------------------------------------------------
-\subsection{Multi-dimensional FFT}
-\label{app:fft_multidim}
-
-A $d$-dimensional DFT on an $N^d$ grid,
-%
-\begin{equation}
-  \tilde{f}(\mathbf{n}_k)
-    = \sum_{\mathbf{n}_r\in\{0,\ldots,N-1\}^d}
-      f(\mathbf{n}_r)\,
-      e^{-2\pi i\,\mathbf{n}_k\cdot\mathbf{n}_r/N},
-  \label{eq:dft_nd}
-\end{equation}
-%
-separates because the exponential factorises:
-$e^{-2\pi i(\mathbf{n}_k\cdot\mathbf{n}_r)/N}
-  = \prod_{j=1}^d e^{-2\pi i n_{k,j} n_{r,j}/N}$.
-The \emph{row--column algorithm} therefore computes the
-$d$-dimensional DFT by applying $N^{d-1}$ independent 1D FFTs
-along each of the $d$ dimensions in turn.
-
-For a 3D grid of $N^3$ points the procedure is:
-%
-\begin{enumerate}
-  \item FFT along dimension 1: $N^2$ independent FFTs of length $N$
-        ($N$ pencils in the $x$-direction for each $(y,z)$ pair).
-  \item FFT along dimension 2: $N^2$ independent FFTs of length $N$
-        (pencils along $y$, using the result from step 1).
-  \item FFT along dimension 3: $N^2$ independent FFTs of length $N$
-        (pencils along $z$).
-\end{enumerate}
-%
-Each step costs $\mathcal{O}(N^2 \cdot N\log_2 N)$, so the total
-3D FFT is $\mathcal{O}(3N^3\log_2 N)$ — only $\log_2 N$ times
-more expensive than a single FFT of length $N^3$ would be if such
-a thing existed.  For $N = 1024$ this is a factor
-$\sim 30$ improvement over the direct $\mathcal{O}(N^6)$ evaluation.
-
-%----------------------------------------------------------------------
-\subsection{Parallel FFT with MPI}
-\label{app:fft_mpi}
-
-On a distributed-memory cluster the $N^3$ grid must be spread across
-$P$ MPI ranks.  The key constraint is that a 1D FFT along direction
-$j$ requires \emph{all $N$ data points along that pencil} to reside
-on the same rank.  The two standard decompositions trade off between
-parallelism and communication volume.
-
-\subsubsection*{Slab decomposition (FFTW-MPI)}
-
-The array is divided into $P$ slabs of size $N \times N \times (N/P)$,
-one slab per rank.  The decomposition is along the $z$-axis, so:
-%
-\begin{enumerate}
-  \item FFTs along $x$ and $y$ are \emph{local}: each rank holds
-        complete $xy$-planes within its slab.
-  \item To perform FFTs along $z$, a global all-to-all transpose
-        must be performed so that each rank holds a full $z$-pencil.
-        After this transpose the $z$-FFTs are local.
-  \item The array is optionally transposed back to the original
-        layout.
-\end{enumerate}
-%
-FFTW-MPI (\texttt{fftw\_mpi\_plan\_dft\_3d}) implements this
-automatically.  The slab decomposition saturates at $P = N$ ranks
-(one slab per rank has only one $xy$-plane), making it unsuitable
-for very large $P$.
-
-\subsubsection*{Pencil (2D) decomposition}
-
-For $P > N$ a 2D pencil decomposition is required.  The $N^3$ grid
-is divided into $P_1 \times P_2$ pencils of size
-$N \times (N/P_1) \times (N/P_2)$, with $P = P_1 P_2$.  The
-algorithm proceeds in three stages with two global transposes:
-%
-\begin{enumerate}
-  \item \textbf{$x$-pencils}: each rank holds pencils aligned with
-        $x$; FFTs along $x$ are local.
-  \item \textbf{Transpose 1} (all-to-all): redistribute data to
-        \textbf{$y$-pencils}; FFTs along $y$ are local.
-  \item \textbf{Transpose 2} (all-to-all): redistribute to
-        \textbf{$z$-pencils}; FFTs along $z$ are local.
-\end{enumerate}
-%
-This decomposition scales up to $P = N^2$ ranks.  Libraries that
-implement pencil decomposition include \textsc{2decomp\&fft}
-\citep{Li2010} and \textsc{fftMPI} \citep{Plimpton2019}.  Many
-large-scale $N$-body and hydro codes (including SWIFT with
-$N \gtrsim 512$) use pencil-decomposed FFTs for the PM force
-calculation.
-
-\subsubsection*{Communication cost}
-
-In a slab decomposition the single global transpose exchanges
-$\mathcal{O}(N^3/P)$ data per rank in a single all-to-all
-collective.  In a pencil decomposition two all-to-all collectives
-are required, each moving $\mathcal{O}(N^3/P)$ data.  The
-communication overhead relative to computation scales as
-$1/\log_2 N$: as $N$ grows the compute cost grows faster than the
-communication cost, so large-$N$ transforms are more communication
-efficient.
+For the FFTW conventions used when implementing the forward and
+inverse transforms, the Cooley--Tukey radix-2 algorithm, the
+row--column multi-dimensional extension, and the slab/pencil MPI
+decompositions, see the companion notes \texttt{fft\_review.pdf}.
 
 %======================================================================
 \section{Power Spectrum Estimation from $N$-body Simulations}
@@ -1497,7 +1318,7 @@ than NGP.
 FFTW computes the unnormalised DFT
 $\delta^{\rm FFTW}(\mathbf{n}_k) = \sum_{\mathbf{n}_r}
 \delta(\mathbf{n}_r)\,e^{-2\pi i\mathbf{n}_k\cdot\mathbf{n}_r/N}$
-(see Appendix~\ref{app:fft_fftw}).  In the notation of
+(see \texttt{fft\_review.pdf} for FFTW conventions).  In the notation of
 Eq.~(\ref{eq:dft_fwd}), $\delta(\bk_p) = H^3\,\delta^{\rm FFTW}(\mathbf{n}_k)$,
 so the correctly normalised Fourier mode is
 %
@@ -1608,9 +1429,80 @@ subtraction, is therefore
   \label{eq:Pk_full}
 \end{equation}
 %
-Note that $1/\bar{n} = V/N_p$.  At high redshift, where
-$P_{\rm lin}(k) \ll V/N_p$ for most $k$, the signal is shot-noise
-dominated and $P(k)$ cannot be reliably recovered (see
-Table~1 in the main text).
+Note that $1/\bar{n} = V/N_p$.
+
+%----------------------------------------------------------------------
+\subsubsection*{Sub-Poissonian noise for lattice initial conditions}
+
+The Poisson formula Eq.~(\ref{eq:Pk_shot}) assumes that particle
+positions are drawn \emph{independently} from the underlying density
+field — a random (Poisson) process.  Initial conditions are
+\emph{not} Poisson-sampled: the particles start on a regular
+lattice perturbed by small LPT displacements.  A lattice is
+maximally sub-Poissonian, and $V/N_p$ \emph{over-estimates} the
+true discreteness noise.
+
+To see why, consider a perfect unperturbed lattice with sites
+$\bR_\alpha = H\,\mathbf{n}_\alpha$, $\mathbf{n}_\alpha\in\mathbb{Z}^3$, spacing $H=L/N$.
+The Fourier-space density contrast at a wavevector $\bk$ in the
+first Brillouin zone ($|\bk| < \pi/H$) is
+%
+\begin{equation}
+  \tilde\delta_{\rm lat}(\bk) = \frac{1}{N_p}
+    \sum_\alpha e^{-i\bk\cdot\bR_\alpha} - \delta_{\bk,\mathbf{0}}.
+  \label{eq:delta_lat}
+\end{equation}
+%
+For $\bk$ not equal to a reciprocal-lattice vector $\bG = (2\pi/H)\mathbf{m}$
+($\mathbf{m}\in\mathbb{Z}^3$), the geometric sum vanishes identically,
+$\sum_\alpha e^{-i\bk\cdot\bR_\alpha} = 0$, so
+$\tilde\delta_{\rm lat}(\bk) = 0$.  The lattice contributes
+\emph{zero} discreteness power for every mode inside the first
+Brillouin zone; all the power at those wavevectors is physical signal.
+
+For LPT initial conditions at redshift $z$, each particle is
+displaced from its lattice site by $\bPsi(\bR_\alpha)$:
+%
+\begin{equation}
+  \bx_\alpha = \bR_\alpha + \bPsi(\bR_\alpha).
+  \label{eq:lpt_disp}
+\end{equation}
+%
+At high $z$ the displacement is small ($|\bPsi| \sim D(z)\ll H$), and
+to first order in $\bPsi$
+%
+\begin{equation}
+  \tilde\delta(\bk)
+    \approx -i\bk\cdot\tilde\bPsi(\bk)
+    \equiv \tilde\delta_{\rm ZA}(\bk).
+  \label{eq:delta_za}
+\end{equation}
+%
+This is purely the Zel'dovich-approximation signal; there is no
+stochastic self-pair contribution.  The measured power spectrum
+$P^m(k)/W^2(k)$ therefore \emph{already} equals $P_{\rm signal}(k)$
+without any subtraction.  Subtracting $V/N_p$ as in
+Eq.~(\ref{eq:Pk_full}) would \emph{over-correct} by $V/N_p$:
+%
+\begin{equation}
+  \hat{P}(k)\big|_{\rm over-sub}
+    = P_{\rm signal}(k) - \frac{V}{N_p} < 0
+  \quad\text{whenever } P_{\rm signal}(k) < \frac{V}{N_p}.
+  \label{eq:oversub}
+\end{equation}
+
+At high redshift the linear signal is suppressed by $D^2(z)
+\propto (1+z)^{-2}$, so $P_{\rm signal}(k,z) \ll V/N_p$ for most
+$k$.  In this regime the physically correct estimator is the
+\emph{raw} spectrum $P_{\rm raw}(k) = P^m(k)/W^2(k)$, with $V/N_p$
+plotted as a reference level to identify the shot-noise floor rather
+than subtracted.  The signal-dominated regime is where
+$P_{\rm raw}(k) \gg V/N_p$.
+
+As the simulation evolves to low $z$, gravitational clustering erases
+the memory of the initial lattice: by $z\sim 0$ the particles are
+strongly clustered and the Poisson approximation becomes a reasonable
+description of the residual discreteness noise, so the standard
+subtraction of $V/N_p$ is justified in that limit.
 
 \end{document}
