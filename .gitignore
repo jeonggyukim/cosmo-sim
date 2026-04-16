@@ -11,15 +11,8 @@ conf/CV_22_MUSIC_n*.conf
 # MUSIC2 build output
 music_build/
 
-# Large binary data files (not versioned)
+# All pipeline data outputs (HDF5, binaries, P(k), xi, CLASS outputs)
 data/
-
-
-# Generated data outputs (reproducible via run_pipeline.sh)
-data/pk_*.txt
-data/xi_*.txt
-data/rbins*.txt
-data/class_pk_z*.dat
 
 # Compiled C binaries
 compute_xi
