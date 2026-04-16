@@ -138,7 +138,19 @@ In the matter-dominated limit $\Dp \propto a$.  The
 %
 \begin{equation}
   f(a) \equiv \frac{d\ln\Dp}{d\ln a} \approx \Omm(a)^{0.55}
-  \quad\text{\citep{Linder2005}},
+  \quad\text{\citep{Linder2005}},%
+  \footnote{The power-law form $f\approx\Omm(a)^\gamma$ is a numerical
+    fitting formula, not an analytic result.
+    In a matter-only universe ($\Omm=1$, $\Omega_\Lambda=0$),
+    $\Dp\propto a$ gives $f=1$ exactly.
+    \citet{Peebles1980} showed that $f\approx\Omm^\gamma$ is
+    self-consistent to first order in $(1-\Omm)$ with $\gamma\approx0.6$.
+    \citet{Linder2005} solved the growth ODE numerically over a wide range
+    of dark-energy models and found $\gamma=0.55$ minimises the error for
+    flat $\Lambda$CDM, achieving $\lesssim0.2\%$ accuracy for $0\le z\le2$.
+    The approximation correctly recovers $f\to1$ as $\Omm(z)\to1$
+    at high $z$, and $f\to0$ as $\Omm(z)\to0$ in the $\Lambda$-dominated
+    future.}
   \label{eq:fgrowth}
 \end{equation}
 %
@@ -260,6 +272,22 @@ with $\phi^{(1)}$ satisfying the Poisson equation in Lagrangian space:
 %
 where $\delta_{\rm lin}$ is the linear density contrast at the
 reference epoch at which $\Dp = 1$.
+To see where Eq.~(\ref{eq:poisson1}) comes from, linearise the exact
+mass-conservation condition $1+\delta = |J|^{-1}$
+(Eq.~\ref{eq:jacobian}).
+At first order, $J_{ij}=\delta_{ij}+\partial\Psi^{(1)}_i/\partial q_j$
+and $\det J\approx 1+\nabla_\bq\cdot\bPsi^{(1)}$, so
+%
+\begin{equation*}
+  \delta \;\approx\; -\nabla_\bq\cdot\bPsi^{(1)}.
+\end{equation*}
+%
+Substituting the potential ansatz $\bPsi^{(1)}=-\nabla_\bq\phi^{(1)}$
+gives $\delta=\nabla_\bq^2\phi^{(1)}$, which is
+Eq.~(\ref{eq:poisson1}). Physically, the displacement divergence
+$\nabla\cdot\bPsi$ measures the fractional change in volume of a
+Lagrangian fluid element, hence the local density contrast.
+
 In Fourier space this is solved trivially:
 %
 \begin{equation}
@@ -269,8 +297,17 @@ In Fourier space this is solved trivially:
   \label{eq:psi1_fourier}
 \end{equation}
 %
-The IC generator draws $\delta_{\rm lin}(\bk)$ from a Gaussian with
-variance $P_{\rm lin}(k)$ (the CLASS power spectrum), then applies
+The IC generator draws $\delta_{\rm lin}(\bk)$ from a complex Gaussian with
+variance $P_{\rm lin}(k)/V$ per mode%
+\footnote{In a periodic box of volume $V$ the allowed wavevectors are
+  discrete with spacing $\Delta^3k=(2\pi)^3/V$.  The real-space variance
+  is $\sigma^2=\int d^3k/(2\pi)^3\,P(k)\approx\sum_\bk P(k)/V$,
+  so each mode contributes $P(k)/V$ to $\sigma^2$ and must therefore
+  be drawn with that variance.  Equivalently, with the DFT convention
+  $\delta(\bk)=V^{-1}\!\int d^3x\,\delta(\bx)\,e^{-i\bk\cdot\bx}$
+  one has $\langle|\delta(\bk)|^2\rangle=P(k)/V$.
+  Larger box $\Rightarrow$ denser mode sampling $\Rightarrow$ smaller variance per mode.}
+(the CLASS power spectrum), then applies
 Eq.~(\ref{eq:psi1_fourier}) to compute particle displacements.
 
 \subsection{Velocity field}
@@ -646,87 +683,91 @@ a flowchart.
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[
-  node distance = 0.55cm and 2.2cm,
   box/.style  = {rectangle, rounded corners=4pt, draw=black!70,
-                 fill=#1, text width=4.2cm, align=center,
-                 font=\small, inner sep=5pt, minimum height=0.9cm},
+                 fill=#1, text width=4.0cm, align=center,
+                 font=\small, inner sep=6pt, minimum height=1.0cm},
   box/.default = blue!8,
   arrow/.style = {-{Stealth[length=5pt]}, thick, black!70},
   label/.style = {font=\footnotesize\itshape, text=gray}
 ]
 
-%% ─── Column A: first-order (ZA) ────────────────────────────────
+%% ─── Shared top chain (centred) ─────────────────────────────────
 \node[box=green!12] (input)
   {$P_{\rm lin}(k)$ from CLASS\\(linear power spectrum)};
 
-\node[box, below=of input] (draw)
-  {Draw $\delta_{\rm lin}(\bk)$\\
-   complex Gaussian,\\
+\node[box, below=0.7cm of input] (draw)
+  {Draw $\delta_{\rm lin}(\bk)$\\complex Gaussian,\\
    variance $P_{\rm lin}(k)/V$};
 
-\node[box, below=of draw] (phi1k)
+\node[box, below=0.7cm of draw] (phi1k)
   {$\phi^{(1)}(\bk) = -\delta_{\rm lin}(\bk)\,/\,k^2$};
 
-\node[box, below=of phi1k] (hess)
+%% ─── Left branch (ZA): Ψ^(1) ────────────────────────────────────
+\node[box, below=2.0cm of phi1k, xshift=-2.4cm] (psi1)
+  {$\Psi^{(1)}_i(\bq) = \mathcal{F}^{-1}\!\left[ik_i\phi^{(1)}\right]$};
+
+%% ─── Right branch (2LPT): Hessian → F → φ^(2) → Ψ^(2) ──────────
+\node[box, below=2.0cm of phi1k, xshift=2.4cm] (hess)
   {IFFT $\to$ 6 Hessian fields\\
    $\phi^{(1)}_{,ij}(\bq)$,\quad $i\!\leq\! j$};
 
-\node[box, below=of hess] (psi1)
-  {$\Psi^{(1)}_i(\bq) = \mathcal{F}^{-1}\!\left[ik_i\phi^{(1)}\right]$};
+\node[box=orange!12, below=0.8cm of hess] (source)
+  {$F(\bq) = \!\sum_{i<j}\!\bigl[
+     \phi^{(1)}_{,ii}\phi^{(1)}_{,jj}
+     - \bigl(\phi^{(1)}_{,ij}\bigr)^{2}\bigr]$};
 
-%% ─── Column B: second-order (2LPT) ─────────────────────────────
-\node[box=orange!12, right=of hess] (source)
-  {Source $F(\bq) =$\\
-   $\displaystyle\sum_{i<j}\!\left[\phi^{(1)}_{,ii}\phi^{(1)}_{,jj}
-   -\!\left(\phi^{(1)}_{,ij}\right)^{\!2}\right]$};
-
-\node[box, below=of source] (phi2k)
+\node[box, below=0.8cm of source] (phi2k)
   {FFT $\to$ $\phi^{(2)}(\bk) = -F(\bk)\,/\,k^2$};
 
-\node[box, below=of phi2k] (psi2)
+\node[box, below=0.7cm of phi2k] (psi2)
   {$\Psi^{(2)}_i(\bq) = \mathcal{F}^{-1}\!\left[ik_i\phi^{(2)}\right]$};
 
-%% ─── Final step ─────────────────────────────────────────────────
+%% ─── Final: assign positions + velocities (centred) ─────────────
 \node[box=green!12,
-      below=1.1cm of $(psi1)!0.5!(psi2)$,
+      below=0.8cm of psi2, xshift=-2.4cm,  %% centres below phi1k
       text width=9.0cm] (final)
   {$\bx = \bq + \Dp\bPsi^{(1)} + \Dpp\bPsi^{(2)}$\\[2pt]
-   $\bv_{\rm pec} = \calH\bigl[f\Dp\bPsi^{(1)} + f^{(2)}\Dpp\bPsi^{(2)}\bigr]$};
+   $\bv_{\rm pec} = \calH\bigl[f\Dp\bPsi^{(1)}
+     + f^{(2)}\Dpp\bPsi^{(2)}\bigr]$};
 
-%% ─── Arrows: column A ───────────────────────────────────────────
+%% ─── Arrows: shared stem ────────────────────────────────────────
 \draw[arrow] (input)  -- (draw);
 \draw[arrow] (draw)   -- (phi1k);
-\draw[arrow] (phi1k)  -- (hess);
-\draw[arrow] (hess)   -- (psi1);
 
-%% ─── Arrow: Hessian → 2LPT source ──────────────────────────────
-\draw[arrow] (hess)   -- (source)
-  node[midway, above, label] {same fields};
+%% ─── Fork: diagonal arrows from φ^(1) to each branch ───────────
+\draw[arrow] (phi1k.south) -- (psi1.north);
+\draw[arrow] (phi1k.south) -- (hess.north);
 
-%% ─── Arrows: column B ───────────────────────────────────────────
+%% ─── Arrows: right branch ───────────────────────────────────────
+\draw[arrow] (hess)   -- (source);
 \draw[arrow] (source) -- (phi2k);
 \draw[arrow] (phi2k)  -- (psi2);
 
-%% ─── Merge arrows → final ───────────────────────────────────────
-\draw[arrow] (psi1) |- (final);
-\draw[arrow] (psi2) |- (final);
+%% ─── Merge arrows → final (straight down into wide box) ─────────
+\draw[arrow] (psi1.south) -- (final.north -| psi1);
+\draw[arrow] (psi2.south) -- (final.north -| psi2);
 
-%% ─── Side labels ────────────────────────────────────────────────
-\node[label, left=0.15cm of draw,   anchor=east] {1. draw IC};
-\node[label, left=0.15cm of phi1k,  anchor=east] {2. Poisson};
-\node[label, left=0.15cm of hess,   anchor=east] {3. IFFTs};
-\node[label, left=0.15cm of psi1,   anchor=east] {4. ZA};
-\node[label, right=0.15cm of source, anchor=west] {5. mode coupling};
-\node[label, right=0.15cm of phi2k, anchor=west] {6. Poisson};
-\node[label, right=0.15cm of psi2,  anchor=west] {7. 2LPT};
+%% ─── Step labels ────────────────────────────────────────────────
+\node[label, left=0.2cm of draw,    anchor=east] {1.~draw IC};
+\node[label, left=0.2cm of phi1k,   anchor=east] {2.~Poisson};
+\node[label, left=0.2cm of psi1,    anchor=east] {3a.~ZA};
+\node[label, right=0.2cm of hess,   anchor=west] {3b.~Hessian};
+\node[label, right=0.2cm of source, anchor=west] {4.~mode coupling};
+\node[label, right=0.2cm of phi2k,  anchor=west] {5.~Poisson};
+\node[label, right=0.2cm of psi2,   anchor=west] {6.~2LPT};
 
 \end{tikzpicture}
 \caption{Flowchart of the 2LPT IC generation algorithm
 (\S\ref{sec:icgen}).  Green boxes are inputs/outputs; blue boxes are
-first-order (ZA) steps; orange boxes are second-order (2LPT) steps.
-The six Hessian fields $\phi^{(1)}_{,ij}$ serve \emph{both} branches:
-the first-order displacement $\bPsi^{(1)}$ (left) and the 2LPT source
-$F(\bq)$ (right).  All IFFT steps are 3D FFTs.}
+computational steps; the orange box is the second-order source.
+After solving the first-order Poisson equation for $\phi^{(1)}(\bk)$,
+the algorithm forks into two parallel branches (3a and 3b):
+the left branch computes the ZA displacement $\bPsi^{(1)}$ directly
+from $\phi^{(1)}$, while the right branch computes six Hessian fields
+$\phi^{(1)}_{,ij}(\bq)$ needed for the 2LPT mode-coupling source $F(\bq)$.
+The two displacement fields $\bPsi^{(1)}$ and $\bPsi^{(2)}$ are combined
+in the final step to assign particle positions and velocities.
+All transforms are 3D FFTs.}
 \label{fig:icgen}
 \end{figure}
 
