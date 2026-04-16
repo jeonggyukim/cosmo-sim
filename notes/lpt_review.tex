@@ -1505,4 +1505,49 @@ strongly clustered and the Poisson approximation becomes a reasonable
 description of the residual discreteness noise, so the standard
 subtraction of $V/N_p$ is justified in that limit.
 
+\subsection{Radiation and the back-scaling growth factor}
+\label{sec:backscaling_radiation}
+
+When validating ICs at high redshift by comparing the measured $P(k)$
+against a Boltzmann-code prediction, one must account for a systematic
+difference in how the growth factor is computed.
+
+IC generators such as MUSIC2 back-scale the power spectrum from a
+reference redshift $z_{\rm ref}=0$ to the starting redshift $z_{\rm
+start}$ using the linear growth factor $D_+(z)$, which they compute
+by solving the matter growth ODE
+\begin{equation}
+  \ddot{D}_+ + 2H\dot{D}_+ = \tfrac{3}{2}\Omega_m H_0^2 \, D_+ / a^3
+\end{equation}
+with radiation \emph{excluded} from the Friedmann equation
+($\Omega_r = 0$, \texttt{ZeroRadiation=true} in MUSIC2 since
+2023-03-08).  This is deliberate: $N$-body codes such as SWIFT and
+GADGET also ignore radiation in their background cosmology when
+integrating the equations of motion, so the ICs must be consistent
+with that approximation.
+
+Boltzmann codes (CLASS, CAMB), on the other hand, solve the full
+Einstein--Boltzmann system including radiation.  At $z=200$ radiation
+contributes $\sim 6\%$ to $H^2(z)$
+($\Omega_r(z{=}200)/\Omega_m \simeq \Omega_r(1+200)/\Omega_m$), so
+the radiation-inclusive $D_+(z=200)/D_+(z=0)$ is $\sim 11\%$ smaller
+than the radiation-free value.  Consequently, a direct comparison of
+the measured IC $P(k)$ at $z=200$ against the CLASS \texttt{mPk}
+output at $z=200$ shows a systematic $\sim 5$--$10\%$ suppression
+that is \emph{expected and not a bug}.
+
+The correct reference for validation at $z_{\rm start}$ is the
+back-scaled CLASS spectrum:
+\begin{equation}
+  P_{\rm ref}(k,\,z_{\rm start})
+  = P_{\rm CLASS}(k,\,z_{\rm ref})
+    \times \left[\frac{D_+^{\rm no-rad}(z_{\rm start})}
+                      {D_+^{\rm no-rad}(z_{\rm ref})}\right]^2,
+  \label{eq:backscaled_ref}
+\end{equation}
+where $z_{\rm ref}$ is a low reference redshift (e.g.\ $z_{\rm
+ref}=2$) at which the radiation correction to $D_+$ is negligible
+(${\lesssim}0.2\%$), and $D_+^{\rm no-rad}$ is computed with
+$\Omega_r=0$, matching MUSIC2's internal convention.
+
 \end{document}

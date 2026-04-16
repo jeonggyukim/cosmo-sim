@@ -320,3 +320,49 @@ Key advantage of PPT over LPT: preserves Hamiltonian structure, so no spurious h
 ### Backscaling reference redshift
 
 monofonIC uses z_ref = 2.125 (not z=0) as the reference for the CLASS transfer function (Hahn 2021 §2.5). At z=0, decaying modes and relativistic effects have already been erased; backscaling from z_ref ≈ 2 captures the BAO scale and the dominant large-scale modes more accurately. MUSIC2 uses `ztarget = 0` (default).
+
+### ZeroRadiation and the ~5% P(k) offset at high z
+
+**Setting:** `[cosmology] ZeroRadiation = true` (default since commit `34e0b88`, 2023-03-08;
+originally `false` when introduced in `0877b8d`, 2023-02-14).
+
+**What it does:** When `true`, MUSIC2 sets `Omega_r = 0` in its growth factor ODE and absorbs
+the radiation energy density into `Omega_DE` so that `Omega_m + Omega_DE = 1` (flat, no
+radiation). The back-scaling growth factor D+(z_start)/D+(z=0) is therefore computed in a
+universe with no radiation background.
+
+**Why this causes a ~5% offset against CLASS at z ≳ 100:**
+At z=200, radiation contributes ~6% to H²(z) (Ω_r(z=200)/Ω_m ≈ Ω_r × 201/Ω_m ≈ 0.06).
+MUSIC2's D+(z=200) (no radiation) is ~11% larger than the true D+(z=200) (with radiation),
+so MUSIC2's back-scaled P(k) is ~25% larger than CLASS's direct P(k,z=200). In practice
+the offset between measured IC P(k) and CLASS P(k) is closer to 5–10% because CLASS's own
+P(k,z=200) already uses the no-radiation growth factor approximation for the comparison
+redshift z=2 (our reference). See Oliver Hahn's explanation below.
+
+**Why this is intentional and correct:**
+N-body codes (SWIFT, GADGET, AREPO) ignore radiation in their background cosmology when
+integrating the equations of motion. MUSIC2 therefore back-scales ICs with the same
+radiation-free D+(z) that the sim code will use, so the ICs are self-consistent with the
+subsequent evolution. Using `ZeroRadiation = false` would produce ICs that are inconsistent
+with a sim code that ignores radiation.
+
+**Consequence for IC validation:**
+Comparing the measured P(k) from ICs at high z against CLASS `mPk` output at that z is
+the wrong test — CLASS includes radiation in the Boltzmann evolution while MUSIC2 does not.
+The correct reference curve is CLASS P(k) back-scaled with MUSIC2's own (no-radiation)
+growth factor:
+
+```
+P_ref(k, z_start) = P_CLASS(k, z_ref) × [D+_norad(z_start) / D+_norad(z_ref)]²
+```
+
+where z_ref is a low reference redshift (e.g. z=2) where the radiation correction to D+ is
+negligible (~0.2%), and D+_norad is computed with Ω_r = 0 (same ODE as MUSIC2).
+`plot_ic.py --theory` currently passes CLASS P(k) at z_start directly, which is why the
+ratio panel shows ~5% suppression at z=200. Using the back-scaled reference would give ~1
+in the ratio panel by construction.
+
+This behaviour is confirmed by the MUSIC2 author: the ~7% difference in
+[D+(no-radiation)/D+(with-radiation)]² at z=200 is expected and intentional, because
+standard N-body codes ignore radiation in the background, so the correct back-scaling is
+with D+(no-radiation).
