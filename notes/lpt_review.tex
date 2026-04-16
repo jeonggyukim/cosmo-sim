@@ -1505,6 +1505,81 @@ strongly clustered and the Poisson approximation becomes a reasonable
 description of the residual discreteness noise, so the standard
 subtraction of $V/N_p$ is justified in that limit.
 
+\subsection{Folding technique for sub-Nyquist power spectra}
+\label{sec:folding}
+
+The standard CIC+FFT estimator is limited to wavenumbers
+$k \leq k_{\rm Ny} = \pi N_{\rm grid}/L$.  Increasing $N_{\rm grid}$
+is expensive ($\mathcal{O}(N_{\rm grid}^3)$ memory and time).  The
+\emph{folding} technique \citep{Jenkins1998} extends the measurable
+$k$-range to $m\times k_{\rm Ny}$ for integer folding factor $m$
+without changing $N_{\rm grid}$, by mapping particle positions into a
+sub-box of side $L/m$:
+\begin{equation}
+  \mathbf{x}^{(m)}_i = \mathbf{x}_i \bmod (L/m).
+  \label{eq:fold}
+\end{equation}
+All $N$ particles are retained, but now occupy a volume $(L/m)^3$.
+Assigning them to the same $N_{\rm grid}^3$ mesh gives a cell size of
+$L/(m\,N_{\rm grid})$, so $k_{\rm Ny}^{(m)} = m\,k_{\rm Ny}$ and the
+fundamental mode $k_f^{(m)} = m\,k_f$.
+
+The measured folded power spectrum is an alias-average of the true
+spectrum,
+\begin{equation}
+  P^{(m)}(k) = \sum_{n=0}^{\infty} P(k + n\,m\,k_f),
+  \label{eq:fold_alias}
+\end{equation}
+because folding maps modes $\mathbf{k}$, $\mathbf{k}\pm m\mathbf{k}_f$,
+$\ldots$ onto the same grid mode.  For a steeply falling $P(k)$ the
+$n \geq 1$ terms are negligible at $k \gg m k_f$, so $P^{(m)}(k)
+\approx P(k)$ in the high-$k$ portion of each folded level.
+
+\paragraph{Shot-noise benefit.}
+The shot-noise level of the folded run is
+\begin{equation}
+  P_{\rm shot}^{(m)} = \frac{(L/m)^3}{N} = \frac{P_{\rm shot}}{m^3}.
+  \label{eq:fold_shot}
+\end{equation}
+This $m^3$ reduction is substantial: at $z=200$, the unfolded shot
+noise $P_{\rm shot} \approx 19\;(\mathrm{Mpc}/h)^3$ swamps the signal
+at nearly all $k$, but with $m=16$ it drops to
+$\approx 0.005\;(\mathrm{Mpc}/h)^3$, well below the signal on small
+scales.
+
+\paragraph{Validity condition.}
+Equation~(\ref{eq:fold_alias}) is a good approximation only when $P(k)$
+falls steeply, so that the $n\geq1$ alias terms are negligible.  More
+importantly, for initial conditions laid on a regular particle lattice
+with spacing $d = L/N^{1/3}$, the true power spectrum contains a strong
+peak at $k_{\rm latt} = 2\pi/d$ (the lattice shot-noise mode).  If
+$k_{\rm latt}$ falls inside the folded measurement range — which it does
+for $m \gtrsim k_{\rm latt}/k_{\rm Ny}$ — folding aliases that lattice
+peak into the estimate, producing a spurious upturn unrelated to the
+physical $P(k)$.
+
+At high redshift IC particles sit nearly on their original lattice
+(rms displacement $\sigma_x \sim D(z)\,\sigma_0 \ll d$), so this
+contamination is severe.  Folding is only meaningful once nonlinear
+clustering has dispersed particles well beyond their lattice sites,
+roughly $z \lesssim 1$--$2$.  This is distinct from the sub-Poissonian
+shot-noise argument for the \emph{unfolded} run: in that case the
+lattice modes appear only at $k \geq 2k_{\rm Ny}$ and are suppressed
+by interlacing, whereas folding deliberately brings them into the
+measurement range.
+
+\paragraph{Stitching.}
+In practice one runs the estimator at levels $m = 1, m_1, m_2, \ldots$
+and retains from each level only the $k$-range where its estimate is
+trustworthy:
+\begin{itemize}
+  \item $m=1$: $k_f < k \leq 0.9\,k_{\rm Ny}$ (alias-free with interlacing);
+  \item $m_j > 1$: $0.9\,k_{\rm Ny}^{(m_{j-1})} < k \leq
+        0.9\,k_{\rm Ny}^{(m_j)}$ (above the previous level's Nyquist).
+\end{itemize}
+The low-$k$ cut for each folded level discards the part contaminated by
+the $n\geq1$ aliases in Eq.~(\ref{eq:fold_alias}).
+
 \subsection{Radiation and the back-scaling growth factor}
 \label{sec:backscaling_radiation}
 
@@ -1545,9 +1620,10 @@ back-scaled CLASS spectrum:
                       {D_+^{\rm no-rad}(z_{\rm ref})}\right]^2,
   \label{eq:backscaled_ref}
 \end{equation}
-where $z_{\rm ref}$ is a low reference redshift (e.g.\ $z_{\rm
-ref}=2$) at which the radiation correction to $D_+$ is negligible
-(${\lesssim}0.2\%$), and $D_+^{\rm no-rad}$ is computed with
-$\Omega_r=0$, matching MUSIC2's internal convention.
+The natural choice is $z_{\rm ref}=0$, for which $D_+^{\rm no-rad}(0)=1$ by
+construction, reducing eq.~\eqref{eq:backscaled_ref} to
+$P_{\rm ref}(k,z_{\rm start}) = P_{\rm CLASS}(k,0)\times
+[D_+^{\rm no-rad}(z_{\rm start})]^2$.
+$D_+^{\rm no-rad}$ is computed with $\Omega_r=0$, matching MUSIC2's internal convention.
 
 \end{document}

@@ -125,7 +125,7 @@ class ICPlotter:
         """Load one pk_*.txt file (output of compute_pk.py)."""
         meta = self._parse_header(pkfile)
         data = np.loadtxt(pkfile, comments='#')
-        # Columns: k  P_raw  P_shot_sub  P_nodeconv  sigma_P  nmodes
+        # Columns: k  P_raw  P_shot_sub  P_nodeconv  sigma_P  nmodes  [fold_m]
         run = {
             "pkfile":           pkfile,
             "stem":             self._stem_from_pkfile(pkfile),
@@ -135,6 +135,7 @@ class ICPlotter:
             "Pk_ss":            data[:, 2],
             "Pk_nodeconv":      data[:, 3] if data.shape[1] > 3 else data[:, 1],
             "Pk_err":           data[:, 4] if data.shape[1] > 4 else np.zeros(len(data)),
+            "fold_m":           data[:, 6].astype(int) if data.shape[1] > 6 else np.ones(len(data), dtype=int),
             "P_shot":           meta["P_shot"],
             "boxsize_mpch":     meta["boxsize_mpch"],
             "N":                meta["N"],
@@ -143,9 +144,40 @@ class ICPlotter:
         }
         self.pk_runs.append(run)
 
-    def load_theory(self, theory_file):
+    @staticmethod
+    def _growth_factor_norad(z, Omega_m, H0):
+        """
+        Linear growth factor D+(z) with Omega_r = 0 (ZeroRadiation convention),
+        normalised to D+(z=0) = 1.  Matches MUSIC2's back-scaling growth factor.
+
+        Uses the standard integral form:
+            D+(z) ∝ H(z) ∫_0^a da' / [a' H(a')]³
+        with H²(a) = H0² [Omega_m/a³ + (1 - Omega_m)].
+        """
+        from scipy.integrate import quad
+        Omega_DE = 1.0 - Omega_m  # flat, no radiation
+        def H(a):
+            return H0 * np.sqrt(Omega_m / a**3 + Omega_DE)
+        def integrand(a):
+            return 1.0 / (a * H(a))**3
+        a = 1.0 / (1.0 + z)
+        D, _  = quad(integrand, 1e-6, a,   limit=500)
+        D0, _ = quad(integrand, 1e-6, 1.0, limit=500)
+        return (H(a) * D) / (H(1.0) * D0)
+
+    def load_theory(self, theory_file, z_ref=None):
         """
         Load CLASS P(k) and compute theory ξ(r) and ψ(r).
+
+        If z_ref is given, the theory file is treated as P(k) at redshift
+        z_ref and back-scaled to z_start (from the primary pk run) using the
+        no-radiation growth factor D+_norad — matching MUSIC2's ZeroRadiation=true
+        convention.  Use this when comparing high-z ICs against CLASS:
+
+            P_ref(k, z_start) = P_CLASS(k, z_ref) × [D+_norad(z_start) / D+_norad(z_ref)]²
+
+        Using z_ref=0 is the natural choice: D+_norad(0)=1 by definition, so
+        the formula simplifies to P_ref(k, z_start) = P_CLASS(k, 0) × D+_norad(z_start)².
 
         ξ(r) is computed via Hankel transform using mcfit (if available).
         ψ(r) = [H(z)·f(z)]²/(2π²) ∫ P(k) j₀(kr) dk is computed via direct
@@ -153,6 +185,17 @@ class ICPlotter:
         loaded (to determine z).
         """
         kt, Pt = np.loadtxt(theory_file, comments='#', unpack=True)
+
+        if z_ref is not None and self.pk_runs:
+            z_start = self.pk_runs[0].get("z")
+            if z_start is not None and z_start != z_ref:
+                D_start = self._growth_factor_norad(z_start, self.Omega_m, self.H0)
+                D_ref   = self._growth_factor_norad(z_ref,   self.Omega_m, self.H0)
+                scale   = (D_start / D_ref) ** 2
+                Pt = Pt * scale
+                print(f"Theory back-scaled from z_ref={z_ref} to z_start={z_start:.4g} "
+                      f"using no-radiation D+: scale factor = {scale:.6g}")
+
         self.theory_k = kt
         self.theory_P = Pt
 
@@ -380,22 +423,27 @@ class ICPlotter:
                       label='theory (CLASS)', zorder=10)
 
         # Per-run curves
+        multi = len(self.pk_runs) > 1
         for i, run in enumerate(self.pk_runs):
-            k      = run["k"]
-            label  = run["stem"]
-            color  = f'C{i}'
+            k     = run["k"]
+            stem  = run["stem"]
+            color = f'C{i}'
+
+            interlaced = "no_interlace" not in stem
+            mas_label  = "CIC-corrected, interlaced" if interlaced else "CIC-corrected (no interlacing)"
+            label      = f'{mas_label} ({stem})' if multi else mas_label
 
             if show_nodeconv and i == 0:
                 ax.loglog(k, run["Pk_nodeconv"], 's--', ms=3, lw=1.0,
                           color='C3', alpha=0.7, label='no CIC correction')
 
             ax.loglog(k, run["Pk_raw"], 'o-', ms=4, lw=1.2, color=color,
-                      label=f'CIC-corrected ({label})')
+                      label=label)
             if show_shot_sub:
                 pos = run["Pk_ss"] > 0
                 ax.loglog(k[pos], run["Pk_ss"][pos], '^-', ms=4, lw=1.2,
                           color=color, alpha=0.6,
-                          label=f'− shot noise ({label})')
+                          label=f'− shot noise ({stem})' if multi else '− shot noise')
 
             if run["P_shot"] is not None:
                 ax.axhline(run["P_shot"], color=color, ls='--', lw=0.8, alpha=0.6,
@@ -417,8 +465,8 @@ class ICPlotter:
         ax.set_ylabel(r'$P(k)$ [(Mpc/$h$)$^3$]')
         if self.pk_runs:
             run = self.pk_runs[0]
-            ax.set_title(f'N={run["npart_side"]}³, L={run["boxsize_mpch"]:.4g} Mpc/h, '
-                         f'z={run["z"] or "?"}')
+            z_str = "?" if run["z"] is None else f'{run["z"]:g}'
+            ax.set_title(f'N={run["npart_side"]}³, L={run["boxsize_mpch"]:.4g} Mpc/h, z={z_str}')
         ax.legend(fontsize="medium")
 
         ax_top = ax.twiny()
@@ -508,7 +556,7 @@ class ICPlotter:
         ax2.set_ylabel(r'$\xi(r)$')
         ax2.set_title(r'Correlation functions $\xi(r)$ and $\psi(r)$')
 
-    _RATIO_LEVELS = [0.05, 0.10, 0.20, 0.30, 0.40, 0.50]
+    _RATIO_LEVELS = [0.05, 0.10, 0.15, 0.20]
 
     def _draw_ratio_reflines(self, ax):
         """Draw ±1/5/10/20/30/40/50 % horizontal reference lines."""
@@ -543,7 +591,7 @@ class ICPlotter:
 
         ax.set_xlabel(r'$k$ [$h$ Mpc$^{-1}$]')
         ax.set_ylabel('Measured/Theory - 1', fontsize=9)
-        ax.set_ylim(-0.55, 0.55)
+        ax.set_ylim(-0.22, 0.22)
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
 
@@ -581,7 +629,7 @@ class ICPlotter:
 
         ax.set_xlabel(r'$r$ [Mpc/$h$]')
         ax.set_ylabel('Measured/Theory - 1', fontsize=9)
-        ax.set_ylim(-0.55, 0.55)
+        ax.set_ylim(-0.22, 0.22)
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
 
@@ -603,6 +651,12 @@ def main():
     parser.add_argument("pkfiles", nargs="+", help="One or more pk_*.txt files")
     parser.add_argument("--theory", default=None,
                         help="CLASS P(k) file (k[h/Mpc]  P[(Mpc/h)^3])")
+    parser.add_argument("--theory-zref", type=float, default=None, metavar="ZREF",
+                        help="If given, treat --theory as P(k) at ZREF and back-scale to "
+                             "z_start using the no-radiation growth factor (matching MUSIC2's "
+                             "ZeroRadiation=true). Use --theory-zref 0 with class_pk_z0_pk.dat "
+                             "when validating high-z ICs (D+_norad(0)=1 makes this the natural "
+                             "choice: P_ref = P_CLASS(k,0) × D+_norad(z_start)²).")
     parser.add_argument("--H0",      type=float, default=67.11)
     parser.add_argument("--Omega_m", type=float, default=0.3)
     parser.add_argument("--Omega_b", type=float, default=0.049)
@@ -634,7 +688,7 @@ def main():
         plotter.load_pk_file(pkfile)
 
     if args.theory:
-        plotter.load_theory(args.theory)
+        plotter.load_theory(args.theory, z_ref=args.theory_zref)
 
     plotter.auto_load_xi(
         nseeds=args.nseeds,

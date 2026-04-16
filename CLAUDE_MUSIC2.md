@@ -356,11 +356,10 @@ growth factor:
 P_ref(k, z_start) = P_CLASS(k, z_ref) × [D+_norad(z_start) / D+_norad(z_ref)]²
 ```
 
-where z_ref is a low reference redshift (e.g. z=2) where the radiation correction to D+ is
-negligible (~0.2%), and D+_norad is computed with Ω_r = 0 (same ODE as MUSIC2).
-`plot_ic.py --theory` currently passes CLASS P(k) at z_start directly, which is why the
-ratio panel shows ~5% suppression at z=200. Using the back-scaled reference would give ~1
-in the ratio panel by construction.
+Using z_ref = 0 is the natural choice: D+_norad(0) = 1 by definition, so the formula
+simplifies to P_ref(k, z_start) = P_CLASS(k, 0) × D+_norad(z_start)².  D+_norad is
+computed with Ω_r = 0 (same ODE as MUSIC2).  The pipeline passes `--theory-zref 0` with
+`class_pk_z0_pk.dat`, so the ratio panel gives ~0% offset by construction.
 
 This behaviour is confirmed by the MUSIC2 author: the ~7% difference in
 [D+(no-radiation)/D+(with-radiation)]² at z=200 is expected and intentional, because

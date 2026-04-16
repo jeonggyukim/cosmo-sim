@@ -275,17 +275,56 @@ echo "    Saved: $PK_FILE"
 # Step 11: Plot diagnostics with plot_ic.py
 # Reads pk_{STEM}.txt; auto-detects xi_{STEM}.txt, xi_cic_{STEM}.txt,
 # vel_cic_{STEM}.txt alongside it; overlays CLASS theory curves.
+#
+# For high-z runs (z > 10) MUSIC2 uses ZeroRadiation=true, so the ICs are
+# back-scaled with a no-radiation growth factor that differs from CLASS's
+# full Boltzmann growth factor at z_start.  We therefore pass CLASS P(k) at
+# z_ref=0 (the natural normalisation point where D+_norad=1) and use
+# --theory-zref 0 so plot_ic.py back-scales it with the same no-radiation
+# D+(z) as MUSIC2: P_ref(k,z) = P_CLASS(k,0) × D+_norad(z)².
+# At z_start <= 10 we pass CLASS P(k) directly at z_start.
+#
 # Outputs: plots/pk_{STEM}.png
 # ---------------------------------------------------------------------------
 PLOT_FILE="plots/pk_${STEM}.png"
+ZREF_LOW=0
+CLASS_PKS_ZREF="data/class_pk_z${ZREF_LOW}_pk.dat"
 log "Plotting diagnostics with plot_ic.py..."
-conda run -n cosmo python scripts/plot_ic.py \
-    "$PK_FILE" \
-    --theory "$CLASS_PKS" \
-    --H0 "$H0" \
-    --Omega_m "$OMEGA_M" \
-    --Omega_b "$OMEGA_B" \
-    -o "$PLOT_FILE"
+
+if (( $(echo "$ZSTART > 10" | bc -l) )); then
+    # Generate CLASS P(k) at z_ref=0 if not already present (used for back-scaling)
+    if [ ! -f "$CLASS_PKS_ZREF" ]; then
+        log "Generating CLASS P(k) at z=${ZREF_LOW} for back-scaling reference..."
+        TMP_INI=$(mktemp /tmp/class_pk_XXXXXX) && mv "$TMP_INI" "${TMP_INI}.ini" && TMP_INI="${TMP_INI}.ini"
+        sed \
+            -e "s/^output =.*/output = mPk/" \
+            -e "s/^z_pk =.*/z_pk = ${ZREF_LOW}/" \
+            -e "/^extra metric transfer functions/d" \
+            -e "/^gauge/d" \
+            "$CLASS_INI" > "$TMP_INI"
+        echo "root = class_pk_z${ZREF_LOW}_" >> "$TMP_INI"
+        "$CLASS_BIN" "$TMP_INI"
+        mv "class_pk_z${ZREF_LOW}_pk.dat" "$CLASS_PKS_ZREF"
+        rm "$TMP_INI"
+        echo "    Saved: $CLASS_PKS_ZREF"
+    fi
+    conda run -n cosmo python scripts/plot_ic.py \
+        "$PK_FILE" \
+        --theory "$CLASS_PKS_ZREF" \
+        --theory-zref "$ZREF_LOW" \
+        --H0 "$H0" \
+        --Omega_m "$OMEGA_M" \
+        --Omega_b "$OMEGA_B" \
+        -o "$PLOT_FILE"
+else
+    conda run -n cosmo python scripts/plot_ic.py \
+        "$PK_FILE" \
+        --theory "$CLASS_PKS" \
+        --H0 "$H0" \
+        --Omega_m "$OMEGA_M" \
+        --Omega_b "$OMEGA_B" \
+        -o "$PLOT_FILE"
+fi
 
 log "Pipeline complete."
 echo "    IC file : $IC_FILE"

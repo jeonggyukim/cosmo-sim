@@ -21,7 +21,7 @@ log "Removing plots..."
 rm -f plots/*.png plots/*.pdf
 
 log "Removing measured P(k) and xi tables..."
-rm -f data/pk_*.txt data/xi_*.txt
+rm -f data/pk_*.txt data/xi_*.txt data/vel_cic_*.txt
 
 log "Removing rbins files..."
 rm -f data/rbins*.txt
