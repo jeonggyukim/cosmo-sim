@@ -12,8 +12,8 @@ conf/CV_22_MUSIC_n*.conf
 music_build/
 
 # Large binary data files (not versioned)
-data/*.hdf5
-data/*.bin
+data/
+
 
 # Generated data outputs (reproducible via run_pipeline.sh)
 data/pk_*.txt
@@ -29,13 +29,15 @@ compute_xi_cic
 memory/
 .claude/
 
-# Figures (generated; only notes/*.pdf used by LaTeX are versioned)
+# Figures (generated; only the three box/tophat/pgrid PDFs copied to notes/ root are versioned)
 plots/
 notes/*.png
 notes/*.pdf
 !notes/box_window.pdf
 !notes/tophat_window.pdf
 !notes/pgrid_comparison.pdf
+notes/figures/*.pdf
+notes/figures/*.png
 
 # LaTeX auxiliary files (never version these)
 *.aux
