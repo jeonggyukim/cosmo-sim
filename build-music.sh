@@ -3,20 +3,30 @@
 # build-music.sh — Build MUSIC2 from source into music_build/
 #
 # Usage:
-#   ./build-music.sh           # builds into <script_dir>/music_build/
-#   ./build-music.sh -d DIR    # builds into DIR
+#   ./build-music.sh                          # auto-detect or clone MUSIC2 source
+#   ./build-music.sh -d DIR                   # builds into DIR
+#   MUSIC2_SOURCE_DIR=/path ./build-music.sh  # use specific MUSIC2 source directory
+#
+# MUSIC2 source directory resolution order:
+#   1. $MUSIC2_SOURCE_DIR environment variable (if set)
+#   2. $HOME/Dropbox/Projects/MUSIC2          (macOS default)
+#   3. $HOME/MUSIC2                           (cluster default)
+#   4. Clone from https://github.com/cosmo-sims/MUSIC2 into option 3
 #
 # Skips compilation if the MUSIC binary already exists in BUILDDIR.
-#
-# Platform behaviour:
-#   macOS (Darwin, user jgkim): MUSICDIR set to Dropbox path; FC=gfortran-14
-#   Cluster (non-Darwin):       MUSICDIR=$HOME/MUSIC2; loads environment modules
 
 # --- Locate MUSIC2 source ---
-if [[ $(uname -s) == "Darwin" && $(whoami) == "jgkim" ]]; then
-    MUSICDIR=$HOME/Dropbox/Projects/MUSIC2
+# Resolution order:
+#   1. $MUSIC2_SOURCE_DIR env var (set by run_pipeline.sh --music2-dir)
+#   2. ../MUSIC2  relative to this repo (sibling directory, default)
+#   3. Clone from GitHub into ../MUSIC2 if not found
+REPO_ROOT="$(dirname "$(readlink -f "$0")")"
+DEFAULT_MUSICDIR="$(readlink -f "$REPO_ROOT/../MUSIC2")"
+
+if [ -n "${MUSIC2_SOURCE_DIR:-}" ]; then
+    MUSICDIR="$MUSIC2_SOURCE_DIR"
 else
-    MUSICDIR=$HOME/MUSIC2
+    MUSICDIR="$DEFAULT_MUSICDIR"
 fi
 
 # --- Clone MUSIC2 if source directory does not exist ---

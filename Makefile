@@ -6,12 +6,10 @@ UNAME_N := $(shell uname -n)
 USER    := $(shell whoami)
 
 # --- Corrfunc paths ---
-ifeq ($(UNAME_S)-$(USER), Darwin-jgkim)
-    CORRFUNCDIR := $(HOME)/Dropbox/Projects/Corrfunc
-else
-    CORRFUNCDIR := $(HOME)/Corrfunc
-endif
-
+# Default: ../Corrfunc (sibling of this repo). Override with:
+#   make CORRFUNCDIR=/path/to/Corrfunc
+# or via run_pipeline.sh --corrfunc-dir /path/to/Corrfunc
+CORRFUNCDIR ?= $(realpath $(dir $(lastword $(MAKEFILE_LIST)))../Corrfunc)
 CORRFUNC_INC := $(CORRFUNCDIR)/theory/xi $(CORRFUNCDIR)/utils
 CORRFUNC_LIB := $(CORRFUNCDIR)/theory/xi/libcountpairs_xi.a
 
@@ -53,6 +51,12 @@ LDFLAGS := -L$(HDF5_LIB) -lhdf5 -lm $(OMP_FLAG)
 
 # --- Targets ---
 all: compute_xi compute_xi_cic
+
+# Clone and build Corrfunc if the static library is missing
+$(CORRFUNC_LIB):
+	@echo "==> Corrfunc not found — cloning from GitHub..."
+	git clone --depth=1 https://github.com/manodeep/Corrfunc.git $(CORRFUNCDIR)
+	$(MAKE) -C $(CORRFUNCDIR) CC=$(CC) theory
 
 compute_xi: scripts/compute_xi.c $(CORRFUNC_LIB)
 	$(CC) $(CFLAGS) $< $(CORRFUNC_LIB) $(LDFLAGS) -o $@

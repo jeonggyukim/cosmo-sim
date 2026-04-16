@@ -51,16 +51,23 @@ LBOX=687   # ≈ 1024 Mpc for h=0.6711
 ZSTART=2
 NTHREADS=8
 FIX_AMP=yes   # fix_mode_amplitude: yes = fixed amplitudes (CV); no = Gaussian draw
+MUSIC2_DIR=""     # optional: path to MUSIC2 source (default: ~/Dropbox/Projects/MUSIC2 or cloned)
+CORRFUNC_DIR=""   # optional: path to built Corrfunc (default: ~/Corrfunc or cloned)
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --ngrid)         NGRID="$2";    shift 2 ;;
-        --lbox)          LBOX="$2";     shift 2 ;;
-        --zstart)        ZSTART="$2";   shift 2 ;;
-        --nthreads)      NTHREADS="$2"; shift 2 ;;
-        --fix-amplitude) FIX_AMP="$2";  shift 2 ;;
+        --ngrid)         NGRID="$2";        shift 2 ;;
+        --lbox)          LBOX="$2";         shift 2 ;;
+        --zstart)        ZSTART="$2";       shift 2 ;;
+        --nthreads)      NTHREADS="$2";     shift 2 ;;
+        --fix-amplitude) FIX_AMP="$2";      shift 2 ;;
+        --music2-dir)    MUSIC2_DIR="$2";   shift 2 ;;
+        --corrfunc-dir)  CORRFUNC_DIR="$2"; shift 2 ;;
         *) echo "Unknown argument: $1"
-           echo "Usage: $0 [--ngrid N] [--lbox L] [--zstart Z] [--nthreads T] [--fix-amplitude yes|no]"
+           echo "Usage: $0 [--ngrid N] [--lbox L] [--zstart Z] [--nthreads T]"
+           echo "          [--fix-amplitude yes|no]"
+           echo "          [--music2-dir /path/to/MUSIC2]"
+           echo "          [--corrfunc-dir /path/to/Corrfunc]"
            exit 1 ;;
     esac
 done
@@ -103,7 +110,11 @@ mkdir -p data plots conf
 # ---------------------------------------------------------------------------
 if [ ! -f "$MUSIC_BIN" ]; then
     log "Building MUSIC2..."
-    ./build-music.sh
+    if [ -n "$MUSIC2_DIR" ]; then
+        MUSIC2_SOURCE_DIR="$MUSIC2_DIR" ./build-music.sh
+    else
+        ./build-music.sh
+    fi
 else
     log "MUSIC2 already built — skipping"
 fi
@@ -112,10 +123,15 @@ fi
 # Step 2: Build compute_xi
 # Skipped if the binary already exists.
 # Compiled via the repo-root Makefile; links against Corrfunc.
+# If --corrfunc-dir is given, pass CORRFUNCDIR to make.
 # ---------------------------------------------------------------------------
 if [ ! -f "compute_xi" ]; then
     log "Building compute_xi..."
-    make
+    if [ -n "$CORRFUNC_DIR" ]; then
+        make CORRFUNCDIR="$CORRFUNC_DIR"
+    else
+        make
+    fi
 else
     log "compute_xi already built — skipping"
 fi

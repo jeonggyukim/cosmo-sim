@@ -26,6 +26,9 @@ Use `conda run -n cosmo python ...` for all Python scripts in this project.
 ./run_pipeline.sh                                          # defaults: N=256, L=687 Mpc/h (~1024 Mpc), z=2
 ./run_pipeline.sh --ngrid 256 --lbox 344 --zstart 2        # 256³, L=344 Mpc/h (~512 Mpc), z=2
 ./run_pipeline.sh --ngrid 256 --lbox 172 --zstart 2        # 256³, L=172 Mpc/h (~256 Mpc), z=2
+
+# Point to existing MUSIC2/Corrfunc installations instead of the default ../MUSIC2, ../Corrfunc
+./run_pipeline.sh --music2-dir /path/to/MUSIC2 --corrfunc-dir /path/to/Corrfunc
 ```
 
 Pipeline steps (each skipped if output already exists):
@@ -152,13 +155,14 @@ Figures are generated from `plot_box_window.py`, `plot_tophat_window.py`, and `p
 See [MUSIC2_CLAUDE.md](MUSIC2_CLAUDE.md) for full details on the MUSIC2 code structure, build
 instructions, IC generation pipeline, transfer function internals, and file formats.
 
-Source lives at `~/Dropbox/Projects/MUSIC2`.
-
 ### Quick usage
 
 ```bash
-# Build (first time or after source changes)
+# Build (first time or after source changes); MUSIC2 source auto-resolved
 ./build-music.sh
+
+# Use a specific MUSIC2 source directory
+MUSIC2_SOURCE_DIR=/path/to/MUSIC2 ./build-music.sh
 
 # Generate a config (canonical CV_22 run: N=256, z=127, L=25 Mpc/h)
 conda run -n cosmo python scripts/make_music_conf.py -N 256 -z 127 -L 25
@@ -169,8 +173,21 @@ conda run -n cosmo python scripts/make_music_conf.py -N 256 -z 127 -L 25
 
 ### build-music.sh
 
+MUSIC2 source directory resolution order:
+1. `$MUSIC2_SOURCE_DIR` environment variable (if set)
+2. `../MUSIC2` — sibling of the repo root (default)
+3. Clones from `https://github.com/cosmo-sims/MUSIC2` into `../MUSIC2` if not found
+
 Uses `uname -s` to detect macOS vs cluster:
 - **macOS (Darwin):** sets `FC=gfortran-14`, relies on Homebrew-installed fftw, gsl, hdf5, open-mpi
 - **Cluster (non-Darwin):** loads modules via `module load gnu12 openmpi4 fftw hdf5 gsl cmake`
 
 Skips compilation if `music_build/MUSIC` already exists.
+
+### Corrfunc
+
+`compute_xi` links against Corrfunc. Resolution order:
+1. `CORRFUNCDIR` make variable: `make CORRFUNCDIR=/path/to/Corrfunc`
+2. `--corrfunc-dir` flag: `./run_pipeline.sh --corrfunc-dir /path/to/Corrfunc`
+3. `../Corrfunc` — sibling of the repo root (default)
+4. Clones from `https://github.com/manodeep/Corrfunc` into `../Corrfunc` and builds if not found
