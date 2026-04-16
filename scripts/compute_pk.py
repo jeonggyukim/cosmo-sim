@@ -99,7 +99,9 @@ def cic_window(kx, ky, kz, knyq):
     """
     def s(k):
         x = k / (2 * knyq) * np.pi   # = pi * k_i / (2 * kNy)
-        return np.where(np.abs(x) < 1e-10, 1.0, np.sin(x) / x)
+        # Use out-of-place evaluation to avoid divide-by-zero at k=0;
+        # np.sinc(u) = sin(pi*u)/(pi*u), so sinc(x/pi) = sin(x)/x.
+        return np.sinc(x / np.pi)
     return (s(kx) * s(ky) * s(kz)) ** 4
 
 

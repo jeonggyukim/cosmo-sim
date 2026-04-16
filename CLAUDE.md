@@ -24,9 +24,9 @@ Use `conda run -n cosmo python ...` for all Python scripts in this project.
 ## Pipeline: Quick Start
 
 ```bash
-./run_pipeline.sh                                          # defaults: N=256, L=687 Mpc/h (~1024 Mpc), z=2
-./run_pipeline.sh --ngrid 256 --lbox 344 --zstart 2        # 256³, L=344 Mpc/h (~512 Mpc), z=2
-./run_pipeline.sh --ngrid 256 --lbox 172 --zstart 2        # 256³, L=172 Mpc/h (~256 Mpc), z=2
+./run_pipeline.sh                                          # defaults: N=256, L=687 Mpc/h (~1024 Mpc), z=200
+./run_pipeline.sh --ngrid 256 --lbox 344 --zstart 200      # 256³, L=344 Mpc/h (~512 Mpc), z=200
+./run_pipeline.sh --ngrid 256 --lbox 172 --zstart 200      # 256³, L=172 Mpc/h (~256 Mpc), z=200
 
 # Point to existing MUSIC2/Corrfunc installations instead of the default ../MUSIC2, ../Corrfunc
 ./run_pipeline.sh --music2-dir /path/to/MUSIC2 --corrfunc-dir /path/to/Corrfunc
@@ -83,7 +83,7 @@ SWIFT stores coordinates and BoxSize in **Mpc** (not Mpc/h). All bin files and P
 
 ```bash
 # Full pipeline (handles CLASS P(k) automatically):
-./run_pipeline.sh --ngrid 256 --lbox 344 --zstart 2
+./run_pipeline.sh --ngrid 256 --lbox 344 --zstart 200
 
 # Manually — two steps:
 conda run -n cosmo python scripts/compute_pk.py data/ics_swift_n256_z2_L687.hdf5

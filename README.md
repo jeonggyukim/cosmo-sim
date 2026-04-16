@@ -25,9 +25,9 @@ conda activate cosmo
 ### Run the full pipeline (recommended)
 
 ```bash
-./run_pipeline.sh                                          # defaults: N=256, L=687 Mpc/h (~1024 Mpc), z=2
-./run_pipeline.sh --ngrid 256 --lbox 344 --zstart 2        # 256³, L=344 Mpc/h (~512 Mpc), z=2
-./run_pipeline.sh --ngrid 256 --lbox 172 --zstart 2        # 256³, L=172 Mpc/h (~256 Mpc), z=2
+./run_pipeline.sh                                          # defaults: N=256, L=687 Mpc/h (~1024 Mpc), z=200
+./run_pipeline.sh --ngrid 256 --lbox 344 --zstart 200      # 256³, L=344 Mpc/h (~512 Mpc), z=200
+./run_pipeline.sh --ngrid 256 --lbox 172 --zstart 200      # 256³, L=172 Mpc/h (~256 Mpc), z=200
 ```
 
 The pipeline runs all steps below automatically, skipping any that are already complete.
