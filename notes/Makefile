@@ -1,6 +1,10 @@
 NOTES  = ic_sampling_review lpt_review fft_review
 PYTHON = conda run -n cosmo python
 
+# Absolute path to this Makefile's directory — pdflatex is always run from here
+# so .log/.out/.aux files land in notes/ regardless of where make is invoked.
+NOTESDIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 UNAME := $(shell uname)
 ifeq ($(UNAME), Linux)
     OPEN = evince
@@ -47,12 +51,12 @@ figures/aliasing.pdf : figures/plot_aliasing.py
 notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
 
 %.pdf : %.tex
-	pdflatex -draftmode -synctex=1 $<
-	-bibtex $(basename $<)
-	pdflatex -draftmode -synctex=1 $<
-	pdflatex $<
-	$(OPEN) $@ &
-	$(TIDY)
+	cd $(NOTESDIR) && pdflatex -draftmode -synctex=1 $(notdir $<)
+	cd $(NOTESDIR) && bibtex $(basename $(notdir $<)) || true
+	cd $(NOTESDIR) && pdflatex -draftmode -synctex=1 $(notdir $<)
+	cd $(NOTESDIR) && pdflatex $(notdir $<)
+	$(OPEN) $(NOTESDIR)$(notdir $@) &
+	cd $(NOTESDIR) && $(TIDY)
 
 clean :
 	rm -f *.aux *.log *.bbl *.blg *.out *.toc *.fls *.synctex.gz

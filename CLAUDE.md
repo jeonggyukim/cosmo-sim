@@ -204,3 +204,4 @@ Skips compilation if `music_build/MUSIC` already exists.
 ## Maintenance Rules
 
 - **Always update `README.md` and `CLAUDE.md`** when making structural changes to the repo: new directories, moved or renamed files, added/removed tools. Update the directory layout block and any file references in the same commit as the structural change.
+- **Always compile LaTeX from the `notes/` directory.** Run `make` (or `make -C notes`) rather than invoking `pdflatex` directly from the repo root — otherwise `.log`, `.out`, `.aux` files land in the root instead of `notes/`. The notes/Makefile enforces this via `cd $(NOTESDIR) &&` before every pdflatex call.
