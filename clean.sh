@@ -44,7 +44,7 @@ if $ALL; then
     rm -f data/ics_swift_*.hdf5
 
     log "Removing wnoise binary files..."
-    rm -f data/wnoise_*.bin
+    rm -f data/wnoise_*.bin wnoise_*.bin
 
     log "Removing MUSIC2 build..."
     rm -rf music_build/
