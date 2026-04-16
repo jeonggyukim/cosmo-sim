@@ -68,17 +68,28 @@ velocity is
   \bv_{\rm pec} = a\,\dot{\bx} = a\,\dot{\bPsi}.
 \end{equation}
 %
-The density field follows from mass conservation,
-$\rho(\bx)\,d^3x = \bar{\rho}\,d^3q$:
+The density field follows from mass conservation.  Each fluid element
+initially at $\bq$ carries fixed mass $\bar{\rho}\,d^3q$.  After
+displacement it occupies the Eulerian volume element
 %
 \begin{equation}
-  1 + \delta(\bx) = \left|\det\!\left(\delta_{ij} +
-    \frac{\partial\Psi_i}{\partial q_j}\right)\right|^{-1}
+  d^3x = \left|\det\!\left(\frac{\partial x_i}{\partial q_j}\right)\right|
+          d^3q = |J|\,d^3q,
+\end{equation}
+%
+where $J_{ij} = \partial x_i/\partial q_j$ is the deformation tensor.
+Requiring $\rho(\bx)\,d^3x = \bar{\rho}\,d^3q$ gives
+$\rho(\bx) = \bar{\rho}/|J|$, so
+%
+\begin{equation}
+  1 + \delta(\bx) \equiv \frac{\rho(\bx)}{\bar{\rho}}
+    = \left|\det\!\left(\delta_{ij} +
+      \frac{\partial\Psi_i}{\partial q_j}\right)\right|^{-1}
   \equiv |J|^{-1},
   \label{eq:jacobian}
 \end{equation}
 %
-where $J_{ij} = \partial x_i/\partial q_j$ is the deformation tensor.
+which is \emph{exact} (no perturbative expansion has been made).
 
 \subsection{Growth factor and perturbative expansion}
 
@@ -364,7 +375,6 @@ the growth factor is small enough that ZA suffices.
 \end{itemize}
 
 %----------------------------------------------------------------------
-\bibliographystyle{aasjournal}
 \bibliography{lpt_review}
 
 \end{document}
