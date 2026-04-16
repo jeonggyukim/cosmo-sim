@@ -178,6 +178,10 @@ conda run -n cosmo python scripts/make_music_conf.py -N 256 -z 127 -L 25
 
 # Run (config is written to conf/ by make_music_conf.py)
 ./music_build/MUSIC conf/CV_22_MUSIC_n256_z127_L25.conf
+# Note: MUSIC2 always writes wnoise_NNNN.bin and input_class_parameters.ini
+# to the CWD (paths are hardcoded in source).  run_pipeline.sh moves both
+# to data/ and conf/ automatically.  For direct MUSIC2 invocations, move
+# them manually: mv wnoise_*.bin data/  &&  mv input_class_parameters.ini conf/
 ```
 
 ### build-music.sh
