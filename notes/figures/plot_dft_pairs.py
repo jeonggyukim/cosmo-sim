@@ -12,8 +12,8 @@ Panels (left = f_n, right = |f̃_k| with fftshift so k=0 is centred):
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
+import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.gridspec import GridSpec  # noqa: E402
 
 N = 16
 n = np.arange(N)
@@ -21,7 +21,7 @@ n = np.arange(N)
 k_shift = np.fft.fftshift(np.arange(N) - N // 2)   # [-8,-7,...,7]
 k_shift = np.arange(-N // 2, N // 2)                # cleaner: -8..7
 
-k0    = 3      # cosine frequency index
+k0 = 3      # cosine frequency index
 sigma = 1.5    # Gaussian width (samples) — narrow in x → broad in k
 
 f_list = [
@@ -50,8 +50,8 @@ gs = GridSpec(4, 2, figure=fig, hspace=0.65, wspace=0.38,
               left=0.09, right=0.97, top=0.91, bottom=0.06)
 
 for i, (f, lab, slab) in enumerate(zip(f_list, labels, spec_labels)):
-    F     = np.fft.fft(f)
-    absF  = np.fft.fftshift(np.abs(F))   # centre at k=0
+    F = np.fft.fft(f)
+    absF = np.fft.fftshift(np.abs(F))   # centre at k=0
 
     ax_l = fig.add_subplot(gs[i, 0])
     ax_r = fig.add_subplot(gs[i, 1])

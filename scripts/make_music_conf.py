@@ -57,7 +57,7 @@ def main():
     level = int(level)
 
     fix_amp = args.fix_amplitude  # "yes" or "no"
-    suffix  = "" if fix_amp == "yes" else "_nofix"
+    suffix = "" if fix_amp == "yes" else "_nofix"
     seed_suffix = f"_s{args.seed}" if args.seed is not None else ""
 
     # Build filename stems
@@ -65,10 +65,10 @@ def main():
     z_s = fmt(args.redshift)
     L_s = fmt(args.boxlength)
 
-    ic_filename   = f"data/ics_swift_n{N_s}_z{z_s}_L{L_s}{suffix}{seed_suffix}.hdf5"
+    ic_filename = f"data/ics_swift_n{N_s}_z{z_s}_L{L_s}{suffix}{seed_suffix}.hdf5"
     # Write config to conf/ relative to repo root (two levels up from scripts/)
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    conf_dir  = os.path.join(repo_root, "conf")
+    conf_dir = os.path.join(repo_root, "conf")
     conf_filename = args.output or os.path.join(
         conf_dir, f"CV_22_MUSIC_n{N_s}_z{z_s}_L{L_s}{suffix}{seed_suffix}.conf"
     )

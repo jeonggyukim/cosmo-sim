@@ -47,7 +47,8 @@ def bins_from_box(boxsize_mpc, npart, nbins):
     """
     mean_spacing = boxsize_mpc / npart   # mean interparticle separation in Mpc
     rmin = 2.0 * mean_spacing            # start safely above the mean spacing
-    rmax = boxsize_mpc / 3.0            # stay well within periodic boundary artifacts (hard limit is L/2)
+    # stay well within periodic boundary artifacts (hard limit is L/2)
+    rmax = boxsize_mpc / 3.0
 
     if rmin >= rmax:
         sys.exit(
@@ -84,7 +85,8 @@ def main():
     parser.add_argument("-N", "--npart", type=int,
                         help="Particles per side (required with -L)")
     parser.add_argument("--H0", type=float, default=67.11,
-                        help="Hubble constant in km/s/Mpc (default: 67.11, used to convert Mpc/h → Mpc)")
+                        help="Hubble constant in km/s/Mpc "
+                             "(default: 67.11, used to convert Mpc/h → Mpc)")
     parser.add_argument("--nbins", type=int, default=24,
                         help="Number of bins (default: 24)")
     parser.add_argument("-o", "--output", default=None,
@@ -105,7 +107,7 @@ def main():
     # Default output path: data/ relative to repo root
     if args.output is None:
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        data_dir  = os.path.join(repo_root, "data")
+        data_dir = os.path.join(repo_root, "data")
         stem = os.path.splitext(os.path.basename(args.hdf5))[0] if args.hdf5 else f"n{npart}"
         stem = stem.replace("ics_swift_", "")
         args.output = os.path.join(data_dir, f"rbins_{stem}.txt")

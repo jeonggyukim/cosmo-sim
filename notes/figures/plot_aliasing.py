@@ -11,16 +11,16 @@ Both pass through identical sample values.
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # noqa: E402
 
 N = 8
 Delta = 1.0 / N
 x_cont = np.linspace(0, 1, 600)
 x_samp = np.arange(N) * Delta
 
-y_true  = np.cos(2 * np.pi * 5 * x_cont)   # 5 cycles (above Nyquist)
+y_true = np.cos(2 * np.pi * 5 * x_cont)   # 5 cycles (above Nyquist)
 y_alias = np.cos(2 * np.pi * 3 * x_cont)   # 3 cycles (alias)
-y_dots  = np.cos(2 * np.pi * 5 * x_samp)   # sample values (same on both)
+y_dots = np.cos(2 * np.pi * 5 * x_samp)   # sample values (same on both)
 
 fig, ax = plt.subplots(figsize=(7, 2.8))
 

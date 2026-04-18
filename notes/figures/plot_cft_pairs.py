@@ -15,11 +15,11 @@ Panels (left = f(x), right = |f̂(k)|):
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
+import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.gridspec import GridSpec  # noqa: E402
 
 # Real-space grid
-x  = np.linspace(-6, 6, 4000)
+x = np.linspace(-6, 6, 4000)
 dx = x[1] - x[0]
 
 # Wavenumber grid (Convention B: k in rad/unit)

@@ -1,11 +1,11 @@
-import numpy as np
 import h5py
 import sys
 
 # PartType indices (MUSIC swift plugin conventions)
-PARTTYPE_GAS     = 0
+PARTTYPE_GAS = 0
 PARTTYPE_HIGHRES = 1   # high-res DM
-PARTTYPE_COARSE  = 2   # coarse DM (default)
+PARTTYPE_COARSE = 2   # coarse DM (default)
+
 
 def read_ics_swift(fname):
     with h5py.File(fname, 'r') as f:

@@ -19,7 +19,7 @@ import matplotlib.cm as cm
 
 # ── style ──────────────────────────────────────────────────────────────────
 plt.rcParams.update({
-    'axes.linewidth' : 0.8,
+    'axes.linewidth': 0.8,
     'xtick.direction': 'in',
     'ytick.direction': 'in',
     'xtick.minor.visible': True,
@@ -31,18 +31,18 @@ ax1, ax2 = axes
 
 # ── parameters ─────────────────────────────────────────────────────────────
 q = np.linspace(-np.pi, np.pi, 20_000)
-Dvals   = [0.3, 0.6, 0.9, 1.0, 1.2]
+Dvals = [0.3, 0.6, 0.9, 1.0, 1.2]
 lstyles = ['-',  '-',  '-', '--', ':']
-labels  = [r'$D_+=0.3$', r'$D_+=0.6$', r'$D_+=0.9$',
-           r'$D_+=1$ (caustic)', r'$D_+=1.2$ (multi-stream)']
-colors  = [cm.plasma(v) for v in [0.15, 0.35, 0.60, 0.80, 0.95]]
+labels = [r'$D_+=0.3$', r'$D_+=0.6$', r'$D_+=0.9$',
+          r'$D_+=1$ (caustic)', r'$D_+=1.2$ (multi-stream)']
+colors = [cm.plasma(v) for v in [0.15, 0.35, 0.60, 0.80, 0.95]]
 
 # ── LEFT panel: density vs Eulerian x ──────────────────────────────────────
 rho_max = 12.0
 
 for D, ls, lbl, c in zip(Dvals, lstyles, labels, colors):
-    x   = q - D * np.sin(q)              # Eulerian position
-    J   = 1.0 - D * np.cos(q)            # Jacobian ∂x/∂q
+    x = q - D * np.sin(q)              # Eulerian position
+    J = 1.0 - D * np.cos(q)            # Jacobian ∂x/∂q
     rho = 1.0 / np.abs(J)                # 1 + δ = 1/|J|
 
     # For D > 1 the map is multi-valued; split into monotone segments

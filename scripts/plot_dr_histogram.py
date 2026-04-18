@@ -13,7 +13,7 @@ import numpy as np
 import h5py
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # noqa: E402
 
 PTYPE = 1   # PartType1 = high-res DM in MUSIC2/SWIFT output
 
@@ -41,11 +41,11 @@ def compute_dr(fname):
     dx = box_size / N_side
 
     # MUSIC2/SWIFT places unperturbed particles at (i + 0.5)*dx
-    idx     = np.floor(pos / dx).astype(np.int64) % N_side
+    idx = np.floor(pos / dx).astype(np.int64) % N_side
     lattice = (idx + 0.5) * dx
-    delta   = pos - lattice
-    delta  -= box_size * np.rint(delta / box_size)
-    dr      = np.sqrt((delta ** 2).sum(axis=1))
+    delta = pos - lattice
+    delta -= box_size * np.rint(delta / box_size)
+    dr = np.sqrt((delta ** 2).sum(axis=1))
 
     print(f"File      : {fname}")
     print(f"  N_part  : {N_part}  ({N_side}^3)")
@@ -87,8 +87,8 @@ ax_r.set_title('Displacement magnitude', fontsize=12)
 ax_r.legend(fontsize=11)
 
 # Component legend: color = component, linestyle = redshift
-from matplotlib.patches import Patch
-from matplotlib.lines import Line2D
+from matplotlib.patches import Patch  # noqa: E402
+from matplotlib.lines import Line2D  # noqa: E402
 handles = [Patch(color=cc, alpha=0.7, label=cl) for cl, cc in zip(comp_labels, comp_colors)]
 handles += [Line2D([0], [0], color='gray', ls='-',  label='z=127'),
             Line2D([0], [0], color='gray', ls='--', label='z=400')]

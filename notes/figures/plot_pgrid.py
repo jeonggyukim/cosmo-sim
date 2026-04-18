@@ -31,8 +31,11 @@ k_class, P_class = data[:, 0], data[:, 1]   # h/Mpc, (Mpc/h)^3
 Pk_interp = interp1d(np.log(k_class), np.log(P_class),
                      kind='cubic', bounds_error=False,
                      fill_value=-np.inf)
+
+
 def P_of_k(k):
     return np.exp(Pk_interp(np.log(np.clip(k, k_class[0], k_class[-1]))))
+
 
 # ---------------------------------------------------------------------------
 # Compute xi(r) via FFTLog
@@ -42,6 +45,7 @@ r_xi, xi_vals = P2xi(k_class, l=0, deriv=0)(P_class, extrap=True)
 xi_of_r = interp1d(np.log(r_xi), xi_vals, kind='cubic',
                    bounds_error=False, fill_value=0.0)
 
+
 def xi(r):
     return xi_of_r(np.log(np.clip(r, r_xi[0], r_xi[-1])))
 
@@ -49,6 +53,8 @@ def xi(r):
 # P^grid(k, L) via direct integration over [0, L/2]
 # P^grid(k) = 4pi int_0^{L/2} xi(r) sinc(kr) r^2 dr
 # ---------------------------------------------------------------------------
+
+
 def compute_Pgrid(k_arr, L, Nr=3000):
     r_int = np.linspace(1e-3, L / 2.0, Nr)
     xi_int = xi(r_int)
@@ -59,11 +65,12 @@ def compute_Pgrid(k_arr, L, Nr=3000):
         Pg[i] = 4 * np.pi * trapz(xi_int * sinc * r_int**2, r_int)
     return Pg
 
+
 # ---------------------------------------------------------------------------
 # Plot
 # ---------------------------------------------------------------------------
-box_sizes  = [25, 100, 500]
-colors     = ['C1', 'C2', 'C3']
+box_sizes = [25, 100, 500]
+colors = ['C1', 'C2', 'C3']
 linestyles = ['-', '--', '-.']
 
 fig, axes = plt.subplots(1, 2, figsize=(10, 4.5))

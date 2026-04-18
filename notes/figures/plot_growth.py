@@ -18,25 +18,31 @@ from scipy.integrate import quad
 import matplotlib.pyplot as plt
 
 # ── cosmology ──────────────────────────────────────────────────────────────
-Om0    = 0.3
-OmL    = 0.7
-H0     = 67.32        # km/s/Mpc (fiducial; only ratios matter here)
+Om0 = 0.3
+OmL = 0.7
+H0 = 67.32        # km/s/Mpc (fiducial; only ratios matter here)
+
 
 def H(a):
     """Hubble parameter H(a) / H0."""
     return np.sqrt(Om0 * a**-3 + OmL)
+
 
 def Om_a(a):
     """Omega_m(a)."""
     return Om0 * a**-3 / H(a)**2
 
 # Growth factor via integral  D_+(a) ∝ H(a) ∫_0^a da'/[a'H(a')]^3
+
+
 def D_integrand(ap):
     return 1.0 / (ap * H(ap))**3
+
 
 def D_plus(a):
     integral, _ = quad(D_integrand, 1e-6, a, limit=200)
     return H(a) * integral
+
 
 # Normalise to D_+(a=1) = 1
 D_norm = D_plus(1.0)
@@ -45,17 +51,17 @@ D_norm = D_plus(1.0)
 z = np.logspace(np.log10(0.01), np.log10(50), 400)
 a = 1.0 / (1.0 + z)
 
-D_arr   = np.array([D_plus(ai) / D_norm for ai in a])
-Om_arr  = Om_a(a)
-f_arr   = Om_arr ** 0.55                        # Linder (2005)
-f2_arr  = 2.0 * Om_arr ** (4.0/7.0)            # Bouchet+ (1995)
+D_arr = np.array([D_plus(ai) / D_norm for ai in a])
+Om_arr = Om_a(a)
+f_arr = Om_arr ** 0.55                        # Linder (2005)
+f2_arr = 2.0 * Om_arr ** (4.0/7.0)            # Bouchet+ (1995)
 
 # Matter-dom references
 D_matdom = 1.0 / (1.0 + z) / (1.0 / (1.0 + 0.01))   # normalized at z=0.01
 
 # ── style ──────────────────────────────────────────────────────────────────
 plt.rcParams.update({
-    'axes.linewidth' : 0.8,
+    'axes.linewidth': 0.8,
     'xtick.direction': 'in',
     'ytick.direction': 'in',
     'xtick.minor.visible': True,

@@ -55,21 +55,21 @@ class ICPlotter:
 
     def __init__(self, H0=67.11, Omega_m=0.3, Omega_b=0.049):
         self.H0 = H0
-        self.h  = H0 / 100.0
+        self.h = H0 / 100.0
         self.Omega_m = Omega_m
         self.Omega_b = Omega_b
 
         # Loaded data
-        self.pk_runs       = []     # list of dicts, one per pk_*.txt
-        self.theory_k      = None   # CLASS k [h/Mpc]
-        self.theory_P      = None   # CLASS P(k) [(Mpc/h)³]
-        self.theory_xi_r   = None   # theory ξ(r) from Hankel transform
-        self.theory_xi     = None
-        self.theory_psi_r  = None   # theory ψ(r) [(km/s)²]
-        self.theory_psi    = None
-        self.corrfunc_xi   = None   # dict: r_mid, xi, err, nseeds_used
-        self.xi_cic_list   = []     # list of dicts: r_mid, xi, stem (one per pk run)
-        self.vel_cic_list  = []     # list of dicts: r_mid, psi, stem (one per pk run)
+        self.pk_runs = []     # list of dicts, one per pk_*.txt
+        self.theory_k = None   # CLASS k [h/Mpc]
+        self.theory_P = None   # CLASS P(k) [(Mpc/h)³]
+        self.theory_xi_r = None   # theory ξ(r) from Hankel transform
+        self.theory_xi = None
+        self.theory_psi_r = None   # theory ψ(r) [(km/s)²]
+        self.theory_psi = None
+        self.corrfunc_xi = None   # dict: r_mid, xi, err, nseeds_used
+        self.xi_cic_list = []     # list of dicts: r_mid, xi, stem (one per pk run)
+        self.vel_cic_list = []     # list of dicts: r_mid, psi, stem (one per pk run)
 
         # Figure handles (set by plot())
         self.fig = self.ax = self.ax2 = self.ax3 = None
@@ -109,9 +109,12 @@ class ICPlotter:
         mz = re.search(r'_z([\d.]+)', stem)
         ml = re.search(r'_L(\d+)', stem)
         parts = []
-        if mn: parts.append(f'N{mn.group(1)}')
-        if ml: parts.append(f'L{ml.group(1)}')
-        if mz: parts.append(f'Z{mz.group(1)}')
+        if mn:
+            parts.append(f'N{mn.group(1)}')
+        if ml:
+            parts.append(f'L{ml.group(1)}')
+        if mz:
+            parts.append(f'Z{mz.group(1)}')
         return '_'.join(parts) if parts else stem
 
     @staticmethod
@@ -125,7 +128,7 @@ class ICPlotter:
         h = H0 / 100.0
         Omh2 = Omega_m * h**2
         Obh2 = Omega_b * h**2
-        r_d_Mpc  = 44.5 * np.log(9.83 / Omh2) / np.sqrt(1 + 10 * Obh2**(3/4))
+        r_d_Mpc = 44.5 * np.log(9.83 / Omh2) / np.sqrt(1 + 10 * Obh2**(3/4))
         r_d_mpch = r_d_Mpc * h
         return r_d_mpch, 2 * np.pi / r_d_mpch
 
@@ -147,7 +150,8 @@ class ICPlotter:
             "Pk_ss":            data[:, 2],
             "Pk_nodeconv":      data[:, 3] if data.shape[1] > 3 else data[:, 1],
             "Pk_err":           data[:, 4] if data.shape[1] > 4 else np.zeros(len(data)),
-            "fold_m":           data[:, 6].astype(int) if data.shape[1] > 6 else np.ones(len(data), dtype=int),
+            "fold_m":           (data[:, 6].astype(int) if data.shape[1] > 6
+                                 else np.ones(len(data), dtype=int)),
             "P_shot":           meta["P_shot"],
             "boxsize_mpch":     meta["boxsize_mpch"],
             "N":                meta["N"],
@@ -168,12 +172,14 @@ class ICPlotter:
         """
         from scipy.integrate import quad
         Omega_DE = 1.0 - Omega_m  # flat, no radiation
+
         def H(a):
             return H0 * np.sqrt(Omega_m / a**3 + Omega_DE)
+
         def integrand(a):
             return 1.0 / (a * H(a))**3
         a = 1.0 / (1.0 + z)
-        D, _  = quad(integrand, 1e-6, a,   limit=500)
+        D, _ = quad(integrand, 1e-6, a,   limit=500)
         D0, _ = quad(integrand, 1e-6, 1.0, limit=500)
         return (H(a) * D) / (H(1.0) * D0)
 
@@ -202,8 +208,8 @@ class ICPlotter:
             z_start = self.pk_runs[0].get("z")
             if z_start is not None and z_start != z_ref:
                 D_start = self._growth_factor_norad(z_start, self.Omega_m, self.H0)
-                D_ref   = self._growth_factor_norad(z_ref,   self.Omega_m, self.H0)
-                scale   = (D_start / D_ref) ** 2
+                D_ref = self._growth_factor_norad(z_ref,   self.Omega_m, self.H0)
+                scale = (D_start / D_ref) ** 2
                 Pt = Pt * scale
                 print(f"Theory back-scaled from z_ref={z_ref} to z_start={z_start:.4g} "
                       f"using no-radiation D+: scale factor = {scale:.6g}")
@@ -216,7 +222,7 @@ class ICPlotter:
             from mcfit import P2xi
             r, xi = P2xi(kt, l=0)(Pt, extrap=True)
             self.theory_xi_r = r
-            self.theory_xi   = xi
+            self.theory_xi = xi
         except ImportError:
             pass
 
@@ -225,12 +231,12 @@ class ICPlotter:
             z = self.pk_runs[0].get("z")
             if z is not None:
                 Ez = np.sqrt(self.Omega_m * (1+z)**3 + (1 - self.Omega_m))
-                Hz        = self.H0 * Ez           # km/s/Mpc
-                Hz_hMpc   = Hz / self.h            # km/s/(Mpc/h) — consistent with k in h/Mpc
-                fz        = (self.Omega_m * (1+z)**3 / Ez**2) ** 0.55   # Linder 2005
+                Hz = self.H0 * Ez           # km/s/Mpc
+                Hz_hMpc = Hz / self.h            # km/s/(Mpc/h) — consistent with k in h/Mpc
+                fz = (self.Omega_m * (1+z)**3 / Ez**2) ** 0.55   # Linder 2005
                 r_psi, psi = self._compute_theory_psi(kt, Pt, Hz_hMpc, fz)
                 self.theory_psi_r = r_psi
-                self.theory_psi   = psi
+                self.theory_psi = psi
                 print(f"Theory ψ(r): z={z:.4g}, H={Hz:.1f} km/s/Mpc, "
                       f"f={fz:.4f}, H·f/(h)={Hz_hMpc*fz:.2f} km/s/(Mpc/h)")
 
@@ -270,32 +276,34 @@ class ICPlotter:
         r = np.logspace(-1, np.log10(rmax), 500)
         psi = np.zeros(len(r))
         for i, ri in enumerate(r):
-            x  = kt * ri
+            x = kt * ri
             j0 = np.where(np.abs(x) < 1e-8, 1.0, np.sin(x) / x)
             psi[i] = np.trapezoid(Pt * j0, kt)
         psi *= (Hz_hMpc * fz) ** 2 / (2 * np.pi**2)
         return r, psi
 
     def load_corrfunc_xi(self, xi_file, hdf5_file=None, rbins_file=None,
-                          repo_root=None, nseeds=8, nthreads=4):
+                         repo_root=None, nseeds=8, nthreads=4):
         """
         Load a Corrfunc xi(r) file and optionally estimate subsampling variance
         by re-running compute_xi with multiple random seeds.
         """
         cf = np.loadtxt(xi_file, comments='#')
-        r_low  = cf[:, 1];  r_high = cf[:, 2]
-        xi_cf  = cf[:, 3];  npairs = cf[:, 4]
-        r_mid  = np.sqrt(r_low * r_high) * self.h   # Mpc → Mpc/h
+        r_low = cf[:, 1]
+        r_high = cf[:, 2]
+        xi_cf = cf[:, 3]
+        npairs = cf[:, 4]
+        r_mid = np.sqrt(r_low * r_high) * self.h   # Mpc → Mpc/h
 
-        xi_poisson_err    = (1 + xi_cf) / np.sqrt(np.maximum(npairs, 1))
-        xi_subsample_std  = np.zeros_like(xi_cf)
-        nseeds_used       = 0
+        xi_poisson_err = (1 + xi_cf) / np.sqrt(np.maximum(npairs, 1))
+        xi_subsample_std = np.zeros_like(xi_cf)
+        nseeds_used = 0
 
         xi_binary = os.path.join(repo_root, 'compute_xi') if repo_root else None
         if (nseeds > 1
                 and xi_binary and os.path.exists(xi_binary)
                 and rbins_file and os.path.exists(rbins_file)
-                and hdf5_file  and os.path.exists(hdf5_file)):
+                and hdf5_file and os.path.exists(hdf5_file)):
             xi_runs = []
             for seed in range(1, nseeds + 1):
                 result = subprocess.run(
@@ -303,9 +311,9 @@ class ICPlotter:
                     capture_output=True, text=True
                 )
                 if result.returncode == 0:
-                    lines = [l for l in result.stdout.splitlines() if not l.startswith('#')]
-                    vals  = np.array([list(map(float, l.split()))
-                                      for l in lines if l.strip()])
+                    lines = [ln for ln in result.stdout.splitlines() if not ln.startswith('#')]
+                    vals = np.array([list(map(float, ln.split()))
+                                     for ln in lines if ln.strip()])
                     if vals.ndim == 2 and vals.shape[0] == len(xi_cf):
                         xi_runs.append(vals[:, 3])
             if len(xi_runs) >= 2:
@@ -345,7 +353,7 @@ class ICPlotter:
         """
         vel = np.loadtxt(vel_cic_file, comments='#')
         r_mid = np.sqrt(vel[:, 1] * vel[:, 2]) * self.h   # Mpc → Mpc/h
-        psi   = vel[:, 3] / a**2                           # convert to v_pec units
+        psi = vel[:, 3] / a**2                           # convert to v_pec units
         self.vel_cic_list.append({
             "r_mid": r_mid, "psi": psi,
             "stem": stem or os.path.basename(vel_cic_file),
@@ -375,7 +383,7 @@ class ICPlotter:
             run = self.pk_runs[0]
             xi_cf_path = os.path.join(run["data_dir"], f"xi_{run['stem']}.txt")
             if os.path.exists(xi_cf_path):
-                hdf5_file  = os.path.join(run["data_dir"], f"ics_swift_{run['stem']}.hdf5")
+                hdf5_file = os.path.join(run["data_dir"], f"ics_swift_{run['stem']}.hdf5")
                 rbins_file = os.path.join(run["data_dir"], f"rbins_{run['stem']}.txt")
                 self.load_corrfunc_xi(
                     xi_cf_path, hdf5_file, rbins_file, repo_root,
@@ -383,10 +391,10 @@ class ICPlotter:
 
         # CIC xi and vel — load for every pk run
         for i, run in enumerate(self.pk_runs):
-            stem     = run["stem"]
+            stem = run["stem"]
             data_dir = run["data_dir"]
-            z_run    = run.get("z")
-            a_run    = 1.0 / (1.0 + z_run) if z_run is not None else 1.0
+            z_run = run.get("z")
+            a_run = 1.0 / (1.0 + z_run) if z_run is not None else 1.0
 
             # xi_cic: explicit file only for the primary (first) run
             if i == 0:
@@ -436,11 +444,11 @@ class ICPlotter:
         self.fig = plt.figure(figsize=(18, 7), constrained_layout=True)
         gs = GridSpec(2, 3, figure=self.fig, height_ratios=[4, 1], hspace=0.05)
 
-        self.ax          = self.fig.add_subplot(gs[0, 0])
-        self.ax_pk_ratio  = self.fig.add_subplot(gs[1, 0], sharex=self.ax)
-        self.ax2         = self.fig.add_subplot(gs[0, 1])
-        self.ax_xi_ratio  = self.fig.add_subplot(gs[1, 1], sharex=self.ax2)
-        self.ax3         = self.fig.add_subplot(gs[0, 2])
+        self.ax = self.fig.add_subplot(gs[0, 0])
+        self.ax_pk_ratio = self.fig.add_subplot(gs[1, 0], sharex=self.ax)
+        self.ax2 = self.fig.add_subplot(gs[0, 1])
+        self.ax_xi_ratio = self.fig.add_subplot(gs[1, 1], sharex=self.ax2)
+        self.ax3 = self.fig.add_subplot(gs[0, 2])
         self.ax_psi_ratio = self.fig.add_subplot(gs[1, 2], sharex=self.ax3)
 
         self._plot_pk_panel(self.ax, show_nodeconv=show_nodeconv, hankel=hankel,
@@ -467,8 +475,8 @@ class ICPlotter:
         # Per-run curves
         multi = len(self.pk_runs) > 1
         for i, run in enumerate(self.pk_runs):
-            k     = run["k"]
-            stem  = run["stem"]
+            k = run["k"]
+            stem = run["stem"]
             color = f'C{i}'
 
             label = self._label_from_stem(stem) if multi else stem
@@ -497,7 +505,7 @@ class ICPlotter:
                 L = run["boxsize_mpch"]
                 n = run["npart_side"] or 256
                 if L:
-                    kf   = 2 * np.pi / L
+                    kf = 2 * np.pi / L
                     knyq = np.pi * n / L
                     ax.axvline(kf,   color=f'C{i}', ls=':', lw=1.0)
                     ax.axvline(knyq, color=f'C{i}', ls='--', lw=1.0)
@@ -515,7 +523,8 @@ class ICPlotter:
             run = self.pk_runs[0]
             if len(self.pk_runs) == 1:
                 z_str = "?" if run["z"] is None else f'{run["z"]:g}'
-                ax.set_title(f'N={run["npart_side"]}³, L={run["boxsize_mpch"]:.4g} Mpc/h, z={z_str}')
+                ax.set_title(
+                    f'N={run["npart_side"]}³, L={run["boxsize_mpch"]:.4g} Mpc/h, z={z_str}')
         ax.legend(fontsize='medium', loc='lower left')
 
         ax_top = ax.twiny()
@@ -634,11 +643,11 @@ class ICPlotter:
 
         if self.theory_psi is not None:
             for j, d in enumerate(self.vel_cic_list):
-                r     = d["r_mid"]
-                pos   = d["psi"] > 0
+                r = d["r_mid"]
+                pos = d["psi"] > 0
                 psi_th = np.interp(r[pos], self.theory_psi_r, self.theory_psi)
-                valid  = psi_th > 0
-                r_v    = r[pos][valid]
+                valid = psi_th > 0
+                r_v = r[pos][valid]
                 ax.semilogx(r_v, d["psi"][pos][valid] / psi_th[valid],
                             'D-', ms=3, lw=1.2, color=f'C{j}')
 
@@ -658,7 +667,7 @@ class ICPlotter:
         """Draw ±1/5/10/20/30/40/50 % horizontal reference lines."""
         ax.axhline(0.0, color='k', lw=1.0)
         for level in self._RATIO_LEVELS:
-            ax.axhline( level, color='gray', lw=0.5, ls='--', alpha=0.5)
+            ax.axhline(level, color='gray', lw=0.5, ls='--', alpha=0.5)
             ax.axhline(-level, color='gray', lw=0.5, ls='--', alpha=0.5)
 
     def _plot_pk_ratio_panel(self, ax, show_shot_sub=False):
@@ -667,9 +676,9 @@ class ICPlotter:
 
         if self.theory_k is not None:
             for i, run in enumerate(self.pk_runs):
-                k     = run["k"]
+                k = run["k"]
                 color = f'C{i}'
-                Pt    = np.interp(k, self.theory_k, self.theory_P)
+                Pt = np.interp(k, self.theory_k, self.theory_P)
                 ax.semilogx(k, run["Pk_raw"] / Pt - 1.0,
                             'o-', ms=3, lw=1.2, color=color)
                 if show_shot_sub:
@@ -697,15 +706,15 @@ class ICPlotter:
 
         if self.theory_xi_r is not None:
             for j, d in enumerate(self.xi_cic_list):
-                r     = d["r_mid"]
+                r = d["r_mid"]
                 xi_th = np.interp(r, self.theory_xi_r, self.theory_xi)
                 valid = xi_th != 0
                 ax.semilogx(r[valid], d["xi"][valid] / xi_th[valid] - 1.0,
                             '^-', ms=3, lw=1.2, color=f'C{j}')
 
             if self.corrfunc_xi is not None:
-                d     = self.corrfunc_xi
-                r     = d["r_mid"]
+                d = self.corrfunc_xi
+                r = d["r_mid"]
                 xi_th = np.interp(r, self.theory_xi_r, self.theory_xi)
                 valid = xi_th != 0
                 ax.semilogx(r[valid], d["xi"][valid] / xi_th[valid] - 1.0,
@@ -795,7 +804,7 @@ def main():
     if args.output:
         out_png = args.output
     elif len(args.pkfiles) == 1:
-        stem     = ICPlotter._stem_from_pkfile(args.pkfiles[0])
+        stem = ICPlotter._stem_from_pkfile(args.pkfiles[0])
         data_dir = os.path.dirname(os.path.abspath(args.pkfiles[0]))
         plots_dir = os.path.join(os.path.dirname(data_dir), "plots")
         if os.path.isdir(plots_dir):
