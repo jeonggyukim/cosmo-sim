@@ -79,6 +79,21 @@ together with the broader landscape of large-scale dark-matter
 simulations, we refer the reader to the Living Review by
 \citet{Angulo2022}.
 
+\paragraph{Organisation and pressure.}
+Most of this note treats matter as a single \emph{pressureless} fluid,
+which is exact for cold dark matter and adequate for baryons on scales
+well above the Jeans length.  The main body of the note (Sections~\ref{sec:fluid} onward) therefore
+uses the pressureless continuity/Euler/Poisson system, which is what
+Lagrangian perturbation theory (ZA, 2LPT, 3LPT) assumes by
+construction.  Baryonic pressure, the associated two-fluid growth
+equations, and the practical machinery for generating joint
+baryon$+$CDM ICs (two transfer functions, compensated mode,
+\texttt{do\_baryons} in \texttt{MUSIC2}/\texttt{monofonIC}) are
+collected separately in Section~\ref{sec:baryons_cdm}, so the LPT
+derivation flow is not interrupted.  The intervening sections can
+therefore be read as the $c_s \to 0$ limit of the full two-fluid
+treatment, which is restored in Section~\ref{sec:baryons_cdm}.
+
 %----------------------------------------------------------------------
 \section{Fluid Equations in an Expanding Universe}
 \label{sec:fluid}
@@ -2133,6 +2148,29 @@ path in \texttt{MUSIC2} (with \texttt{levelmin = levelmax}) and
 \texttt{monofonIC} generate essentially identical ICs for the same
 random seed, and \texttt{MUSIC2}'s lighter dependency footprint and
 slab-free FFT are a better fit for a laptop-scale testbed.
+
+%----------------------------------------------------------------------
+\section{Baryon + CDM Initial Conditions}
+\label{sec:baryons_cdm}
+
+\emph{Placeholder.}  This section will collect the material that the
+pressureless treatment in Sections~\ref{sec:fluid} onward deliberately
+leaves out:
+%
+\begin{itemize}
+  \item baryon Euler equation with the $-\nabla p/\rho_b$ term and the
+        adiabatic / post-recombination sound-speed closure;
+  \item two-fluid linear growth system for $(\delta_c,\delta_b)$
+        including the $c_s^2 k^2/a^2$ Jeans term \citep{ShojiKomatsu2009,
+        Somogyi2010};
+  \item scale-dependent baryon suppression below the Jeans scale and
+        the slow c--b mode convergence;
+  \item two-species IC realisation in \texttt{MUSIC2}/\texttt{monofonIC}:
+        separate $\delta_c$, $\delta_b$, $\theta_c$, $\theta_b$ transfer
+        functions from CLASS, the compensated-isocurvature ``cb'' mode,
+        and the \texttt{do\_baryons} / two-fluid switches
+        \citep{HahnRampfUhlemann2021}.
+\end{itemize}
 
 %----------------------------------------------------------------------
 \section{Summary}
