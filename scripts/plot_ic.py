@@ -588,23 +588,30 @@ class ICPlotter:
                 ax2.plot(r_m[neg], -xi_m[neg], '^--', ms=4, lw=1.2,
                          color=color, alpha=0.5)
 
-        # Reference lines: L/3 and Δx per run, proxy legend entries
+        # Reference lines: L/2 (torus Nyquist for CIC-grid ξ) and Δx per run.
+        # L/3 is drawn only when Corrfunc pair-count data is present (pair
+        # counts beyond L/3 are biased by periodic images; the CIC FFT path
+        # is exact on the torus up to L/2).
         if self.pk_runs:
             import matplotlib.lines as mlines
+            show_L3 = self.corrfunc_xi is not None
             for i, run in enumerate(self.pk_runs):
                 L = run["boxsize_mpch"]
                 n = run["npart_side"]
                 if L:
-                    ax2.axvline(L / 3, color=f'C{i}', ls='--', lw=0.9)
+                    ax2.axvline(L / 2, color=f'C{i}', ls='--', lw=0.9)
+                    if show_L3:
+                        ax2.axvline(L / 3, color=f'C{i}', ls='-.', lw=0.9)
                 if L and n:
                     ax2.axvline(L / n, color=f'C{i}', ls=':', lw=0.9)
+            handles = [mlines.Line2D([], [], color='gray', ls='--', lw=1.0, label=r'$L/2$')]
+            if show_L3:
+                handles.append(
+                    mlines.Line2D([], [], color='gray', ls='-.', lw=1.0, label=r'$L/3$'))
+            handles.append(
+                mlines.Line2D([], [], color='gray', ls=':', lw=1.0, label=r'$\Delta x$'))
             ax2.add_artist(ax2.legend(
-                handles=[
-                    mlines.Line2D([], [], color='gray', ls='--', lw=1.0, label=r'$L/3$'),
-                    mlines.Line2D([], [], color='gray', ls=':',  lw=1.0, label=r'$\Delta x$'),
-                ],
-                fontsize='medium', loc='upper right'
-            ))
+                handles=handles, fontsize='medium', loc='upper right'))
 
         # Set xlim to span all loaded data
         all_r = [d["r_mid"] for d in self.xi_cic_list] + \
@@ -630,10 +637,7 @@ class ICPlotter:
                 ymax = xi_abs.max() * 3.0
                 ymin = ymax * 1e-5
                 ax2.set_ylim(ymin, ymax)
-        ngrid_str = ''
-        if self.xi_cic_list and self.xi_cic_list[0].get('ngrid'):
-            ngrid_str = f', CIC $N_{{\\rm grid}}={self.xi_cic_list[0]["ngrid"]}$'
-        ax2.set_title(r'$\xi(r)$' + ngrid_str)
+        ax2.set_title(r'$\xi(r) = \langle \delta(x)\,\delta(x+r)\rangle$')
 
     def _plot_psi_panel(self, ax):
         """Populate the ψ(r) panel (third column, top row)."""
@@ -760,10 +764,13 @@ class ICPlotter:
                             's-', ms=3, lw=1.2, color='C1', mfc='none', alpha=0.5)
 
         # Repeat L/3 and Δx reference lines for each run
+        show_L3 = self.corrfunc_xi is not None
         for i, run in enumerate(self.pk_runs):
             L, n = run["boxsize_mpch"], run["npart_side"]
             if L:
-                ax.axvline(L / 3, color=f'C{i}', ls='--', lw=0.9)
+                ax.axvline(L / 2, color=f'C{i}', ls='--', lw=0.9)
+                if show_L3:
+                    ax.axvline(L / 3, color=f'C{i}', ls='-.', lw=0.9)
             if L and n:
                 ax.axvline(L / n, color=f'C{i}', ls=':', lw=0.9)
 

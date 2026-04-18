@@ -69,7 +69,7 @@
  *  Total work ≈ N_lags × Ngrid³ cell-pair multiply-adds.
  *  N_lags ≈ (4/3)π(rmax/cell)³/8  (positive octant of a sphere).
  *
- *  Example (rmax = L/3 = 341 Mpc):
+ *  Example (rmax = L/2 = 512 Mpc):
  *    Ngrid=256, cell=4 Mpc  →  k_max=85, N_lags≈1.3M  → ~2×10¹³ ops (~40 min)
  *    Ngrid=128, cell=8 Mpc  →  k_max=43, N_lags≈43k   → ~9×10¹⁰ ops (~90 s)
  *
@@ -85,7 +85,7 @@
  *   ./compute_xi_cic --input data/ics_swift_n256_z2_L687.hdf5
  *   ./compute_xi_cic --input data/ics_swift_n256_z2_L687.hdf5 \
  *            --Ngrid 128 --nbins 24 --nthreads 8 \
- *            --rmin 8.0 --rmax 341.2 \
+ *            --rmin 8.0 --rmax 512.0 \
  *            --output data/xi_cic_n256_z2_L687.txt
  */
 
@@ -131,7 +131,7 @@ typedef struct {
     XiMode  mode;
     int     nbins;        /* number of radial bins */
     double  rmin;         /* minimum lag in Mpc; -1 = auto: cell size */
-    double  rmax;         /* maximum lag in Mpc; -1 = auto: boxsize/3 */
+    double  rmax;         /* maximum lag in Mpc; -1 = auto: boxsize/2 */
     char    output[512];  /* output file for xi(r) */
     int     r2_plot;      /* if set, also write xi(r)·r² as an extra column */
     int     periodic;     /* bit mask: which axes use periodic wrapping */
@@ -993,12 +993,12 @@ static void usage(const char *prog)
         "\n"
         "  --input FILE       SWIFT IC HDF5 file (required)\n"
         "  --ptype INT        PartType index (default 1 = dark matter)\n"
-        "  --Ngrid INT        CIC grid size (default: min(cbrt(N), 128))\n"
-        "                     Work ~ N_lags × Ngrid³; use Ngrid≤128 for rmax=L/3.\n"
+        "  --Ngrid INT        CIC grid size (default: cbrt(N))\n"
+        "                     Work ~ Ngrid³ log Ngrid with --fft (default).\n"
         "  --mode  STR        3d | 1d-x | 1d-y | 1d-z (default 3d)\n"
-        "  --nbins INT        number of r bins (default 30)\n"
+        "  --nbins INT        number of r bins (default 60)\n"
         "  --rmin  FLOAT      minimum lag in Mpc (default: cell size)\n"
-        "  --rmax  FLOAT      maximum lag in Mpc (default: boxsize/3)\n"
+        "  --rmax  FLOAT      maximum lag in Mpc (default: boxsize/2)\n"
         "  --output FILE      output text file for xi(r) (default xi_cic_out.txt)\n"
         "  --r2               also write xi(r)·r² as an extra column\n"
         "  --logbin           log-spaced bins (default)\n"
@@ -1133,7 +1133,7 @@ int main(int argc, char **argv)
 
     /* Set deferred defaults (need boxsize and cell) */
     if (o.rmin < 0) o.rmin = cell;           /* ≥ 1 cell ensures lags are resolved */
-    if (o.rmax < 0) o.rmax = boxsize / 3.0;  /* L/3: max reliable scale for PBC */
+    if (o.rmax < 0) o.rmax = boxsize / 2.0;  /* L/2: Nyquist radial distance on a torus; PBC is exact for CIC grid */
     if (o.logbin && o.rmin <= 0.0) {
         printf("WARNING: --logbin requires rmin > 0; setting rmin = cell = %.6f\n", cell);
         o.rmin = cell;
