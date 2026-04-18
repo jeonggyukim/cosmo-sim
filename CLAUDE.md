@@ -74,6 +74,7 @@ Remove outputs with `./clean.sh` (or `--all` to also remove IC HDF5 files).
 ### Utilities
 - `scripts/read_wnoise.py` — reads `wnoise_NNNN.bin` white noise binary into a numpy array
 - `scripts/read_ics_swift.py` — reads `ics_swift.hdf5` IC file (header + particle data)
+- `scripts/check_ic_dc_mode.py` — verifies DC (k=0) modes of displacement/velocity (Lagrangian + Eulerian CIC); prints mass resolution and recommended SWIFT force-softening range (ε = Δx/40…Δx/25). Add `--explain` for full preamble.
 
 ## IC Validation
 

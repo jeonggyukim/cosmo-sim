@@ -1875,6 +1875,61 @@ forces the radiation-free convention used by most legacy N-body
 codes.  A fuller discussion lives in
 Section~\ref{sec:backscaling_radiation} (Appendix~B).
 
+\paragraph{Gravitational softening resolution.}
+The IC displacement field sets the smallest meaningful scale in the
+simulation, but the subsequent N-body evolution also needs a
+\emph{force softening} $\varepsilon$ to regularise the two-body
+potential and suppress spurious discreteness effects.  A common rule
+of thumb ties $\varepsilon$ to the mean inter-particle spacing
+$\Delta x \equiv L/N$:
+%
+\begin{itemize}
+  \item \citet{Power2003} find $\varepsilon_{\rm opt} \approx \Delta x/50$
+        -- $\Delta x/25$ (Plummer-equivalent) by converging on the
+        inner density profile of $\Lambda$CDM haloes; softer choices
+        bias the inner slope, harder ones amplify two-body heating.
+  \item \texttt{GADGET-2} / Millennium used
+        $\varepsilon = \Delta x/25$~\citep{Springel2005}.
+  \item \citet{Ludlow2019} recommend $\varepsilon \approx \Delta x/20$
+        as a compromise that avoids relaxation-driven biases in halo
+        mass functions.
+  \item \texttt{MUSIC}/\texttt{monofonIC} papers suggest
+        $\varepsilon \approx \Delta x/40$~\citep{Hahn2011, Michaux2020};
+        the tighter value exploits the cleaner near-grid dynamics of
+        PLT-corrected ICs.
+\end{itemize}
+%
+A useful default is $\varepsilon \in [\Delta x/40,\ \Delta x/25]$
+(comoving).  Table~\ref{tab:softening} lists the range for our
+$N=256^3$ configurations.
+%
+\begin{table}[h]
+\centering
+\begin{tabular}{rccc}
+\hline
+$L$ [Mpc/$h$] & $\Delta x$ [kpc/$h$] & $\varepsilon=\Delta x/40$ [kpc/$h$]
+              & $\varepsilon=\Delta x/25$ [kpc/$h$] \\ \hline
+ 256 &  1000 & 25 & 40 \\
+ 512 &  2000 & 50 & 80 \\
+1024 &  4000 & 100 & 160 \\ \hline
+\end{tabular}
+\caption{Recommended comoving force-softening ranges for our current
+$N=256^3$ IC set.}
+\label{tab:softening}
+\end{table}
+%
+\texttt{SWIFT} implements a cubic-spline kernel (so the quoted
+$\varepsilon$ is the spline-kernel scale, not Plummer-equivalent: the
+conversion is $\varepsilon_{\rm Plummer} \approx \varepsilon_{\rm
+spline}/2.8$) and exposes separate
+\texttt{Comoving\_DM\_softening} and
+\texttt{Max\_physical\_DM\_softening} parameters, switching between
+the two at a user-chosen $z_{\rm pivot}$ (default $z=2.8$) so that the
+physical softening does not shrink unboundedly at late
+times~\citep{Schaller2024}.  For our runs the comoving value should
+sit in Table~\ref{tab:softening} and the physical cap at roughly the
+same value divided by $(1+z_{\rm pivot})$.
+
 %----------------------------------------------------------------------
 \subsection{The broader IC landscape}
 \label{sec:ic_landscape}

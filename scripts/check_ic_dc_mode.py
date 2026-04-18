@@ -70,6 +70,28 @@ def check(path, ngrid=None):
     print(f'  Mass resolution: m_DM = {m_part:.4g} × 1e10 M_sun '
           f'= {m_part * 1e10:.4g} M_sun/particle')
 
+    # Force-softening recommendation (SWIFT cubic-spline kernel).
+    # Literature range: eps_spline ≈ dx/40 (MUSIC/monofonIC, Hahn+2011,
+    # Michaux+2020) to dx/25 (GADGET-2/Millennium, Springel 2005; upper
+    # bound of Power+2003).  Plummer-equivalent: eps_P ≈ eps_spline/2.8.
+    # SWIFT params: Gravity:comoving_DM_softening sits in this range;
+    # Gravity:max_physical_DM_softening caps it at ~same value / (1+z_pivot)
+    # with default z_pivot = 2.8.
+    eps_tight = dx_lat / 40.0
+    eps_loose = dx_lat / 25.0
+    print('  [Force-softening recommendation (SWIFT cubic-spline)]')
+    print(f'    mean spacing dx        = {dx_lat:.4g} Mpc')
+    print(f'    eps_spline = dx/40     = {eps_tight:.4g} Mpc  '
+          '(MUSIC/monofonIC, tight)')
+    print(f'    eps_spline = dx/25     = {eps_loose:.4g} Mpc  '
+          '(GADGET-2, loose)')
+    print(f'    Plummer-equiv (dx/40)  = {eps_tight / 2.8:.4g} Mpc')
+    print(f'    SWIFT Gravity:comoving_DM_softening       ~ {eps_tight:.4g} '
+          f'… {eps_loose:.4g} Mpc')
+    print(f'    SWIFT Gravity:max_physical_DM_softening   ~ '
+          f'{eps_tight / 3.8:.4g} … {eps_loose / 3.8:.4g} Mpc '
+          '(z_pivot=2.8)')
+
     # ---- 1. Lagrangian displacement-based DC check ----------------------
     i = ids // (n * n)
     j = (ids // n) % n
@@ -153,6 +175,15 @@ Quantity glossary (printed below):
   v_grid_RMS            : std of cell-averaged velocity — always ≤
                           vel_RMS; the gap measures sub-cell velocity
                           variance lost to CIC smoothing
+
+Force-softening recommendation:
+  Derived from the mean inter-particle spacing dx = L/N using the
+  literature range eps = dx/40 (Hahn & Abel 2011; Michaux+ 2020) to
+  dx/25 (Springel 2005; upper end of Power+ 2003).  Values are quoted
+  for SWIFT's cubic-spline kernel; the Plummer-equivalent scale is
+  eps_P ≈ eps_spline / 2.8.  SWIFT switches from comoving to physical
+  softening at z_pivot = 2.8 by default, so the physical cap is ~the
+  comoving value divided by (1+z_pivot) = 3.8.
 """
 
 
