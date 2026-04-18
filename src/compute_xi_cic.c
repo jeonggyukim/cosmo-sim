@@ -100,6 +100,7 @@
 #endif
 
 #include <hdf5.h>
+#include <fftw3.h>
 
 /* ─── mode enum ─────────────────────────────────────────────────────────── */
 /*
@@ -138,6 +139,8 @@ typedef struct {
     int     nthreads;     /* OpenMP threads; 0 = defer to OMP_NUM_THREADS */
     int     compute_vel;  /* if set, also compute velocity correlation ψ(r) */
     char    vel_output[512]; /* output file for ψ(r); auto-derived if empty */
+    int     use_fft;      /* 1 = FFT autocorrelation (default for xyz-periodic);
+                             0 = direct lag-sum */
 } Opts;
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -241,57 +244,36 @@ static int read_header(const char *fname, int ptype,
  * H5T_NATIVE_DOUBLE as the memory type causes HDF5 to promote float32 →
  * float64 during the read, with no extra copy needed.
  */
-static int read_coords(const char *fname, int ptype,
-                       double **coords, long long N)
+static int read_nx3_double(const char *fname, int ptype, const char *suffix,
+                           double **out, long long N, int must_exist)
 {
-    *coords = (double *)malloc((size_t)N * 3 * sizeof(double));
-    if (!*coords) { fprintf(stderr, "OOM reading coords\n"); return -1; }
+    *out = (double *)malloc((size_t)N * 3 * sizeof(double));
+    if (!*out) { fprintf(stderr, "OOM reading %s\n", suffix); return -1; }
 
     char dset_name[64];
-    snprintf(dset_name, sizeof(dset_name), "PartType%d/Coordinates", ptype);
+    snprintf(dset_name, sizeof(dset_name), "PartType%d/%s", ptype, suffix);
 
     hid_t file = H5Fopen(fname, H5F_ACC_RDONLY, H5P_DEFAULT);
-    hid_t dset = H5Dopen2(file, dset_name, H5P_DEFAULT);
-    /* H5S_ALL for both file and memory dataspace reads the full dataset */
-    H5Dread(dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, *coords);
-    H5Dclose(dset);
-    H5Fclose(file);
-    return 0;
-}
+    if (file < 0) { fprintf(stderr, "Cannot open %s\n", fname); free(*out); *out = NULL; return -1; }
 
-/*
- * read_velocities — read all PartType{ptype}/Velocities into a flat double array.
- *
- * SWIFT stores peculiar velocities as float32 in km/s (comoving peculiar
- * velocity a·v_pec, where a is the scale factor at the IC redshift).
- * The dataset has shape (N, 3) and is laid out as [vx0,vy0,vz0, vx1,...].
- *
- * HDF5 auto-promotes float32 → float64 during the read (H5T_NATIVE_DOUBLE).
- */
-static int read_velocities(const char *fname, int ptype,
-                           double **vels, long long N)
-{
-    *vels = (double *)malloc((size_t)N * 3 * sizeof(double));
-    if (!*vels) { fprintf(stderr, "OOM reading velocities\n"); return -1; }
-
-    char dset_name[64];
-    snprintf(dset_name, sizeof(dset_name), "PartType%d/Velocities", ptype);
-
-    hid_t file = H5Fopen(fname, H5F_ACC_RDONLY, H5P_DEFAULT);
-    if (file < 0) { fprintf(stderr, "Cannot open %s\n", fname); free(*vels); return -1; }
-
-    /* Check that the dataset exists before opening */
-    if (!H5Lexists(file, dset_name, H5P_DEFAULT)) {
+    if (must_exist && !H5Lexists(file, dset_name, H5P_DEFAULT)) {
         fprintf(stderr, "Dataset %s not found in %s\n", dset_name, fname);
-        H5Fclose(file); free(*vels); return -1;
+        H5Fclose(file); free(*out); *out = NULL; return -1;
     }
 
     hid_t dset = H5Dopen2(file, dset_name, H5P_DEFAULT);
-    H5Dread(dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, *vels);
+    /* HDF5 auto-promotes float32 → float64 when H5T_NATIVE_DOUBLE is requested. */
+    H5Dread(dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, *out);
     H5Dclose(dset);
     H5Fclose(file);
     return 0;
 }
+
+static int read_coords(const char *fname, int ptype, double **coords, long long N)
+{ return read_nx3_double(fname, ptype, "Coordinates", coords, N, 0); }
+
+static int read_velocities(const char *fname, int ptype, double **vels, long long N)
+{ return read_nx3_double(fname, ptype, "Velocities",  vels,   N, 1); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
  *  CIC density grid
@@ -321,45 +303,54 @@ static int read_velocities(const char *fname, int ptype,
  * used here.  For P(k) estimation this would require deconvolution, but
  * for ξ(r) at large r (rmin >> cell) the suppression is negligible.
  */
-static void cic_assign(const double *coords, long long npart,
-                       double boxsize, int Ngrid, double *grid)
+typedef struct { long idx; double w; } CicW;
+
+/*
+ * cic_weights — compute the 8 (linear_index, weight) pairs for one particle.
+ *
+ * Given a particle at (px_mpc, py_mpc, pz_mpc), fills out[0..7] with the
+ * trilinear weights and flat indices into an Ngrid³ grid, with periodic wrap.
+ * Both cic_assign and cic_vel_assign call this helper; the only difference
+ * between the two is what they accumulate into at each of the 8 cells.
+ */
+static inline void cic_weights(double px_mpc, double py_mpc, double pz_mpc,
+                               double cell, int Ngrid, CicW out[8])
 {
-    double cell = boxsize / Ngrid;  /* cell side length in Mpc */
-    long   Ng   = Ngrid;
-    long   Ng2  = Ng * Ng;
+    double px = px_mpc / cell, py = py_mpc / cell, pz = pz_mpc / cell;
+    int    i0 = (int)floor(px); double dx = px - floor(px);
+    int    j0 = (int)floor(py); double dy = py - floor(py);
+    int    k0 = (int)floor(pz); double dz = pz - floor(pz);
+    double tx = 1.0-dx, ty = 1.0-dy, tz = 1.0-dz;
 
-#define IDX(i,j,k) ((long)(i)*Ng2 + (long)(j)*Ng + (long)(k))
-
-    for (long long p = 0; p < npart; p++) {
-        /* Convert position to cell-fractional coordinates */
-        double px = coords[p*3+0] / cell;
-        double py = coords[p*3+1] / cell;
-        double pz = coords[p*3+2] / cell;
-
-        /* Lower-left grid node index and fractional offset within cell */
-        int i0 = (int)floor(px); double dx = px - floor(px);
-        int j0 = (int)floor(py); double dy = py - floor(py);
-        int k0 = (int)floor(pz); double dz = pz - floor(pz);
-
-        /* CIC weights: tx/dx = fraction assigned to lower/upper node */
-        double tx = 1.0-dx, ty = 1.0-dy, tz = 1.0-dz;
-
-        /* Loop over the 2×2×2 neighbouring cells */
-        for (int di = 0; di < 2; di++) {
-            double wx = di ? dx : tx;             /* weight along x */
-            int ix = ((i0+di) % Ngrid + Ngrid) % Ngrid;  /* periodic wrap */
-            for (int dj = 0; dj < 2; dj++) {
-                double wy = dj ? dy : ty;
-                int iy = ((j0+dj) % Ngrid + Ngrid) % Ngrid;
-                for (int dk = 0; dk < 2; dk++) {
-                    double wz = dk ? dz : tz;
-                    int iz = ((k0+dk) % Ngrid + Ngrid) % Ngrid;
-                    grid[IDX(ix,iy,iz)] += wx * wy * wz;
-                }
+    long Ng = Ngrid, Ng2 = Ng * Ng;
+    int n = 0;
+    for (int di = 0; di < 2; di++) {
+        double wx = di ? dx : tx;
+        int    ix = ((i0+di) % Ngrid + Ngrid) % Ngrid;
+        for (int dj = 0; dj < 2; dj++) {
+            double wy = dj ? dy : ty;
+            int    iy = ((j0+dj) % Ngrid + Ngrid) % Ngrid;
+            for (int dk = 0; dk < 2; dk++) {
+                double wz = dk ? dz : tz;
+                int    iz = ((k0+dk) % Ngrid + Ngrid) % Ngrid;
+                out[n].idx = (long)ix * Ng2 + (long)iy * Ng + (long)iz;
+                out[n].w   = wx * wy * wz;
+                n++;
             }
         }
     }
-#undef IDX
+}
+
+static void cic_assign(const double *coords, long long npart,
+                       double boxsize, int Ngrid, double *grid)
+{
+    double cell = boxsize / Ngrid;
+    CicW   w[8];
+    for (long long p = 0; p < npart; p++) {
+        cic_weights(coords[p*3+0], coords[p*3+1], coords[p*3+2],
+                    cell, Ngrid, w);
+        for (int n = 0; n < 8; n++) grid[w[n].idx] += w[n].w;
+    }
 }
 
 /*
@@ -391,11 +382,8 @@ static void cic_vel_assign(const double *coords, const double *vels,
                            double *vx_field, double *vy_field, double *vz_field)
 {
     double cell = boxsize / Ngrid;
-    long   Ng   = Ngrid;
-    long   Ng2  = Ng * Ng;
+    long   Ng3  = (long)Ngrid * Ngrid * Ngrid;
 
-    /* Temporary arrays to accumulate weighted velocity sums */
-    long Ng3 = Ng * Ng * Ng;
     double *vx_sum = (double *)calloc((size_t)Ng3, sizeof(double));
     double *vy_sum = (double *)calloc((size_t)Ng3, sizeof(double));
     double *vz_sum = (double *)calloc((size_t)Ng3, sizeof(double));
@@ -403,40 +391,19 @@ static void cic_vel_assign(const double *coords, const double *vels,
         fprintf(stderr, "OOM in cic_vel_assign\n"); exit(1);
     }
 
-#define IDX(i,j,k) ((long)(i)*Ng2 + (long)(j)*Ng + (long)(k))
-
+    CicW w[8];
     for (long long p = 0; p < npart; p++) {
-        double px = coords[p*3+0] / cell;
-        double py = coords[p*3+1] / cell;
-        double pz = coords[p*3+2] / cell;
-
-        int    i0 = (int)floor(px); double dx = px - floor(px);
-        int    j0 = (int)floor(py); double dy = py - floor(py);
-        int    k0 = (int)floor(pz); double dz = pz - floor(pz);
-
-        double tx = 1.0-dx, ty = 1.0-dy, tz = 1.0-dz;
-
-        /* Particle velocity components */
+        cic_weights(coords[p*3+0], coords[p*3+1], coords[p*3+2],
+                    cell, Ngrid, w);
         double vpx = vels[p*3+0], vpy = vels[p*3+1], vpz = vels[p*3+2];
-
-        for (int di = 0; di < 2; di++) {
-            double wx = di ? dx : tx;
-            int ix = ((i0+di) % Ngrid + Ngrid) % Ngrid;
-            for (int dj = 0; dj < 2; dj++) {
-                double wy = dj ? dy : ty;
-                int iy = ((j0+dj) % Ngrid + Ngrid) % Ngrid;
-                for (int dk = 0; dk < 2; dk++) {
-                    double wz = dk ? dz : tz;
-                    int iz = ((k0+dk) % Ngrid + Ngrid) % Ngrid;
-                    double w = wx * wy * wz;
-                    vx_sum[IDX(ix,iy,iz)] += w * vpx;
-                    vy_sum[IDX(ix,iy,iz)] += w * vpy;
-                    vz_sum[IDX(ix,iy,iz)] += w * vpz;
-                }
-            }
+        for (int n = 0; n < 8; n++) {
+            double ww = w[n].w;
+            long   ii = w[n].idx;
+            vx_sum[ii] += ww * vpx;
+            vy_sum[ii] += ww * vpy;
+            vz_sum[ii] += ww * vpz;
         }
     }
-#undef IDX
 
     /*
      * Normalise: divide weighted sum by cell mass (particle count).
@@ -557,6 +524,200 @@ static inline int find_bin(const double *edges, int nbins, double r)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ *  FFT-based autocorrelation (Wiener–Khinchin)
+ *
+ *  For a fully periodic box the cyclic autocorrelation
+ *    C[r] = Σ_x δ(x) δ(x+r)
+ *  equals IDFT(|DFT(δ)|²)[r] exactly (discrete Wiener–Khinchin).  Cost drops
+ *  from O(N_lags × Ngrid³) to O(Ngrid³ log Ngrid).  See notes/cosmo_ic.tex
+ *  §"Correlation function estimation: direct pair sum vs. FFT".
+ *
+ *  FFTW convention: r2c + c2r (unnormalised), so
+ *    c2r(|r2c(δ)|²)[r] = Ngrid³ × C[r]
+ *  and ⟨δ(x)δ(x+r)⟩ = C[r] / Ngrid³ = c2r_result[r] / Ngrid⁶.
+ *
+ *  The DD/DR/RR accumulators are filled so downstream Landy–Szalay
+ *    ξ = (DD − 2·DR + RR) / RR
+ *  evaluates to ⟨ξ⟩_b without modification of the main output loop.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static inline int wrap_signed(int d, int N)
+{
+    /* Map torus index d ∈ [0, N) to the signed displacement nearest zero. */
+    return (d <= N/2) ? d : d - N;
+}
+
+static void accumulate_pairs_fft(const double *den, int Ngrid, double cell,
+                                 XiMode mode,
+                                 const double *bin_edges, int nbins,
+                                 double *DD, double *DR, double *RR)
+{
+    long Ng   = Ngrid;
+    long Ng3  = Ng * Ng * Ng;
+    long Nch  = Ng/2 + 1;            /* complex z-length after r2c */
+    long Ncom = Ng * Ng * Nch;
+
+    double       *field = (double *)fftw_malloc(sizeof(double)       * (size_t)Ng3);
+    fftw_complex *fhat  = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * (size_t)Ncom);
+    double       *acor  = (double *)fftw_malloc(sizeof(double)       * (size_t)Ng3);
+    if (!field || !fhat || !acor) {
+        fprintf(stderr, "OOM in accumulate_pairs_fft\n"); exit(1);
+    }
+
+    /* δ = den − 1  (den = 1 + δ after normalisation in main) */
+    for (long i = 0; i < Ng3; i++) field[i] = den[i] - 1.0;
+
+    fftw_plan fwd = fftw_plan_dft_r2c_3d(Ngrid, Ngrid, Ngrid,
+                                         field, fhat, FFTW_ESTIMATE);
+    fftw_execute(fwd);
+    fftw_destroy_plan(fwd);
+
+    /* |δ̂|² in place */
+    for (long i = 0; i < Ncom; i++) {
+        double re = fhat[i][0], im = fhat[i][1];
+        fhat[i][0] = re*re + im*im;
+        fhat[i][1] = 0.0;
+    }
+
+    fftw_plan bwd = fftw_plan_dft_c2r_3d(Ngrid, Ngrid, Ngrid,
+                                         fhat, acor, FFTW_ESTIMATE);
+    fftw_execute(bwd);
+    fftw_destroy_plan(bwd);
+    fftw_free(fhat);
+    fftw_free(field);
+
+    /* acor[lag] = Ngrid³ × Σ_x δ(x)·δ(x+lag). ⟨ξ⟩(lag) = acor[lag] / Ngrid⁶. */
+    double inv_N6 = 1.0 / ((double)Ng3 * (double)Ng3);
+
+    long   *cnt    = (long   *)calloc((size_t)nbins, sizeof(long));
+    double *sum_xi = (double *)calloc((size_t)nbins, sizeof(double));
+    if (!cnt || !sum_xi) { fprintf(stderr, "OOM in accumulate_pairs_fft (bins)\n"); exit(1); }
+
+    for (int di = 0; di < Ngrid; di++) {
+        int diw = wrap_signed(di, Ngrid);
+        if (mode == MODE_1D_X && (diw == 0)) continue;
+        if (mode == MODE_1D_Y || mode == MODE_1D_Z) if (diw != 0) continue;
+        for (int dj = 0; dj < Ngrid; dj++) {
+            int djw = wrap_signed(dj, Ngrid);
+            if (mode == MODE_1D_Y && (djw == 0)) continue;
+            if (mode == MODE_1D_X || mode == MODE_1D_Z) if (djw != 0) continue;
+            long row = ((long)di*Ng + (long)dj) * Ng;
+            for (int dk = 0; dk < Ngrid; dk++) {
+                int dkw = wrap_signed(dk, Ngrid);
+                if (mode == MODE_1D_Z && (dkw == 0)) continue;
+                if (mode == MODE_1D_X || mode == MODE_1D_Y) if (dkw != 0) continue;
+                if (di == 0 && dj == 0 && dk == 0) continue;
+                double r = sqrt((double)(diw*diw + djw*djw + dkw*dkw)) * cell;
+                int b = find_bin(bin_edges, nbins, r);
+                if (b < 0) continue;
+                double xi_lag = acor[row + dk] * inv_N6;
+                sum_xi[b] += xi_lag;
+                cnt[b]++;
+            }
+        }
+    }
+    fftw_free(acor);
+
+    /*
+     * Fill DD/DR/RR such that (DD − 2·DR + RR)/RR == sum_xi/cnt = ⟨ξ⟩_b:
+     *   RR[b] = cnt[b] × Ngrid³
+     *   DR[b] = cnt[b] × Ngrid³
+     *   DD[b] = Ngrid³ × (cnt[b] + sum_xi[b])
+     * Derivation: per lag, Σ_x den·den' = Ngrid³·(1+ξ), Σ_x den = Ngrid³,
+     *             Σ_x 1 = Ngrid³; accumulated over full-torus lags in bin b.
+     */
+    for (int b = 0; b < nbins; b++) {
+        double rr = (double)cnt[b] * (double)Ng3;
+        RR[b] = rr;
+        DR[b] = rr;
+        DD[b] = (double)Ng3 * ((double)cnt[b] + sum_xi[b]);
+    }
+    free(cnt); free(sum_xi);
+}
+
+static void accumulate_vel_pairs_fft(const double *vx, const double *vy,
+                                     const double *vz, int Ngrid, double cell,
+                                     XiMode mode,
+                                     const double *bin_edges, int nbins,
+                                     double *VV, double *RR_vel)
+{
+    long Ng   = Ngrid;
+    long Ng3  = Ng * Ng * Ng;
+    long Nch  = Ng/2 + 1;
+    long Ncom = Ng * Ng * Nch;
+
+    double       *field   = (double *)fftw_malloc(sizeof(double)       * (size_t)Ng3);
+    fftw_complex *fhat    = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * (size_t)Ncom);
+    fftw_complex *pow_sum = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * (size_t)Ncom);
+    double       *acor    = (double *)fftw_malloc(sizeof(double)       * (size_t)Ng3);
+    if (!field || !fhat || !pow_sum || !acor) {
+        fprintf(stderr, "OOM in accumulate_vel_pairs_fft\n"); exit(1);
+    }
+
+    for (long i = 0; i < Ncom; i++) { pow_sum[i][0] = 0.0; pow_sum[i][1] = 0.0; }
+
+    fftw_plan fwd = fftw_plan_dft_r2c_3d(Ngrid, Ngrid, Ngrid,
+                                         field, fhat, FFTW_ESTIMATE);
+
+    const double *vptr[3] = {vx, vy, vz};
+    for (int a = 0; a < 3; a++) {
+        for (long i = 0; i < Ng3; i++) field[i] = vptr[a][i];
+        fftw_execute_dft_r2c(fwd, field, fhat);
+        for (long i = 0; i < Ncom; i++) {
+            double re = fhat[i][0], im = fhat[i][1];
+            pow_sum[i][0] += re*re + im*im;
+        }
+    }
+    fftw_destroy_plan(fwd);
+    fftw_free(fhat);
+    fftw_free(field);
+
+    fftw_plan bwd = fftw_plan_dft_c2r_3d(Ngrid, Ngrid, Ngrid,
+                                         pow_sum, acor, FFTW_ESTIMATE);
+    fftw_execute(bwd);
+    fftw_destroy_plan(bwd);
+    fftw_free(pow_sum);
+
+    /* acor[lag] = Ngrid³ × Σ_x Σ_α v_α(x) v_α(x+lag). */
+    double inv_N = 1.0 / (double)Ng3;
+
+    long   *cnt    = (long   *)calloc((size_t)nbins, sizeof(long));
+    double *sum_vv = (double *)calloc((size_t)nbins, sizeof(double));
+    if (!cnt || !sum_vv) { fprintf(stderr, "OOM in accumulate_vel_pairs_fft (bins)\n"); exit(1); }
+
+    for (int di = 0; di < Ngrid; di++) {
+        int diw = wrap_signed(di, Ngrid);
+        if (mode == MODE_1D_X && (diw == 0)) continue;
+        if (mode == MODE_1D_Y || mode == MODE_1D_Z) if (diw != 0) continue;
+        for (int dj = 0; dj < Ngrid; dj++) {
+            int djw = wrap_signed(dj, Ngrid);
+            if (mode == MODE_1D_Y && (djw == 0)) continue;
+            if (mode == MODE_1D_X || mode == MODE_1D_Z) if (djw != 0) continue;
+            long row = ((long)di*Ng + (long)dj) * Ng;
+            for (int dk = 0; dk < Ngrid; dk++) {
+                int dkw = wrap_signed(dk, Ngrid);
+                if (mode == MODE_1D_Z && (dkw == 0)) continue;
+                if (mode == MODE_1D_X || mode == MODE_1D_Y) if (dkw != 0) continue;
+                if (di == 0 && dj == 0 && dk == 0) continue;
+                double r = sqrt((double)(diw*diw + djw*djw + dkw*dkw)) * cell;
+                int b = find_bin(bin_edges, nbins, r);
+                if (b < 0) continue;
+                sum_vv[b] += acor[row + dk] * inv_N;  /* = Σ_x v(x)·v(x+lag) */
+                cnt[b]++;
+            }
+        }
+    }
+    fftw_free(acor);
+
+    /* VV/RR_vel fills so that ψ = VV/RR_vel = sum_vv / (cnt × Ngrid³) = ⟨v·v'⟩_b. */
+    for (int b = 0; b < nbins; b++) {
+        VV[b]     = sum_vv[b];
+        RR_vel[b] = (double)cnt[b] * (double)Ng3;
+    }
+    free(cnt); free(sum_vv);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
  *  Pair accumulation — OpenMP parallel over lag vectors
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -652,8 +813,23 @@ static void accumulate_pairs(const double *den, int Ngrid,
                  */
                 const double *lo_row = den + i  *Ng2 + j  *Ng;
                 const double *hi_row = den + ihi*Ng2 + jhi*Ng;
-                for (long k = 0; k < nz; k++) {
-                    long khi = per_z ? (k+dk)%Ng : (k+dk);
+                /*
+                 * Split into a no-wrap segment [0, nz_flat) + a wrap
+                 * segment [nz_flat, nz).  The no-wrap segment has hi = lo+dk
+                 * (no branch, unit stride) and vectorises under -O3.
+                 */
+                long nz_flat = per_z ? (Ng - dk) : nz;
+                if (nz_flat > nz) nz_flat = nz;
+                #pragma omp simd reduction(+:dd_sum,lo_sum,hi_sum)
+                for (long k = 0; k < nz_flat; k++) {
+                    double lo_v = lo_row[k];
+                    double hi_v = hi_row[k + dk];
+                    dd_sum += lo_v * hi_v;
+                    lo_sum += lo_v;
+                    hi_sum += hi_v;
+                }
+                for (long k = nz_flat; k < nz; k++) {
+                    long khi = (k + dk) - Ng;     /* per_z implied here */
                     double lo_v = lo_row[k];
                     double hi_v = hi_row[khi];
                     dd_sum += lo_v * hi_v;
@@ -774,9 +950,16 @@ static void accumulate_vel_pairs(const double *vx, const double *vy, const doubl
                 const double *vx_hi = vx + ihi*Ng2 + jhi*Ng;
                 const double *vy_hi = vy + ihi*Ng2 + jhi*Ng;
                 const double *vz_hi = vz + ihi*Ng2 + jhi*Ng;
-                for (long k = 0; k < nz; k++) {
-                    long khi = per_z ? (k+dk)%Ng : (k+dk);
-                    /* Scalar product of velocity at the two ends of the lag */
+                long nz_flat = per_z ? (Ng - dk) : nz;
+                if (nz_flat > nz) nz_flat = nz;
+                #pragma omp simd reduction(+:vv_sum)
+                for (long k = 0; k < nz_flat; k++) {
+                    vv_sum += vx_lo[k]*vx_hi[k+dk]
+                            + vy_lo[k]*vy_hi[k+dk]
+                            + vz_lo[k]*vz_hi[k+dk];
+                }
+                for (long k = nz_flat; k < nz; k++) {
+                    long khi = (k + dk) - Ng;
                     vv_sum += vx_lo[k]*vx_hi[khi]
                             + vy_lo[k]*vy_hi[khi]
                             + vz_lo[k]*vz_hi[khi];
@@ -818,11 +1001,14 @@ static void usage(const char *prog)
         "  --rmax  FLOAT      maximum lag in Mpc (default: boxsize/3)\n"
         "  --output FILE      output text file for xi(r) (default xi_cic_out.txt)\n"
         "  --r2               also write xi(r)·r² as an extra column\n"
-        "  --logbin           log-spaced bins (default: on)\n"
+        "  --logbin           log-spaced bins (default)\n"
+        "  --linear           linear-spaced bins\n"
         "  --nthreads INT     OpenMP threads (default: OMP_NUM_THREADS)\n"
         "  --periodic STR     none|x|y|z|xy|xz|yz|xyz (default: xyz)\n"
         "  --vel              also compute velocity correlation ψ(r) = <v·v'>\n"
         "  --vel-output FILE  output file for ψ(r) (default: auto-derived from --output)\n"
+        "  --no-fft           force direct O(N_lags × Ngrid³) lag sum instead of\n"
+        "                     O(Ngrid³ log Ngrid) FFT (FFT is default when periodic=xyz)\n"
         "  --help\n"
         "\n"
         "  r and BoxSize are in Mpc (SWIFT IC units, not Mpc/h).\n"
@@ -839,13 +1025,14 @@ static Opts parse_args(int argc, char **argv)
     o.ptype    = 1;
     o.Ngrid    = -1;       /* -1 triggers auto-detection in main */
     o.mode     = MODE_3D;
-    o.nbins    = 30;
+    o.nbins    = 60;
     o.rmin     = -1.0;     /* -1 → set to cell size after header is read */
     o.rmax     = -1.0;     /* -1 → set to boxsize/3 after header is read */
     o.periodic    = PERIODIC_X | PERIODIC_Y | PERIODIC_Z;  /* xyz = all periodic */
     o.logbin      = 1;        /* default: log-spaced bins */
     o.nthreads    = 0;        /* 0 → use OMP_NUM_THREADS environment variable */
     o.compute_vel = 0;        /* default: density xi only */
+    o.use_fft     = 1;        /* default: FFT path (falls back to direct if non-periodic) */
     strcpy(o.output,     "xi_cic_out.txt");
     o.vel_output[0] = '\0';   /* empty: auto-derived from --output in main() */
 
@@ -861,8 +1048,11 @@ static Opts parse_args(int argc, char **argv)
         else if (!strcmp(argv[i], "--nthreads") && i+1<argc) o.nthreads = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--r2"))                    o.r2_plot     = 1;
         else if (!strcmp(argv[i], "--logbin"))                o.logbin      = 1;
+        else if (!strcmp(argv[i], "--linear"))                o.logbin      = 0;
         else if (!strcmp(argv[i], "--vel"))                   o.compute_vel = 1;
         else if (!strcmp(argv[i], "--vel-output") && i+1<argc) strncpy(o.vel_output, argv[++i], 511);
+        else if (!strcmp(argv[i], "--no-fft"))                o.use_fft     = 0;
+        else if (!strcmp(argv[i], "--fft"))                   o.use_fft     = 1;
         else if (!strcmp(argv[i], "--periodic") && i+1<argc) {
             i++;
             o.periodic = 0;
@@ -920,17 +1110,22 @@ int main(int argc, char **argv)
            o.ptype, N_total, boxsize, redshift);
 
     /*
-     * Auto Ngrid: natural choice is cbrt(N) so each grid cell holds exactly
-     * one particle on average (mean occupancy = 1), which preserves the
+     * The FFT path runs only when all three axes are periodic; otherwise
+     * the cyclic autocorrelation does not equal the true (linear) one.
+     */
+    int fft_active = o.use_fft &&
+                     o.periodic == (PERIODIC_X | PERIODIC_Y | PERIODIC_Z);
+
+    /*
+     * Auto Ngrid: match the particle-per-dimension count (cbrt(N)) so each
+     * grid cell holds exactly one particle on average, preserving the
      * sub-Poissonian shot-noise properties of the perturbed lattice.
-     * Capped at 128 because work ∝ Ngrid³ × N_lags; Ngrid=256 with
-     * rmax = L/3 would take ~40 min even on 8 threads.
+     * The direct path scales as Ngrid³ × N_lags, which can be very slow for
+     * Ngrid ≥ 256 — use --no-fft only with a small --Ngrid in that case.
      */
     if (o.Ngrid <= 0) {
-        int ngrid_natural = (int)round(cbrt((double)N_total));
-        o.Ngrid = (ngrid_natural > 128) ? 128 : ngrid_natural;
-        printf("  Auto Ngrid = %d  (cbrt(%lld)=%d, capped at 128)\n",
-               o.Ngrid, N_total, ngrid_natural);
+        o.Ngrid = (int)round(cbrt((double)N_total));
+        printf("  Auto Ngrid = %d  (cbrt(%lld))\n", o.Ngrid, N_total);
     }
 
     int    Ngrid = o.Ngrid;
@@ -1032,35 +1227,46 @@ int main(int argc, char **argv)
     printf("Bins: %d %s in [%.4f, %.4f] Mpc\n",
            nbins, o.logbin ? "log" : "linear", o.rmin, o.rmax);
 
-    /* ── Step 5: build list of lag vectors ─────────────────────────────── */
-    long n_lags = 0;
-    Lag *lags   = build_lag_list(Ngrid, cell, o.rmin, o.rmax, o.mode, &n_lags);
-    printf("Lag vectors: %ld  (positive-octant integer grid displacements)\n", n_lags);
+    /* ── Step 5: build list of lag vectors (only needed for direct path) ─ */
+    long  n_lags = 0;
+    Lag  *lags   = NULL;
+    if (!fft_active) {
+        lags = build_lag_list(Ngrid, cell, o.rmin, o.rmax, o.mode, &n_lags);
+        printf("Lag vectors: %ld  (positive-octant integer grid displacements)\n",
+               n_lags);
 
-    /* Print estimated work and warn if it looks excessive */
-    {
         double ops             = (double)n_lags * (double)Ngrid3;
         double ops_per_thread  = ops / nthreads_actual;
         printf("Estimated work: %.2e cell-pair ops  (%.1e per thread)\n",
                ops, ops_per_thread);
         if (ops_per_thread > 5e11)
             printf("WARNING: heavy workload — consider --Ngrid 128 or smaller --rmax.\n");
+    } else {
+        printf("Using FFT autocorrelation: O(Ngrid³ log Ngrid) ~ %.2e ops\n",
+               (double)Ngrid3 * log2((double)Ngrid3));
     }
 
-    /* ── Step 6: accumulate DD, DR, RR (OpenMP parallel over lags) ────── */
+    /* ── Step 6: accumulate DD, DR, RR (FFT or direct lag-sum) ────────── */
     const char *per_str =
         (o.periodic == (PERIODIC_X|PERIODIC_Y|PERIODIC_Z)) ? "xyz" :
         (o.periodic == 0)                                   ? "none" : "partial";
-    printf("Pair counting (periodic=%s) ...\n", per_str);
+    printf("%s (periodic=%s) ...\n",
+           fft_active ? "FFT autocorrelation" : "Pair counting", per_str);
     fflush(stdout);
 
     double *DD = (double *)calloc((size_t)nbins, sizeof(double));
     double *DR = (double *)calloc((size_t)nbins, sizeof(double));
     double *RR = (double *)calloc((size_t)nbins, sizeof(double));
 
-    accumulate_pairs(den, Ngrid, lags, n_lags,
-                     bin_edges, nbins, DD, DR, RR, o.periodic);
-    free(lags);
+    if (fft_active) {
+        accumulate_pairs_fft(den, Ngrid, cell, o.mode,
+                             bin_edges, nbins, DD, DR, RR);
+    } else {
+        accumulate_pairs(den, Ngrid, lags, n_lags,
+                         bin_edges, nbins, DD, DR, RR, o.periodic);
+        free(lags);
+        lags = NULL;
+    }
     free(den);
 
     /* ── Step 7: Landy-Szalay estimator  ξ = (DD − 2·DR + RR) / RR ─────
@@ -1179,27 +1385,31 @@ int main(int argc, char **argv)
         free(vels); free(coords); free(count_raw);
         coords = NULL;
 
-        /* (c) Rebuild lag list (same parameters as density run) */
-        long n_lags_v = 0;
-        Lag *lags_v = build_lag_list(Ngrid, cell, o.rmin, o.rmax,
-                                     o.mode, &n_lags_v);
-        printf("Lag vectors (velocity): %ld\n", n_lags_v);
-
-        /* (d) Accumulate ψ(r) */
-        printf("Pair counting (velocity) ...\n");
-        fflush(stdout);
+        /* (c,d) Accumulate ψ(r) — FFT fast path or direct */
         double *VV     = (double *)calloc((size_t)nbins, sizeof(double));
         double *RR_vel = (double *)calloc((size_t)nbins, sizeof(double));
         if (!VV || !RR_vel) {
             fprintf(stderr, "OOM for VV/RR_vel\n");
-            free(vx_f); free(vy_f); free(vz_f); free(lags_v);
+            free(vx_f); free(vy_f); free(vz_f);
             goto cleanup;
         }
 
-        accumulate_vel_pairs(vx_f, vy_f, vz_f, Ngrid,
-                             lags_v, n_lags_v,
-                             bin_edges, nbins, VV, RR_vel, o.periodic);
-        free(lags_v); free(vx_f); free(vy_f); free(vz_f);
+        if (fft_active) {
+            printf("FFT autocorrelation (velocity) ...\n"); fflush(stdout);
+            accumulate_vel_pairs_fft(vx_f, vy_f, vz_f, Ngrid, cell, o.mode,
+                                     bin_edges, nbins, VV, RR_vel);
+        } else {
+            long n_lags_v = 0;
+            Lag *lags_v = build_lag_list(Ngrid, cell, o.rmin, o.rmax,
+                                         o.mode, &n_lags_v);
+            printf("Lag vectors (velocity): %ld\n", n_lags_v);
+            printf("Pair counting (velocity) ...\n"); fflush(stdout);
+            accumulate_vel_pairs(vx_f, vy_f, vz_f, Ngrid,
+                                 lags_v, n_lags_v,
+                                 bin_edges, nbins, VV, RR_vel, o.periodic);
+            free(lags_v);
+        }
+        free(vx_f); free(vy_f); free(vz_f);
 
         /* ψ(r) = VV / RR_vel  (normalised per cell pair) */
         double *psi = (double *)malloc((size_t)nbins * sizeof(double));

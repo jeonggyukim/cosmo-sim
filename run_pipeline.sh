@@ -91,7 +91,7 @@ CONF_FILE="conf/CV_22_MUSIC_${STEM}.conf"
 # input_class_parameters.ini is written by MUSIC2 to CWD during the IC run;
 # we move it to conf/ immediately after so it stays with the other run artifacts.
 CLASS_INI="conf/input_class_parameters_${STEM}.ini"
-CLASS_PKS="data/class_pk_z${ZSTART}_pk.dat"
+CLASS_PKS="data/class_pk_z0_pk.dat"
 RBINS_FILE="data/rbins_${STEM}.txt"
 MUSIC_BIN="music_build/MUSIC"
 CLASS_BIN="music_build/_deps/class-build/class"
@@ -186,7 +186,11 @@ fi
 # CLASS writes class_pk_z{Z}_pk.dat to CWD; we move it to data/.
 # ---------------------------------------------------------------------------
 if [ ! -f "$CLASS_PKS" ]; then
-    log "Running CLASS for z=${ZSTART}..."
+    # CLASS P(k) is generated at z=0, and plot_ic.py back-scales it to the
+    # IC redshift using the radiation-free growth factor D_+^no-rad(z) that
+    # matches MUSIC2's ZeroRadiation=true convention.  See notes/cosmo_ic.tex
+    # §"Radiation and the back-scaling growth factor".
+    log "Running CLASS at z=0 (back-scaled at plot time to z=${ZSTART})..."
     if [ ! -f "$CLASS_INI" ]; then
         echo "Error: $CLASS_INI not found — was MUSIC2 run with transfer_function = CLASS?"
         exit 1
@@ -195,13 +199,13 @@ if [ ! -f "$CLASS_PKS" ]; then
     TMP_INI=$(mktemp /tmp/class_pk_XXXXXX) && mv "$TMP_INI" "${TMP_INI}.ini" && TMP_INI="${TMP_INI}.ini"
     sed \
         -e "s/^output =.*/output = mPk/" \
-        -e "s/^z_pk =.*/z_pk = ${ZSTART}/" \
+        -e "s/^z_pk =.*/z_pk = 0/" \
         -e "/^extra metric transfer functions/d" \
         -e "/^gauge/d" \
         "$CLASS_INI" > "$TMP_INI"
-    echo "root = class_pk_z${ZSTART}_" >> "$TMP_INI"
+    echo "root = class_pk_z0_" >> "$TMP_INI"
     "$CLASS_BIN" "$TMP_INI"
-    mv "class_pk_z${ZSTART}_pk.dat" "$CLASS_PKS"
+    mv "class_pk_z0_pk.dat" "$CLASS_PKS"
     rm "$TMP_INI"
     echo "    Saved: $CLASS_PKS"
 else
@@ -281,55 +285,32 @@ echo "    Saved: $PK_FILE"
 # Reads pk_{STEM}.txt; auto-detects xi_{STEM}.txt, xi_cic_{STEM}.txt,
 # vel_cic_{STEM}.txt alongside it; overlays CLASS theory curves.
 #
-# For high-z runs (z > 10) MUSIC2 uses ZeroRadiation=true, so the ICs are
-# back-scaled with a no-radiation growth factor that differs from CLASS's
-# full Boltzmann growth factor at z_start.  We therefore pass CLASS P(k) at
-# z_ref=0 (the natural normalisation point where D+_norad=1) and use
-# --theory-zref 0 so plot_ic.py back-scales it with the same no-radiation
-# D+(z) as MUSIC2: P_ref(k,z) = P_CLASS(k,0) × D+_norad(z)².
-# At z_start <= 10 we pass CLASS P(k) directly at z_start.
+# MUSIC2 uses ZeroRadiation=true, which back-scales from z=0 with the
+# matter-only growth factor D_+^no-rad(z).  The reason is that downstream
+# N-body/hydro codes (SWIFT, GADGET, ...) ignore radiation in their
+# background Friedmann evolution, so the ICs must be generated with the
+# same Omega_r=0 growth history for consistency — otherwise the IC
+# amplitude at z_start would disagree with what the N-body integrator
+# expects a linear mode to be at that redshift.  Boltzmann codes (CLASS,
+# CAMB) include radiation, so their D_+(z) differs by ~11% at z=200,
+# producing a ~5-10% P(k) suppression if compared without back-scaling.
+# For a clean apples-to-apples comparison at any z_start, we always feed
+# plot_ic.py the CLASS P(k) at z=0 and let it back-scale with the same
+# D_+^no-rad convention MUSIC2 uses internally.
+# See notes/cosmo_ic.tex §"Radiation and the back-scaling growth factor".
 #
 # Outputs: plots/pk_{STEM}.png
 # ---------------------------------------------------------------------------
 PLOT_FILE="plots/pk_${STEM}.png"
-ZREF_LOW=0
-CLASS_PKS_ZREF="data/class_pk_z${ZREF_LOW}_pk.dat"
 log "Plotting diagnostics with plot_ic.py..."
-
-if (( $(echo "$ZSTART > 10" | bc -l) )); then
-    # Generate CLASS P(k) at z_ref=0 if not already present (used for back-scaling)
-    if [ ! -f "$CLASS_PKS_ZREF" ]; then
-        log "Generating CLASS P(k) at z=${ZREF_LOW} for back-scaling reference..."
-        TMP_INI=$(mktemp /tmp/class_pk_XXXXXX) && mv "$TMP_INI" "${TMP_INI}.ini" && TMP_INI="${TMP_INI}.ini"
-        sed \
-            -e "s/^output =.*/output = mPk/" \
-            -e "s/^z_pk =.*/z_pk = ${ZREF_LOW}/" \
-            -e "/^extra metric transfer functions/d" \
-            -e "/^gauge/d" \
-            "$CLASS_INI" > "$TMP_INI"
-        echo "root = class_pk_z${ZREF_LOW}_" >> "$TMP_INI"
-        "$CLASS_BIN" "$TMP_INI"
-        mv "class_pk_z${ZREF_LOW}_pk.dat" "$CLASS_PKS_ZREF"
-        rm "$TMP_INI"
-        echo "    Saved: $CLASS_PKS_ZREF"
-    fi
-    conda run -n cosmo python scripts/plot_ic.py \
-        "$PK_FILE" \
-        --theory "$CLASS_PKS_ZREF" \
-        --theory-zref "$ZREF_LOW" \
-        --H0 "$H0" \
-        --Omega_m "$OMEGA_M" \
-        --Omega_b "$OMEGA_B" \
-        -o "$PLOT_FILE"
-else
-    conda run -n cosmo python scripts/plot_ic.py \
-        "$PK_FILE" \
-        --theory "$CLASS_PKS" \
-        --H0 "$H0" \
-        --Omega_m "$OMEGA_M" \
-        --Omega_b "$OMEGA_B" \
-        -o "$PLOT_FILE"
-fi
+conda run -n cosmo python scripts/plot_ic.py \
+    "$PK_FILE" \
+    --theory "$CLASS_PKS" \
+    --theory-zref 0 \
+    --H0 "$H0" \
+    --Omega_m "$OMEGA_M" \
+    --Omega_b "$OMEGA_B" \
+    -o "$PLOT_FILE"
 
 log "Pipeline complete."
 echo "    IC file : $IC_FILE"
