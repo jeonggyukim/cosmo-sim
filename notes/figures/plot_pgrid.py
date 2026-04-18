@@ -12,7 +12,7 @@ Hankel pair (l=0):
   xi(r) = 1/(2pi^2) int P(k) sinc(kr) k^2 dk
   P(k)  = 4pi       int xi(r) sinc(kr) r^2 dr   (sinc(x) = sin(x)/x)
 
-CLASS output: ../class_pk_z45_pk.dat  (k in h/Mpc, P in (Mpc/h)^3)
+CLASS output: ../class_pk_z200_pk.dat  (k in h/Mpc, P in (Mpc/h)^3)
 """
 
 import numpy as np
@@ -25,7 +25,7 @@ trapz = np.trapezoid   # numpy >= 2.0
 # ---------------------------------------------------------------------------
 # Load CLASS P(k)
 # ---------------------------------------------------------------------------
-data = np.loadtxt('../../data/class_pk_z45_pk.dat', comments='#')
+data = np.loadtxt('../../data/class_pk_z200_pk.dat', comments='#')
 k_class, P_class = data[:, 0], data[:, 1]   # h/Mpc, (Mpc/h)^3
 
 Pk_interp = interp1d(np.log(k_class), np.log(P_class),
@@ -71,16 +71,18 @@ def compute_Pgrid(k_arr, L, Nr=3000):
 # ---------------------------------------------------------------------------
 box_sizes = [25, 100, 500]
 colors = ['C1', 'C2', 'C3']
-linestyles = ['-', '--', '-.']
+linestyles = ['-', '--', ':']
+linewidths = [2, 3, 4]
+line_alpha = 0.5
 
 fig, axes = plt.subplots(1, 2, figsize=(10, 4.5))
 ax1, ax2 = axes
 
 # P(k) from CLASS
 ax1.loglog(k_class, P_class, 'k-', lw=1.8,
-           label=r'$P(k)$ (CLASS, $z=45$)', zorder=5)
+           label=r'$P(k)$ (CLASS, $z=200$)', zorder=5)
 
-for L, col, ls in zip(box_sizes, colors, linestyles):
+for L, col, ls, lw in zip(box_sizes, colors, linestyles, linewidths):
     kf = 2 * np.pi / L
 
     # k grid: from kf/10 up to knyq of class, spanning sub-fundamental modes
@@ -92,14 +94,16 @@ for L, col, ls in zip(box_sizes, colors, linestyles):
     Pg = compute_Pgrid(k_eval, L)
 
     # Left panel: full curves
-    ax1.loglog(k_eval[Pg > 0], Pg[Pg > 0], color=col, ls=ls, lw=1.5,
+    ax1.loglog(k_eval[Pg > 0], Pg[Pg > 0], color=col, ls=ls, lw=lw,
+               alpha=line_alpha,
                label=rf'$P^{{\rm grid}}(k),\ L={L}\ h^{{-1}}$Mpc')
     ax1.axvline(kf, color=col, lw=0.7, alpha=0.4)
 
     # Right panel: ratio — meaningful for k where P(k) is not tiny
     # Show from kf/10 to show the divergence as k -> 0
     ratio = Pg / P_of_k(k_eval) - 1.0
-    ax2.semilogx(k_eval, ratio, color=col, ls=ls, lw=1.5,
+    ax2.semilogx(k_eval, ratio, color=col, ls=ls, lw=lw,
+                 alpha=line_alpha,
                  label=rf'$L={L}\ h^{{-1}}$Mpc')
     ax2.axvline(kf, color=col, lw=0.7, alpha=0.4,
                 label=rf'$k_f\ (L={L})$' if L == 25 else None)
@@ -108,7 +112,7 @@ ax1.set_xlabel(r'$k$  [$h$ Mpc$^{-1}$]', fontsize=12)
 ax1.set_ylabel(r'$P(k)$  [(Mpc/$h$)$^3$]', fontsize=12)
 ax1.set_title(r'$P(k)$ and $P^{\rm grid}(k)$', fontsize=11)
 ax1.legend(fontsize=8.5, loc='lower left')
-ax1.set_xlim(1e-3, k_class[-1])
+ax1.set_xlim(1e-3, 1.0)
 ax1.set_ylim(1e-5, None)
 
 ax2.axhline(0.0, color='k', lw=1.0, ls=':', zorder=0)
