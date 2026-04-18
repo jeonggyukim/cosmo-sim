@@ -149,6 +149,10 @@ Three LaTeX write-ups live in `notes/`:
 | `ic_sampling.tex` | IC sampling methods (Pen 1997, Sirko 2005, Hahn & Abel 2011): P-sampled vs ξ-sampled, box window truncation errors |
 | `fft.tex` | FFT reference: DFT, Cooley–Tukey radix-2, FFTW mixed-radix, multi-D row-column algorithm, MPI slab vs. pencil decomposition, FFTW API, fftMPI (Plimpton 2019) and Tigris `BlockFFT` usage |
 
+Planning docs (markdown, kept next to the notes):
+
+- `notes/baryon_ic_plan.md` — roadmap for extending the pipeline from CDM-only to baryon+CDM ICs (theory write-up for `cosmo_ic.tex` §9, `--baryons` switch in `make_music_conf.py`, per-species P(k) diagnostics, two-species coherence test).
+
 ```bash
 cd notes
 make            # regenerate figures + compile all PDFs (opens automatically)
