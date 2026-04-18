@@ -29,8 +29,8 @@
 \newcommand{\Omm}{\Omega_{\rm m}}
 \newcommand{\calH}{\mathcal{H}}
 
-\title{Lagrangian Perturbation Theory: Zel'dovich Approximation and 2LPT}
-\author{Theory and practice of cosmological initial conditions}
+\title{Cosmological Initial Conditions: Theory and Practice}
+\author{}
 \date{\today}
 
 \begin{document}
@@ -42,7 +42,7 @@
 \begin{tcolorbox}[colback=yellow!10!white, colframe=orange!75!black,
                   title={\bfseries Disclaimer}]
 These notes were compiled by an AI assistant (Claude, Anthropic) drawing on
-established references (\citealt{Jeong2010}; \citealt{Dodelson2021}; \citealt{Baumann2022}; \citealt{Tong2019}; \citealt{Choudhury}; \citealt{Dullemond}; etc.) and have \textbf{not been reviewed by a
+established references (\citealt{Jeong2010}; \citealt{Dodelson2021}; \citealt{Baumann2022}; \citealt{Tong2019}; \citealt{Choudhury2021}; \citealt{Dullemond2011}; etc.) and have \textbf{not been reviewed by a
 human domain expert}.  They may contain errors in derivations, physical
 reasoning, or numerical estimates.  Cross-check key equations against the
 primary literature before using them in research.
@@ -65,9 +65,19 @@ At first order this yields the \emph{Zel'dovich approximation} (ZA;
 used for IC codes at high redshift.  Second-order LPT (2LPT;
 \citealt{Buchert1993,Bouchet1995,Crocce2006}) adds a correction that
 accounts for mode coupling and reduces transient artefacts caused by
-initialising simulations at finite redshift.  \textsc{music2}
-\citep{Hahn2011} implements both, controlled by the conf key
-\texttt{use\_2LPT = yes}.
+initialising simulations at finite redshift.  Third-order and
+arbitrary-order schemes have since been developed
+\citep{Michaux2020,RampfHahn2021} and are available in modern
+IC generators.  \textsc{music2}
+\citep{Hahn2011} implements 1LPT and 2LPT for nested-grid zooms,
+controlled by the conf key \texttt{use\_2LPT = yes}; its unigrid
+sibling \texttt{monofonIC} additionally supports 3LPT for full-box
+runs.  For a comprehensive and up-to-date overview of IC generation
+techniques (forward vs.\ backscaling, reduced-variance sampling,
+constrained realisations, particle loads, and discreteness effects)
+together with the broader landscape of large-scale dark-matter
+simulations, we refer the reader to the Living Review by
+\citet{Angulo2022}.
 
 %----------------------------------------------------------------------
 \section{Fluid Equations in an Expanding Universe}
@@ -981,6 +991,47 @@ In summary:
     large-scale structure simulations.
 \end{itemize}
 
+\paragraph{Truncation vs.\ discreteness: an unavoidable trade-off.}
+Raising $z_{\rm start}$ is not a free parameter to be pushed arbitrarily
+high.  Two competing errors set the optimal starting redshift, nicely
+reviewed by \citet{Angulo2022} (their \S8.3):
+%
+\begin{itemize}
+  \item \textbf{Truncation error.}  Finite-order LPT is a low-order
+    truncation of the full non-linear dynamics, so the density field
+    handed to the $N$-body code contains a transient that grows as
+    $a^{m+1}$ for $m$-th order LPT (so ZA: $\propto a$, 2LPT:
+    $\propto a^2$, 3LPT: $\propto a^3$).  This error is
+    \emph{largest at late starting times}, pushing one towards higher
+    $z_{\rm start}$.
+  \item \textbf{Discreteness error.}  Once an $N$-body code takes over,
+    the dynamics are those of a \emph{discrete} system of
+    self-gravitating particles on a pre-IC lattice.  The linear
+    dispersion relation of the lattice differs from the continuum
+    \citep{MarcosEtal2006,Garrison2016}; small force inaccuracies
+    (round-off, tree opening, softening transitions) also accumulate
+    more aggressively when $\delta$ is tiny and much of the
+    gravitational signal sits in the noise.  This error is
+    \emph{largest at early starting times}, pushing one towards lower
+    $z_{\rm start}$.
+\end{itemize}
+%
+The sweet spot depends on the LPT order, the pre-IC lattice, and the
+target accuracy.  \citet{Michaux2020} showed that 3LPT combined with a
+BCC or FCC load and a relatively late start ($z_{\rm start} \sim 11$--$24$)
+matches a deep reference run to sub-percent accuracy on $P(k)$ and the
+bispectrum up to $k \lesssim 2\,h\,{\rm Mpc}^{-1}$, whereas ZA at the
+same $z_{\rm start}$ leaves visible systematic biases (see fig.~23 of
+\citealt{Angulo2022} reproduced from \citealt{Michaux2020}).
+\citet{RampfHahn2021} further show that LPT converges rapidly before
+shell crossing, so for most practical purposes 3LPT is sufficient;
+higher orders are needed only in special regimes.  Exclusion of
+``corner modes'' ($k > k_{\rm Ny}$, i.e.\ $k$ between $1$ and
+$\sqrt{3}\,k_{\rm Ny}$ in the $N^3$ cube) when constructing $n \ge 3$
+LPT terms further suppresses UV truncation artefacts from the
+convolution integrals, with negligible impact on non-linear results
+for $n \le 2$ \citep{RampfHahn2021,Falck2017}.
+
 %----------------------------------------------------------------------
 \section{Relation to the Power Spectrum}
 \label{sec:pk}
@@ -1673,9 +1724,12 @@ constraint fields, and PANPHASIA (optional Fortran dependency).
 \texttt{monofonIC} (sometimes written ``\texttt{MUSIC2--monofonIC}'')
 drops the zoom machinery in favour of a single periodic box with all
 fields on one uniform grid.  The gain is access to third-order
-Lagrangian perturbation theory~\citep{Michaux2020}, aliasing-free
-convolutions via the Orszag 3/2 rule, baryon/CDM species handled
-as separate sublattices~\citep{HahnRampfUhlemann2021}, and full
+Lagrangian perturbation theory~\citep{Michaux2020}---extended to
+arbitrary order by \citet{RampfHahn2021}, who demonstrated rapid
+convergence of the LPT series up to shell crossing and established
+that 3LPT is sufficient for almost all practical purposes---plus
+aliasing-free convolutions via the Orszag 3/2 rule, baryon/CDM species
+handled as separate sublattices~\citep{HahnRampfUhlemann2021}, and full
 hybrid MPI+OpenMP parallelisation using FFTW's slab decomposition
 (so runs with $N \gtrsim 2048^3$ are routine on modern clusters).
 
@@ -1820,6 +1874,155 @@ growth-factor ODE to include $\Omega_r(z)$; setting it to \texttt{true}
 forces the radiation-free convention used by most legacy N-body
 codes.  A fuller discussion lives in
 Section~\ref{sec:backscaling_radiation} (Appendix~B).
+
+%----------------------------------------------------------------------
+\subsection{The broader IC landscape}
+\label{sec:ic_landscape}
+
+\texttt{MUSIC2}/\texttt{monofonIC} sit inside a wider ecosystem of IC
+techniques that address specific modelling problems.  The Living Review
+by \citet{Angulo2022} covers these in depth; we summarise the
+essentials that set context for the choices made above.
+
+\paragraph{Forward vs.\ backscaling conventions.}
+The transfer function $T(k, z)$ in a $\Lambda$CDM cosmology is
+genuinely scale-dependent at sub-horizon scales at high $z$ because
+radiation contributes to the expansion rate; strictly, matter and
+radiation fluctuations satisfy a coupled system whose solutions at
+$z_{\rm start}$ differ from the $z=0$ linear field rescaled by an
+$\Omega_{\rm m}$-only growth factor.  In practice one of three
+conventions is adopted:
+%
+\begin{enumerate}
+  \item \textbf{Forward with radiation.}  Feed $T(k, z_{\rm start})$
+        directly from a Boltzmann code, evolve with an $N$-body code
+        that honours $\Omega_r$.  The ``correct'' prescription if the
+        simulation is to agree with linear theory at $z_{\rm start}$.
+  \item \textbf{Backscaled matter-only.}  Take $P(k, 0)$ from CLASS
+        and rescale by the radiation-free growth factor $D_{\rm mat}$.
+        By construction the resulting ICs reproduce $P(k, 0)$ at low
+        $z$ when run through a matter-only $N$-body code, at the price
+        of a small ($\lesssim\!1\%$) distortion of the $z_{\rm start}$
+        field.  Legacy choice used by most large simulation campaigns.
+  \item \textbf{Hybrid / species-split.}  Evolve the baryon and CDM
+        components separately using species transfer functions,
+        optionally including the compensated relative-velocity mode
+        $v_{\rm bc}$~\citep{HahnRampfUhlemann2021}.
+\end{enumerate}
+%
+\citet{Angulo2022} (their \S6.1) discuss these as the three distinct
+IC families in current use; the \texttt{monofonIC} flag
+\texttt{ZeroRadiation} toggles (1) vs.\ (2), and
+\texttt{DoBaryonVrel} enables the $v_{\rm bc}$ piece of (3).  See
+Appendix~\ref{sec:backscaling_radiation} for a numerical comparison of
+the $P(k)$ convention mismatch.
+
+\paragraph{Reduced-variance sampling: fixed \& paired ICs.}
+A single Gaussian realisation has cosmic variance that scales only as
+$1/\sqrt{N_{\rm modes}}$: at the box scale, this is the dominant error
+for many observables.  \citet{Angulo2016} proposed two variance-reduction
+techniques that can be combined:
+%
+\begin{itemize}
+  \item \textbf{Fixing.}  Replace $|\tilde\delta(\bk)|$ by its
+        ensemble-mean $\sqrt{P(k)}$ at every $\bk$, keeping only the
+        phase random.  This removes amplitude scatter exactly.
+  \item \textbf{Pairing.}  Run the same $\bk$-phases with a sign flip
+        $\tilde\delta \!\to\! -\tilde\delta$ and average the two runs.
+        This cancels odd-order terms in the non-linear expansion,
+        reducing variance on the mean $P(k)$ and mean halo mass
+        function.
+\end{itemize}
+%
+Fixing is implemented both in \texttt{monofonIC} (and optionally in
+\texttt{MUSIC2} via the noise plugin) as an overlay on the usual
+Gaussian white-noise sampling; it is incompatible with primordial
+non-Gaussianity, since those non-Gaussianities rely on the full
+Gaussian statistics of the underlying field.  A single fixed-paired
+pair is typically equivalent to an ensemble of $\mathcal{O}(10)$
+unfixed independent boxes for the mean $P(k)$ on large scales
+\citep{Angulo2016,Angulo2022}.
+
+\paragraph{Spatially stable white noise.}
+For a suite of resimulations in which the same large-scale structure
+is re-rendered at different resolutions, the white-noise field must
+be seeded in a way that the coarse and fine realisations agree on the
+large-scale modes.  The \texttt{NGenIC} prescription fixes the
+amplitude/phase of each $\bk$ from a deterministic per-mode seed, but
+this does \emph{not} commute with zooming because the set of resolved
+modes changes with $N$.  Two alternatives resolve this:
+%
+\begin{itemize}
+  \item \textbf{Panphasia}~\citep{Jenkins2013} ships a public
+        $64$-bit octree of white-noise amplitudes; any box at any
+        resolution queries the same tree and so obtains identical
+        modes within its resolved band.  Implemented as a plugin in
+        \texttt{MUSIC2}/\texttt{monofonIC}.
+  \item \textbf{MUSIC-1 RNG} hierarchically splits the noise on the
+        nested grid hierarchy; modes on the finer grid are
+        \emph{conditionally} sampled so that coarsening reproduces the
+        coarse-level field (this is the Fourier-splicing composition
+        described in \S\ref{sec:music2}).
+\end{itemize}
+
+\paragraph{Particle loads beyond SC/BCC/FCC.}
+A uniform cubic lattice has residual anisotropy at high $k$ because
+the Madelung constant and force kernel of the SC/BCC/FCC lattices are
+not perfectly isotropic; the lattice also imprints discrete modes in
+the initial power spectrum.  Alternatives:
+%
+\begin{itemize}
+  \item \textbf{Glass.}  Relax a random particle distribution under
+        repulsive gravity until $\delta \approx 0$; the result is
+        isotropic but retains Poisson-like sub-Nyquist shot noise,
+        which pays a cost in $P(k)$ estimators but is closer to the
+        continuum than a lattice \citep{Michaux2020}.
+  \item \textbf{Q-set (quaquaversal).}  \citet{Hansen2007} proposed
+        an aperiodic tiling of space generated by a set of rotations
+        and reflections, producing a load that is maximally disordered
+        while preserving uniform density and avoiding the Fourier
+        artefacts of a glass.
+  \item \textbf{CCVT.}  Capacity-constrained Voronoi tessellation
+        loads \citep{Liao2018} iteratively move particles towards
+        centroids of equal-area Voronoi cells, yielding an isotropic
+        load with low-amplitude shot noise intermediate between a
+        glass and a lattice.
+\end{itemize}
+%
+Each load requires its own discrete growth correction at the PLT level
+\citep{MarcosEtal2006,Garrison2016}, and the choice matters mostly for
+small scales; for large-scale-structure statistics the SC/BCC/FCC
+choice is usually sufficient.
+
+\paragraph{Constrained realisations and genetic modification.}
+The Hoffman--Ribak algorithm \citep{HoffmanRibak1991} imposes linear
+constraints on a Gaussian random field (e.g.\ ``produce a halo of
+$M = 10^{14} M_\odot$ at position $\mathbf{x}_0$'') by adding the
+conditional mean and covariance-reduced residual field.  This is the
+basis of the CLUES and ELUCID projects, and of the ``genetic
+modification'' framework of \citet{Roth2016}, which performs
+controlled counterfactuals by editing specific modes of the initial
+field.  \texttt{monofonIC} supports user-supplied constraint modes as
+an overlay on the white noise.
+
+\paragraph{Separate-universe and super-sample covariance.}
+A small simulation box is blind to modes longer than its side length,
+yet such modes modulate the non-linear field inside the box through
+tides and mean-density offsets (``super-sample covariance'').  Two
+prescriptions incorporate them:
+%
+\begin{itemize}
+  \item \textbf{Separate-universe runs}~\citep{Sirko2005,Wagner2015}
+        absorb a mean-density offset $\delta_b$ into a modified
+        background cosmology $(\Omega_{\rm m}', h')$ so that a box at
+        $\bar\rho_{\rm global}$ mimics a sub-volume at
+        $\bar\rho = (1+\delta_b)\bar\rho_{\rm global}$.
+  \item \textbf{External-tide mode}~\citep{Stuecker2021} augments the
+        second-order displacement with an anisotropic term
+        $\tfrac{1}{2}\lambda_{ij}q_i q_j$ parameterised by three
+        eigenvalues $\lambda_i$ with $\sum \lambda_i = 0$, which
+        \texttt{monofonIC} accepts as \texttt{LSS\_aniso\_lx/ly/lz}.
+\end{itemize}
 
 %----------------------------------------------------------------------
 \subsection{Choosing between the two codes}
