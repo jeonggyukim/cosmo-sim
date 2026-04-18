@@ -242,14 +242,16 @@ class ICPlotter:
                 Hz = self.H0 * Ez           # km/s/Mpc
                 Hz_hMpc = Hz / self.h            # km/s/(Mpc/h) — consistent with k in h/Mpc
                 fz = (self.Omega_m * (1+z)**3 / Ez**2) ** 0.55   # Linder 2005
-                r_psi, psi = self._compute_theory_psi(kt, Pt, Hz_hMpc, fz)
+                r_grid = self.theory_xi_r if self.theory_xi_r is not None else None
+                r_psi, psi = self._compute_theory_psi(kt, Pt, Hz_hMpc, fz,
+                                                     r_grid=r_grid)
                 self.theory_psi_r = r_psi
                 self.theory_psi = psi
                 print(f"Theory ψ(r): z={z:.4g}, H={Hz:.1f} km/s/Mpc, "
                       f"f={fz:.4f}, H·f/(h)={Hz_hMpc*fz:.2f} km/s/(Mpc/h)")
 
     @staticmethod
-    def _compute_theory_psi(kt, Pt, Hz_hMpc, fz):
+    def _compute_theory_psi(kt, Pt, Hz_hMpc, fz, r_grid=None):
         """
         Compute the true peculiar-velocity correlation ψ(r) = ⟨v_pec(x)·v_pec(x+r)⟩.
 
@@ -280,8 +282,11 @@ class ICPlotter:
             [Hz_hMpc·fz]² × [Pt] × [dkt]
             = (km/s)²/(Mpc/h)² × (Mpc/h)³ × h/Mpc = (km/s)²  ✓
         """
-        rmax = 2 * np.pi / kt.min() * 5
-        r = np.logspace(-1, np.log10(rmax), 500)
+        if r_grid is not None:
+            r = np.asarray(r_grid)
+        else:
+            rmax = 2 * np.pi / kt.min() * 5
+            r = np.logspace(-1, np.log10(rmax), 500)
         psi = np.zeros(len(r))
         for i, ri in enumerate(r):
             x = kt * ri
@@ -582,10 +587,10 @@ class ICPlotter:
             r_m, xi_m = d["r_mid"], d["xi"]
             pos = xi_m > 0
             neg = xi_m < 0
-            ax2.plot(r_m[pos], xi_m[pos], '^-', ms=4, lw=1.2,
+            ax2.plot(r_m[pos], xi_m[pos], 'o-', ms=4, lw=1.2,
                      color=color, alpha=0.5, label=run_label)
             if neg.any():
-                ax2.plot(r_m[neg], -xi_m[neg], '^--', ms=4, lw=1.2,
+                ax2.plot(r_m[neg], -xi_m[neg], 'o--', ms=4, lw=1.2,
                          color=color, alpha=0.5)
 
         # Reference lines: L/2 (torus Nyquist for CIC-grid ξ) and Δx per run.
@@ -620,7 +625,6 @@ class ICPlotter:
             r_all = np.concatenate(all_r)
             ax2.set_xlim(r_all.min() * 0.8, r_all.max() * 1.2)
 
-        ax2.legend(fontsize='medium', loc='lower left')
         ax2.set_xscale('log')
         ax2.set_yscale('log')
         ax2.set_ylabel(r'$\xi(r)$')
@@ -658,7 +662,7 @@ class ICPlotter:
             color = f'C{j}'
             run_label = self._label_from_stem(d["stem"]) if multi else 'CIC grid'
             pos = d["psi"] > 0
-            ax.loglog(d["r_mid"][pos], d["psi"][pos], 'D-', ms=4, lw=1.2,
+            ax.loglog(d["r_mid"][pos], d["psi"][pos], 'o-', ms=4, lw=1.2,
                       color=color, alpha=0.5, label=run_label)
 
         # Reference lines: L/2 per run
@@ -674,9 +678,15 @@ class ICPlotter:
                 fontsize='medium', loc='upper right'
             ))
 
+        # Match xlim to the ξ panel (same r-range as measured CIC ξ/ψ data)
+        all_r = [d["r_mid"] for d in self.xi_cic_list] + \
+                [d["r_mid"] for d in self.vel_cic_list]
+        if all_r:
+            r_all = np.concatenate(all_r)
+            ax.set_xlim(r_all.min() * 0.8, r_all.max() * 1.2)
+
         ax.set_ylabel(r'$\psi(r)$ [(km/s)$^2$]')
-        ax.set_title(r'$\psi(r) = \langle v(x)\cdot v(x+r)\rangle$')
-        ax.legend(fontsize='medium', loc='lower left')
+        ax.set_title(r'$\psi(r) = \langle \mathbf{v}(x)\cdot \mathbf{v}(x+r)\rangle$')
 
     def _plot_psi_ratio_panel(self, ax):
         """ψ_meas / ψ_theory ratio panel (third column, bottom row)."""
@@ -692,7 +702,7 @@ class ICPlotter:
                 valid = psi_th > 0
                 r_v = r[pos][valid]
                 ax.semilogx(r_v, d["psi"][pos][valid] / psi_th[valid],
-                            'D-', ms=3, lw=1.2, color=f'C{j}')
+                            'o-', ms=3, lw=1.2, color=f'C{j}', alpha=0.5)
 
         # Reference lines: L/2 per run
         for i, run in enumerate(self.pk_runs):
@@ -753,7 +763,7 @@ class ICPlotter:
                 xi_th = np.interp(r, self.theory_xi_r, self.theory_xi)
                 valid = xi_th != 0
                 ax.semilogx(r[valid], d["xi"][valid] / xi_th[valid] - 1.0,
-                            '^-', ms=3, lw=1.2, color=f'C{j}', alpha=0.5)
+                            'o-', ms=3, lw=1.2, color=f'C{j}', alpha=0.5)
 
             if self.corrfunc_xi is not None:
                 d = self.corrfunc_xi
