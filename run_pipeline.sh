@@ -47,11 +47,12 @@ cd "$(dirname "$(readlink -f "$0")")"
 # Parse arguments
 # ---------------------------------------------------------------------------
 NGRID=256
-LBOX=687   # ≈ 1024 Mpc for h=0.6711
+LBOX=1024
 ZSTART=200
 # Default to all logical CPUs; detect cross-platform (macOS: sysctl, Linux: nproc)
 NTHREADS=$(sysctl -n hw.logicalcpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 FIX_AMP=yes   # fix_mode_amplitude: yes = fixed amplitudes (CV); no = Gaussian draw
+SEED=""       # random seed override for the IC level; empty = use template default
 MUSIC2_DIR=""     # optional: path to MUSIC2 source (default: ~/Dropbox/Projects/MUSIC2 or cloned)
 CORRFUNC_DIR=""   # optional: path to built Corrfunc (default: ~/Corrfunc or cloned)
 
@@ -62,11 +63,12 @@ while [[ $# -gt 0 ]]; do
         --zstart)        ZSTART="$2";       shift 2 ;;
         --nthreads)      NTHREADS="$2";     shift 2 ;;
         --fix-amplitude) FIX_AMP="$2";      shift 2 ;;
+        --seed)          SEED="$2";         shift 2 ;;
         --music2-dir)    MUSIC2_DIR="$2";   shift 2 ;;
         --corrfunc-dir)  CORRFUNC_DIR="$2"; shift 2 ;;
         *) echo "Unknown argument: $1"
            echo "Usage: $0 [--ngrid N] [--lbox L] [--zstart Z] [--nthreads T]"
-           echo "          [--fix-amplitude yes|no]"
+           echo "          [--fix-amplitude yes|no] [--seed INT]"
            echo "          [--music2-dir /path/to/MUSIC2]"
            echo "          [--corrfunc-dir /path/to/Corrfunc]"
            exit 1 ;;
@@ -82,7 +84,8 @@ OMEGA_B=0.049
 # Derived paths — all keyed by STEM so multiple runs coexist without collision
 # ---------------------------------------------------------------------------
 AMP_SUFFIX=$([ "$FIX_AMP" = "no" ] && echo "_nofix" || echo "")
-STEM="n${NGRID}_z${ZSTART}_L${LBOX}${AMP_SUFFIX}"
+SEED_SUFFIX=$([ -n "$SEED" ] && echo "_s${SEED}" || echo "")
+STEM="n${NGRID}_z${ZSTART}_L${LBOX}${AMP_SUFFIX}${SEED_SUFFIX}"
 IC_FILE="data/ics_swift_${STEM}.hdf5"
 CONF_FILE="conf/CV_22_MUSIC_${STEM}.conf"
 # input_class_parameters.ini is written by MUSIC2 to CWD during the IC run;
@@ -145,7 +148,7 @@ fi
 # ---------------------------------------------------------------------------
 if [ ! -f "$CONF_FILE" ]; then
     log "Generating MUSIC2 config..."
-    conda run -n cosmo python scripts/make_music_conf.py -N "$NGRID" -z "$ZSTART" -L "$LBOX" --fix-amplitude "$FIX_AMP"
+    conda run -n cosmo python scripts/make_music_conf.py -N "$NGRID" -z "$ZSTART" -L "$LBOX" --fix-amplitude "$FIX_AMP" ${SEED:+--seed "$SEED"}
 else
     log "MUSIC2 config already exists — skipping ($CONF_FILE)"
 fi

@@ -68,8 +68,8 @@ class ICPlotter:
         self.theory_psi_r  = None   # theory ψ(r) [(km/s)²]
         self.theory_psi    = None
         self.corrfunc_xi   = None   # dict: r_mid, xi, err, nseeds_used
-        self.xi_cic        = None   # dict: r_mid, xi
-        self.vel_cic       = None   # dict: r_mid, psi
+        self.xi_cic_list   = []     # list of dicts: r_mid, xi, stem (one per pk run)
+        self.vel_cic_list  = []     # list of dicts: r_mid, psi, stem (one per pk run)
 
         # Figure handles (set by plot())
         self.fig = self.ax = self.ax2 = self.ax3 = None
@@ -101,6 +101,18 @@ class ICPlotter:
     @staticmethod
     def _stem_from_pkfile(pkfile):
         return os.path.basename(pkfile).replace("pk_", "").replace(".txt", "")
+
+    @staticmethod
+    def _label_from_stem(stem):
+        """Format stem 'n256_z200_L172' → 'N256_L172_Z200'."""
+        mn = re.search(r'n(\d+)', stem)
+        mz = re.search(r'_z([\d.]+)', stem)
+        ml = re.search(r'_L(\d+)', stem)
+        parts = []
+        if mn: parts.append(f'N{mn.group(1)}')
+        if ml: parts.append(f'L{ml.group(1)}')
+        if mz: parts.append(f'Z{mz.group(1)}')
+        return '_'.join(parts) if parts else stem
 
     @staticmethod
     def _parse_z_from_stem(stem):
@@ -305,13 +317,25 @@ class ICPlotter:
             "r_mid": r_mid, "xi": xi_cf, "err": xi_err, "nseeds_used": nseeds_used
         }
 
-    def load_xi_cic(self, xi_cic_file):
+    def load_xi_cic(self, xi_cic_file, stem=None):
         """Load CIC density correlation ξ(r) from xi_cic_*.txt."""
+        ngrid = None
+        with open(xi_cic_file) as f:
+            for line in f:
+                if not line.startswith('#'):
+                    break
+                m = re.search(r'Ngrid\s*:\s*(\d+)', line)
+                if m:
+                    ngrid = int(m.group(1))
         cic = np.loadtxt(xi_cic_file, comments='#')
         r_mid = np.sqrt(cic[:, 1] * cic[:, 2]) * self.h   # Mpc → Mpc/h
-        self.xi_cic = {"r_mid": r_mid, "xi": cic[:, 3]}
+        self.xi_cic_list.append({
+            "r_mid": r_mid, "xi": cic[:, 3],
+            "stem": stem or os.path.basename(xi_cic_file),
+            "ngrid": ngrid,
+        })
 
-    def load_vel_cic(self, vel_cic_file, a=1.0):
+    def load_vel_cic(self, vel_cic_file, a=1.0, stem=None):
         """
         Load CIC velocity correlation ψ(r) from vel_cic_*.txt.
 
@@ -322,50 +346,63 @@ class ICPlotter:
         vel = np.loadtxt(vel_cic_file, comments='#')
         r_mid = np.sqrt(vel[:, 1] * vel[:, 2]) * self.h   # Mpc → Mpc/h
         psi   = vel[:, 3] / a**2                           # convert to v_pec units
-        self.vel_cic = {"r_mid": r_mid, "psi": psi}
+        self.vel_cic_list.append({
+            "r_mid": r_mid, "psi": psi,
+            "stem": stem or os.path.basename(vel_cic_file),
+        })
 
     def auto_load_xi(self, nseeds=8, nthreads=4,
                      xi_cic_file=None, vel_cic_file=None):
         """
-        Auto-detect and load xi/vel_cic/Corrfunc files for the primary pk run.
+        Auto-detect and load xi/vel_cic/Corrfunc files for all pk runs.
 
-        Looks alongside the first pk_*.txt for:
-          xi_<stem>.txt       → Corrfunc pair-counting ξ(r)
+        Looks alongside each pk_*.txt for:
+          xi_<stem>.txt       → Corrfunc pair-counting ξ(r)  (single-run only)
           xi_cic_<stem>.txt   → CIC grid ξ(r)
           vel_cic_<stem>.txt  → CIC velocity ψ(r)
 
         Parameters
         ----------
-        xi_cic_file, vel_cic_file : explicit paths (override auto-detection)
+        xi_cic_file, vel_cic_file : explicit paths for the primary run only
         """
         if not self.pk_runs:
             return
-        run      = self.pk_runs[0]
-        stem     = run["stem"]
-        data_dir = run["data_dir"]
-        repo_root = os.path.dirname(data_dir)
+
+        repo_root = os.path.dirname(self.pk_runs[0]["data_dir"])
 
         # Corrfunc xi (single-run only)
         if len(self.pk_runs) == 1:
-            xi_cf_path = os.path.join(data_dir, f"xi_{stem}.txt")
+            run = self.pk_runs[0]
+            xi_cf_path = os.path.join(run["data_dir"], f"xi_{run['stem']}.txt")
             if os.path.exists(xi_cf_path):
-                hdf5_file  = os.path.join(data_dir, f"ics_swift_{stem}.hdf5")
-                rbins_file = os.path.join(data_dir, f"rbins_{stem}.txt")
+                hdf5_file  = os.path.join(run["data_dir"], f"ics_swift_{run['stem']}.hdf5")
+                rbins_file = os.path.join(run["data_dir"], f"rbins_{run['stem']}.txt")
                 self.load_corrfunc_xi(
                     xi_cf_path, hdf5_file, rbins_file, repo_root,
                     nseeds=nseeds, nthreads=nthreads)
 
-        # CIC xi
-        path = xi_cic_file or os.path.join(data_dir, f"xi_cic_{stem}.txt")
-        if os.path.exists(path):
-            self.load_xi_cic(path)
+        # CIC xi and vel — load for every pk run
+        for i, run in enumerate(self.pk_runs):
+            stem     = run["stem"]
+            data_dir = run["data_dir"]
+            z_run    = run.get("z")
+            a_run    = 1.0 / (1.0 + z_run) if z_run is not None else 1.0
 
-        # CIC vel — divide by a² to convert SWIFT v_int=a·v_pec → v_pec
-        z_run = run.get("z")
-        a_run = 1.0 / (1.0 + z_run) if z_run is not None else 1.0
-        path = vel_cic_file or os.path.join(data_dir, f"vel_cic_{stem}.txt")
-        if os.path.exists(path):
-            self.load_vel_cic(path, a=a_run)
+            # xi_cic: explicit file only for the primary (first) run
+            if i == 0:
+                path = xi_cic_file or os.path.join(data_dir, f"xi_cic_{stem}.txt")
+            else:
+                path = os.path.join(data_dir, f"xi_cic_{stem}.txt")
+            if os.path.exists(path):
+                self.load_xi_cic(path, stem=stem)
+
+            # vel_cic: explicit file only for the primary run
+            if i == 0:
+                path = vel_cic_file or os.path.join(data_dir, f"vel_cic_{stem}.txt")
+            else:
+                path = os.path.join(data_dir, f"vel_cic_{stem}.txt")
+            if os.path.exists(path):
+                self.load_vel_cic(path, a=a_run, stem=stem)
 
     # ------------------------------------------------------------------ #
     # Plotting
@@ -395,32 +432,37 @@ class ICPlotter:
             show_shot_sub = (z is not None and z <= 10)
 
         from matplotlib.gridspec import GridSpec
-        self.fig = plt.figure(figsize=(13, 8), constrained_layout=True)
-        gs = GridSpec(2, 2, figure=self.fig, height_ratios=[4, 1], hspace=0.05)
+        plt.rcParams.update({'font.size': 13})
+        self.fig = plt.figure(figsize=(18, 7), constrained_layout=True)
+        gs = GridSpec(2, 3, figure=self.fig, height_ratios=[4, 1], hspace=0.05)
 
-        self.ax         = self.fig.add_subplot(gs[0, 0])
-        self.ax_pk_ratio = self.fig.add_subplot(gs[1, 0], sharex=self.ax)
-        self.ax2        = self.fig.add_subplot(gs[0, 1])
-        self.ax_xi_ratio = self.fig.add_subplot(gs[1, 1], sharex=self.ax2)
+        self.ax          = self.fig.add_subplot(gs[0, 0])
+        self.ax_pk_ratio  = self.fig.add_subplot(gs[1, 0], sharex=self.ax)
+        self.ax2         = self.fig.add_subplot(gs[0, 1])
+        self.ax_xi_ratio  = self.fig.add_subplot(gs[1, 1], sharex=self.ax2)
+        self.ax3         = self.fig.add_subplot(gs[0, 2])
+        self.ax_psi_ratio = self.fig.add_subplot(gs[1, 2], sharex=self.ax3)
 
         self._plot_pk_panel(self.ax, show_nodeconv=show_nodeconv, hankel=hankel,
                             show_shot_sub=show_shot_sub)
         self._plot_pk_ratio_panel(self.ax_pk_ratio, show_shot_sub=show_shot_sub)
         self._plot_xi_panel(self.ax2)
         self._plot_xi_ratio_panel(self.ax_xi_ratio)
+        self._plot_psi_panel(self.ax3)
+        self._plot_psi_ratio_panel(self.ax_psi_ratio)
 
         # Hide x tick labels on the main panels (shared with ratio panels below)
-        plt.setp(self.ax.get_xticklabels(), visible=False)
-        self.ax.set_xlabel('')
-        plt.setp(self.ax2.get_xticklabels(), visible=False)
-        self.ax2.set_xlabel('')
+        for ax in (self.ax, self.ax2, self.ax3):
+            plt.setp(ax.get_xticklabels(), visible=False)
+            ax.set_xlabel('')
 
     def _plot_pk_panel(self, ax, show_nodeconv=False, hankel=False, show_shot_sub=False):
         """Populate the left P(k) panel."""
         # Theory
         if self.theory_k is not None:
+            z = self.pk_runs[0].get("z", "?") if self.pk_runs else "?"
             ax.loglog(self.theory_k, self.theory_P, 'k-', lw=1.2,
-                      label='theory (CLASS)', zorder=10)
+                      label=rf'Theory (CLASS, $z={z:.4g}$)', zorder=10)
 
         # Per-run curves
         multi = len(self.pk_runs) > 1
@@ -429,9 +471,7 @@ class ICPlotter:
             stem  = run["stem"]
             color = f'C{i}'
 
-            interlaced = "no_interlace" not in stem
-            mas_label  = "CIC-corrected, interlaced" if interlaced else "CIC-corrected (no interlacing)"
-            label      = f'{mas_label} ({stem})' if multi else mas_label
+            label = self._label_from_stem(stem) if multi else stem
 
             if show_nodeconv and i == 0:
                 ax.loglog(k, run["Pk_nodeconv"], 's--', ms=3, lw=1.0,
@@ -443,31 +483,40 @@ class ICPlotter:
                 pos = run["Pk_ss"] > 0
                 ax.loglog(k[pos], run["Pk_ss"][pos], '^-', ms=4, lw=1.2,
                           color=color, alpha=0.6,
-                          label=f'− shot noise ({stem})' if multi else '− shot noise')
+                          label=f'− shot noise ({label})' if multi else '− shot noise')
 
             if run["P_shot"] is not None:
                 ax.axhline(run["P_shot"], color=color, ls='--', lw=0.8, alpha=0.6,
                            label=fr'$P_{{\rm shot}} = V/N = {run["P_shot"]:.2g}$ (Mpc/$h$)$^3$')
 
-        # Reference lines from primary run
+        # Reference lines: k_fund (dotted) and k_Ny (dashed) per run
+        # Draw colored lines without labels; add two proxy legend entries.
         if self.pk_runs:
-            run = self.pk_runs[0]
-            L   = run["boxsize_mpch"]
-            n   = run["npart_side"] or 256
-            if L:
-                kf   = 2 * np.pi / L
-                knyq = np.pi * n / L
-                ax.axvline(kf,   color='C2',   ls=':', lw=1.0,
-                           label=fr'$k_{{\rm fund}}$ = {kf:.2g} $h$/Mpc')
-                ax.axvline(knyq, color='gray', ls='--', lw=1.0,
-                           label=fr'$k_{{\rm Ny}}$ = {knyq:.2g} $h$/Mpc')
+            import matplotlib.lines as mlines
+            for i, run in enumerate(self.pk_runs):
+                L = run["boxsize_mpch"]
+                n = run["npart_side"] or 256
+                if L:
+                    kf   = 2 * np.pi / L
+                    knyq = np.pi * n / L
+                    ax.axvline(kf,   color=f'C{i}', ls=':', lw=1.0)
+                    ax.axvline(knyq, color=f'C{i}', ls='--', lw=1.0)
+            # Proxy handles for k_fund / k_Ny — upper right
+            ax.add_artist(ax.legend(
+                handles=[
+                    mlines.Line2D([], [], color='gray', ls=':',  lw=1.0, label=r'$k_{\rm fund}$'),
+                    mlines.Line2D([], [], color='gray', ls='--', lw=1.0, label=r'$k_{\rm Ny}$'),
+                ],
+                fontsize='medium', loc='upper right'
+            ))
 
         ax.set_ylabel(r'$P(k)$ [(Mpc/$h$)$^3$]')
         if self.pk_runs:
             run = self.pk_runs[0]
-            z_str = "?" if run["z"] is None else f'{run["z"]:g}'
-            ax.set_title(f'N={run["npart_side"]}³, L={run["boxsize_mpch"]:.4g} Mpc/h, z={z_str}')
-        ax.legend(fontsize="medium")
+            if len(self.pk_runs) == 1:
+                z_str = "?" if run["z"] is None else f'{run["z"]:g}'
+                ax.set_title(f'N={run["npart_side"]}³, L={run["boxsize_mpch"]:.4g} Mpc/h, z={z_str}')
+        ax.legend(fontsize='medium', loc='lower left')
 
         ax_top = ax.twiny()
         ax_top.set_xscale('log')
@@ -478,83 +527,130 @@ class ICPlotter:
 
     def _plot_xi_panel(self, ax2):
         """Populate the right ξ(r) / ψ(r) panel."""
-        # Theory ξ(r)
-        if self.theory_xi_r is not None:
-            mask = (self.theory_xi_r > 0) & (self.theory_xi > 0)
-            ax2.loglog(self.theory_xi_r[mask], self.theory_xi[mask],
-                       'k-', lw=1.2, label='theory ξ (CLASS)', zorder=10)
+        multi = len(self.pk_runs) > 1
 
-        # Corrfunc xi(r)
+        # Theory r²ξ(r) — linear y-axis
+        if self.theory_xi_r is not None:
+            z = self.pk_runs[0].get("z", "?") if self.pk_runs else "?"
+            r = self.theory_xi_r
+            ax2.plot(r, r**2 * self.theory_xi, 'k-', lw=1.2,
+                     label=rf'Theory (CLASS, $z={z:.4g}$)', zorder=10)
+
+        # Corrfunc r²ξ(r)
         if self.corrfunc_xi is not None:
             d = self.corrfunc_xi
-            pos = d["xi"] > 0
-            if pos.sum() >= len(d["xi"]) / 2:
-                label = 'measured ξ (Corrfunc)'
-                if d["nseeds_used"] > 0:
-                    label += f' ±{d["nseeds_used"]}-seed'
-                ax2.errorbar(d["r_mid"][pos], d["xi"][pos], yerr=d["err"][pos],
-                             fmt='s-', ms=4, lw=1.2, elinewidth=0.8, capsize=2,
-                             color='C1', mfc='none', label=label)
+            label = 'Corrfunc'
+            if d["nseeds_used"] > 0:
+                label += f' (±{d["nseeds_used"]}-seed)'
+            ax2.errorbar(d["r_mid"], d["r_mid"]**2 * d["xi"],
+                         yerr=d["r_mid"]**2 * d["err"],
+                         fmt='s-', ms=4, lw=1.2, elinewidth=0.8, capsize=2,
+                         color='C1', mfc='none', label=label)
 
-        # CIC xi(r)
-        if self.xi_cic is not None:
-            d = self.xi_cic
-            pos, neg = d["xi"] > 0, d["xi"] < 0
-            ax2.loglog(d["r_mid"][pos], d["xi"][pos], '^-', ms=4, lw=1.2,
-                       color='C4', label=r'measured ξ (CIC grid, $>0$)')
-            if neg.any():
-                ax2.loglog(d["r_mid"][neg], np.abs(d["xi"][neg]), '^--',
-                           ms=4, lw=0.8, color='C4', alpha=0.4,
-                           label=r'measured ξ (CIC grid, $<0$)')
+        # CIC r²ξ(r) — one per pk run, matched colors
+        for j, d in enumerate(self.xi_cic_list):
+            color = f'C{j}'
+            run_label = self._label_from_stem(d["stem"]) if multi else 'CIC grid'
+            ax2.plot(d["r_mid"], d["r_mid"]**2 * d["xi"], '^-', ms=4, lw=1.2,
+                     color=color, label=run_label)
 
-        # Reference lines (added before legend so they appear in it)
+        # Reference lines: L/3 and Δx per run, proxy legend entries
         if self.pk_runs:
-            run = self.pk_runs[0]
-            L   = run["boxsize_mpch"]
-            n   = run["npart_side"]
+            import matplotlib.lines as mlines
+            for i, run in enumerate(self.pk_runs):
+                L = run["boxsize_mpch"]
+                n = run["npart_side"]
+                if L:
+                    ax2.axvline(L / 3, color=f'C{i}', ls='--', lw=0.9)
+                if L and n:
+                    ax2.axvline(L / n, color=f'C{i}', ls=':', lw=0.9)
+            ax2.add_artist(ax2.legend(
+                handles=[
+                    mlines.Line2D([], [], color='gray', ls='--', lw=1.0, label=r'$L/3$'),
+                    mlines.Line2D([], [], color='gray', ls=':',  lw=1.0, label=r'$\Delta x$'),
+                ],
+                fontsize='medium', loc='upper right'
+            ))
+
+        # Set xlim to span all loaded data
+        all_r = [d["r_mid"] for d in self.xi_cic_list] + \
+                [d["r_mid"] for d in self.vel_cic_list]
+        if all_r:
+            r_all = np.concatenate(all_r)
+            ax2.set_xlim(r_all.min() * 0.8, r_all.max() * 1.2)
+
+        ax2.legend(fontsize='medium', loc='lower left')
+        ax2.set_xscale('log')
+        ax2.set_ylabel(r'$r^2\,\xi(r)$ [(Mpc/$h$)$^2$]')
+        ngrid_str = ''
+        if self.xi_cic_list and self.xi_cic_list[0].get('ngrid'):
+            ngrid_str = f', CIC $N_{{\\rm grid}}={self.xi_cic_list[0]["ngrid"]}$'
+        ax2.set_title(r'$r^2\,\xi(r)$' + ngrid_str)
+
+    def _plot_psi_panel(self, ax):
+        """Populate the ψ(r) panel (third column, top row)."""
+        multi = len(self.pk_runs) > 1
+
+        # Theory ψ(r)
+        if self.theory_psi is not None and self.pk_runs:
+            L_max = max(r["boxsize_mpch"] for r in self.pk_runs if r["boxsize_mpch"])
+            mask = ((self.theory_psi_r > 0) & (self.theory_psi > 0)
+                    & (self.theory_psi_r < L_max / 2))
+            z = self.pk_runs[0].get("z", "?")
+            ax.loglog(self.theory_psi_r[mask], self.theory_psi[mask],
+                      'k-', lw=1.2,
+                      label=rf'Theory (CLASS, $z={z:.4g}$)', zorder=10)
+
+        # Measured ψ(r) per run
+        for j, d in enumerate(self.vel_cic_list):
+            color = f'C{j}'
+            run_label = self._label_from_stem(d["stem"]) if multi else 'CIC grid'
+            pos = d["psi"] > 0
+            ax.loglog(d["r_mid"][pos], d["psi"][pos], 'D-', ms=4, lw=1.2,
+                      color=color, label=run_label)
+
+        # Reference lines: L/2 per run
+        if self.pk_runs:
+            import matplotlib.lines as mlines
+            for i, run in enumerate(self.pk_runs):
+                L = run["boxsize_mpch"]
+                if L:
+                    ax.axvline(L / 2, color=f'C{i}', ls='--', lw=0.9)
+            ax.add_artist(ax.legend(
+                handles=[mlines.Line2D([], [], color='gray', ls='--', lw=1.0,
+                                       label=r'$L/2$')],
+                fontsize='medium', loc='upper right'
+            ))
+
+        ax.set_ylabel(r'$\psi(r)$ [(km/s)$^2$]')
+        ax.set_title(r'$\psi(r) = \langle v(x)\cdot v(x+r)\rangle$')
+        ax.legend(fontsize='medium', loc='lower left')
+
+    def _plot_psi_ratio_panel(self, ax):
+        """ψ_meas / ψ_theory ratio panel (third column, bottom row)."""
+        ax.axhline(1.0, color='k', lw=1.0)
+        for level in [0.2, 0.4, 0.6, 0.8]:
+            ax.axhline(level, color='gray', lw=0.5, ls='--', alpha=0.5)
+
+        if self.theory_psi is not None:
+            for j, d in enumerate(self.vel_cic_list):
+                r     = d["r_mid"]
+                pos   = d["psi"] > 0
+                psi_th = np.interp(r[pos], self.theory_psi_r, self.theory_psi)
+                valid  = psi_th > 0
+                r_v    = r[pos][valid]
+                ax.semilogx(r_v, d["psi"][pos][valid] / psi_th[valid],
+                            'D-', ms=3, lw=1.2, color=f'C{j}')
+
+        # Reference lines: L/2 per run
+        for i, run in enumerate(self.pk_runs):
+            L = run["boxsize_mpch"]
             if L:
-                ax2.axvline(L / 3, color='gray', ls='--', lw=1.0,
-                            label=fr'$L/3 = {L/3:.4g}$ Mpc/$h$ (max reliable $r$)')
-            if L and n:
-                dx = L / n
-                ax2.axvline(dx, color='C2', ls=':', lw=1.0,
-                            label=fr'$\Delta x = {dx:.2g}$ Mpc/$h$ (mean particle spacing)')
+                ax.axvline(L / 2, color=f'C{i}', ls='--', lw=0.9)
 
-        # ψ(r) on twin y-axis
-        has_psi = (self.vel_cic is not None) or (self.theory_psi is not None)
-        if has_psi:
-            ax3 = ax2.twinx()
-            ax3.set_ylabel(r'$\psi(r)$ [$v_\mathrm{pec}$, (km/s)$^2$]', color='C5')
-            ax3.tick_params(axis='y', labelcolor='C5')
-            ax3.set_xscale('log')
-            ax3.set_yscale('log')
-            self.ax3 = ax3
-
-            if self.vel_cic is not None:
-                d   = self.vel_cic
-                pos = d["psi"] > 0
-                ax3.plot(d["r_mid"][pos], d["psi"][pos], 'D-', ms=4, lw=1.2,
-                         color='C5', label=r'measured $\psi(r)$ (CIC grid)')
-
-            if self.theory_psi is not None and self.pk_runs:
-                L = self.pk_runs[0]["boxsize_mpch"]
-                mask = ((self.theory_psi_r > 0) & (self.theory_psi > 0)
-                        & (self.theory_psi_r < (L / 2 if L else np.inf)))
-                z = self.pk_runs[0].get("z", "?")
-                ax3.loglog(self.theory_psi_r[mask], self.theory_psi[mask],
-                           'k--', lw=1.2,
-                           label=rf'theory $\psi(r)$ (CLASS, $z={z:.4g}$)')
-
-            # Merge legends from both axes
-            lines2, labels2 = ax2.get_legend_handles_labels()
-            lines3, labels3 = ax3.get_legend_handles_labels()
-            ax2.legend(lines2 + lines3, labels2 + labels3,
-                       fontsize="medium", loc='lower left')
-        else:
-            ax2.legend(fontsize="medium", loc='lower left')
-
-        ax2.set_ylabel(r'$\xi(r)$')
-        ax2.set_title(r'Correlation functions $\xi(r)$ and $\psi(r)$')
+        ax.set_xlabel(r'$r$ [Mpc/$h$]')
+        ax.set_ylabel('Measured / Theory', fontsize='medium')
+        ax.set_ylim(0.0, 1.1)
 
     _RATIO_LEVELS = [0.05, 0.10, 0.15, 0.20]
 
@@ -590,7 +686,7 @@ class ICPlotter:
                 ax.axvline(np.pi * n / L,    color='gray', ls='--', lw=1.0)
 
         ax.set_xlabel(r'$k$ [$h$ Mpc$^{-1}$]')
-        ax.set_ylabel('Measured/Theory - 1', fontsize=9)
+        ax.set_ylabel('Measured/Theory - 1', fontsize='medium')
         ax.set_ylim(-0.22, 0.22)
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
@@ -600,35 +696,31 @@ class ICPlotter:
         self._draw_ratio_reflines(ax)
 
         if self.theory_xi_r is not None:
-            if self.xi_cic is not None:
-                d   = self.xi_cic
-                pos = d["xi"] > 0
-                r   = d["r_mid"][pos]
+            for j, d in enumerate(self.xi_cic_list):
+                r     = d["r_mid"]
                 xi_th = np.interp(r, self.theory_xi_r, self.theory_xi)
-                valid = xi_th > 0
-                ax.semilogx(r[valid], d["xi"][pos][valid] / xi_th[valid] - 1.0,
-                            '^-', ms=3, lw=1.2, color='C4')
+                valid = xi_th != 0
+                ax.semilogx(r[valid], d["xi"][valid] / xi_th[valid] - 1.0,
+                            '^-', ms=3, lw=1.2, color=f'C{j}')
 
             if self.corrfunc_xi is not None:
-                d   = self.corrfunc_xi
-                pos = d["xi"] > 0
-                r   = d["r_mid"][pos]
+                d     = self.corrfunc_xi
+                r     = d["r_mid"]
                 xi_th = np.interp(r, self.theory_xi_r, self.theory_xi)
-                valid = xi_th > 0
-                ax.semilogx(r[valid], d["xi"][pos][valid] / xi_th[valid] - 1.0,
+                valid = xi_th != 0
+                ax.semilogx(r[valid], d["xi"][valid] / xi_th[valid] - 1.0,
                             's-', ms=3, lw=1.2, color='C1', mfc='none')
 
-        # Repeat L/3 and Δx reference lines
-        if self.pk_runs:
-            run = self.pk_runs[0]
+        # Repeat L/3 and Δx reference lines for each run
+        for i, run in enumerate(self.pk_runs):
             L, n = run["boxsize_mpch"], run["npart_side"]
             if L:
-                ax.axvline(L / 3, color='gray', ls='--', lw=1.0)
+                ax.axvline(L / 3, color=f'C{i}', ls='--', lw=0.9)
             if L and n:
-                ax.axvline(L / n, color='C2',   ls=':', lw=1.0)
+                ax.axvline(L / n, color=f'C{i}', ls=':', lw=0.9)
 
         ax.set_xlabel(r'$r$ [Mpc/$h$]')
-        ax.set_ylabel('Measured/Theory - 1', fontsize=9)
+        ax.set_ylabel('Measured/Theory - 1', fontsize='medium')
         ax.set_ylim(-0.22, 0.22)
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))

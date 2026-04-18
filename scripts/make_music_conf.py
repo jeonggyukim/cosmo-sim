@@ -22,6 +22,7 @@ The IC output filename embedded in the config will be:
 import argparse
 import math
 import os
+import re
 import sys
 
 
@@ -45,6 +46,8 @@ def main():
     parser.add_argument("--fix-amplitude", choices=["yes", "no"], default="yes",
                         help="Fix Fourier mode amplitudes to sqrt(P(k)) (default: yes)."
                              " When no, '_nofix' is appended to output stems.")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Override the random seed for the IC level (e.g. 12345).")
     args = parser.parse_args()
 
     # Validate N is a power of 2
@@ -55,18 +58,19 @@ def main():
 
     fix_amp = args.fix_amplitude  # "yes" or "no"
     suffix  = "" if fix_amp == "yes" else "_nofix"
+    seed_suffix = f"_s{args.seed}" if args.seed is not None else ""
 
     # Build filename stems
     N_s = fmt(args.npart)
     z_s = fmt(args.redshift)
     L_s = fmt(args.boxlength)
 
-    ic_filename   = f"data/ics_swift_n{N_s}_z{z_s}_L{L_s}{suffix}.hdf5"
+    ic_filename   = f"data/ics_swift_n{N_s}_z{z_s}_L{L_s}{suffix}{seed_suffix}.hdf5"
     # Write config to conf/ relative to repo root (two levels up from scripts/)
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     conf_dir  = os.path.join(repo_root, "conf")
     conf_filename = args.output or os.path.join(
-        conf_dir, f"CV_22_MUSIC_n{N_s}_z{z_s}_L{L_s}{suffix}.conf"
+        conf_dir, f"CV_22_MUSIC_n{N_s}_z{z_s}_L{L_s}{suffix}{seed_suffix}.conf"
     )
 
     # Load template from conf/
@@ -86,6 +90,11 @@ def main():
     # Override fix_mode_amplitude if requested
     if fix_amp == "no":
         conf = conf.replace("fix_mode_amplitude = yes", "fix_mode_amplitude = no")
+
+    # Override the random seed for this level if requested
+    if args.seed is not None:
+        conf = re.sub(rf'seed\[{level}\]\s*=\s*\d+',
+                      f'seed[{level}]           = {args.seed}', conf)
 
     with open(conf_filename, "w") as f:
         f.write(conf)
