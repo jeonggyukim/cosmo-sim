@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-plot_cft_pairs.py — Four illustrative continuous FT pairs for fft_review.tex.
+plot_cft_pairs.py — Four illustrative continuous FT pairs for fft.tex.
 
 Convention B (physics/cosmology):
   f̂(k) = ∫ f(x) e^{-ikx} dx,   f(x) = ∫ dk/(2π) f̂(k) e^{ikx}

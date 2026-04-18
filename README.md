@@ -180,9 +180,9 @@ Three LaTeX write-ups live in `notes/`:
 
 | File | Contents |
 |------|----------|
-| `ic_sampling_review.tex` | IC sampling literature (Pen 1997, Sirko 2005, Hahn & Abel 2011): P-sampled vs ξ-sampled methods, box window truncation errors, implications for MUSIC2/monofonIC |
-| `lpt_review.tex` | Lagrangian perturbation theory: fluid equations, ZA, 2LPT derivation, Zel'dovich pancake, IC generation algorithm, starting redshifts, one-loop P(k). Appendix A: Fourier transform conventions, DFT, FFT algorithm (Cooley–Tukey, multi-D, parallel MPI). Appendix B: P(k) estimation from N-body (CIC window, deconvolution, shot noise). |
-| `fft_review.tex` | FFT reference: DFT definition, Cooley–Tukey radix-2, FFTW mixed-radix, multi-dimensional row–column algorithm, MPI slab vs. pencil decomposition, FFTW API, fftMPI (Plimpton 2019) API and Tigris `BlockFFT` usage |
+| `cosmo_ic.tex` | Cosmological ICs: fluid equations, ZA, 2LPT derivation, Zel'dovich pancake, IC generation algorithm, starting redshifts, P(k)/ξ(r)/ψ(r), one-loop P(k); §11 implementation details for MUSIC2 and monofonIC (refinement hierarchy, hybrid Poisson solve, 2LPT/3LPT source, PLT, Orszag 3/2 rule, back-scaling). Appendix A: Fourier conventions. Appendix B: P(k) estimation from N-body (CIC window, deconvolution, shot noise). |
+| `ic_sampling.tex` | IC sampling literature (Pen 1997, Sirko 2005, Hahn & Abel 2011): P-sampled vs ξ-sampled methods, box window truncation errors, implications for MUSIC2/monofonIC |
+| `fft.tex` | FFT reference: DFT definition, Cooley–Tukey radix-2, FFTW mixed-radix, multi-dimensional row–column algorithm, MPI slab vs. pencil decomposition, FFTW API, fftMPI (Plimpton 2019) API and Tigris `BlockFFT` usage |
 
 ```bash
 cd notes

@@ -1,46 +1,47 @@
-# Figures to implement
+# Figures
 
-## Status legend
-- [ ] pending
-- [x] done
+Index of figures generated for the LaTeX notes. All scripts live in `figures/`
+and write their PDFs into the same directory; the `notes/Makefile` drives them.
 
----
+## By note
 
-## fft_review.tex
+### `cosmo_ic.tex`
 
-- [x] **butterfly.tikz** — N=8 signal flow graph (inline TikZ in §2.1)
-  - 4 columns × 8 nodes; connections color-coded by stage (3 stages)
-  - Shows O(N log N): N/2=4 butterflies per stage, log₂N=3 stages
-  - Single butterfly detail callout on the side
+| PDF | Script | Used in |
+|-----|--------|---------|
+| `growth.pdf` | `plot_growth.py` | §2.2 growth factor $D_+(z)$ and rate $f(z)$ |
+| `pancake.pdf` | `plot_pancake.py` | §4.4 Zel'dovich pancake (density + trajectories) |
 
-## lpt_review.tex
+Inline TikZ: IC-generation flowchart at end of §6.
 
-- [x] **pancake.pdf** — Zel'dovich pancake collapse (`notes/plot_pancake.py`)
-  - Left: density 1+δ = 1/|1−D₊cosq| vs Eulerian x, for D₊=0.3,0.6,0.9,1.0,1.2
-  - Right: particle trajectories x(q)=q−D₊sinq showing fold-over at shell crossing
-  - Placed in §4.4 (Shell crossing and the Zel'dovich pancake)
+### `fft.tex`
 
-- [x] **growth.pdf** — Growth factor and growth rate (`notes/plot_growth.py`)
-  - Left: D₊(z) normalized to 1 at z=0; flat ΛCDM (Ωm=0.3, ΩΛ=0.7)
-  - Right: f(z) = Ωm(a)^0.55; also f^(2)(z) = 2 Ωm(a)^(4/7)
-  - Dashed reference lines: matter-dom limit D₊∝1/(1+z), f→1, f^(2)→2
-  - Placed after eq:fgrowth in §2.2
+| PDF | Script | Used in |
+|-----|--------|---------|
+| `cft_pairs.pdf` | `plot_cft_pairs.py` | §1 four illustrative continuous FT pairs |
+| `dft_pairs.pdf` | `plot_dft_pairs.py` | §3 four DFT input/output pairs |
+| `aliasing.pdf` | `plot_aliasing.py` | §3 aliasing from undersampling |
 
-- [x] **icgen_flow.tikz** — IC generation flowchart (inline TikZ in §6)
-  - Boxes: draw δ → φ^(1) → IFFTs → Ψ^(1); branch for 2LPT source → φ^(2) → Ψ^(2)
-  - Final: x = q + D₊Ψ^(1) + D₊^(2)Ψ^(2); v = ℋ(...)
-  - Placed at end of §6 as a summary figure
+Inline TikZ: $N=8$ Cooley–Tukey butterfly flow graph in §2.1.
 
----
+### `ic_sampling.tex`
 
-## Makefile additions needed
+| PDF | Script | Used in |
+|-----|--------|---------|
+| `box_window.pdf` | `plot_box_window.py` | §box window truncation in Fourier space |
+| `tophat_window.pdf` | `plot_tophat_window.py` | §top-hat window for ξ-sampling |
+| `pgrid_comparison.pdf` | `plot_pgrid.py` | §P-sampled vs ξ-sampled $P_{\rm grid}(k)$ (needs `data/class_pk_z2_pk.dat`) |
 
-```
-pancake.pdf : plot_pancake.py
-    $(PYTHON) $<
+## Regeneration
 
-growth.pdf : plot_growth.py
-    $(PYTHON) $<
+```bash
+cd notes
+make figures     # rebuild all PDFs via the Makefile
 ```
 
-Add `pancake.pdf growth.pdf` to FIGURES variable.
+Individual plots can be rerun directly:
+
+```bash
+cd notes/figures
+conda run -n cosmo python plot_<name>.py
+```

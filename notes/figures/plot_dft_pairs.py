@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-plot_dft_pairs.py — Four illustrative DFT input/output pairs for fft_review.tex.
+plot_dft_pairs.py — Four illustrative DFT input/output pairs for fft.tex.
 
 Panels (left = f_n, right = |f̃_k| with fftshift so k=0 is centred):
   (a) Unit impulse at n=0       → flat spectrum

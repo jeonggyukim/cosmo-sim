@@ -11,12 +11,16 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,decorations.pathreplacing}
 \usepackage{tcolorbox}
+\usepackage{booktabs}
 \tcbuselibrary{breakable,skins}
 \bibliographystyle{aasjournal}
 
 \newcommand{\bq}{\mathbf{q}}
 \newcommand{\bx}{\mathbf{x}}
 \newcommand{\bk}{\mathbf{k}}
+\newcommand{\br}{\mathbf{r}}
+\newcommand{\bR}{\mathbf{R}}
+\newcommand{\bG}{\mathbf{G}}
 \newcommand{\bPsi}{\boldsymbol{\Psi}}
 \newcommand{\bv}{\mathbf{v}}
 \newcommand{\bn}{\hat{\mathbf{n}}}
@@ -34,6 +38,16 @@
 \maketitle
 \tableofcontents
 \newpage
+
+\begin{tcolorbox}[colback=yellow!10!white, colframe=orange!75!black,
+                  title={\bfseries Disclaimer}]
+These notes were compiled by an AI assistant (Claude, Anthropic) drawing on
+established references (\citealt{Jeong2010}; \citealt{Dodelson2021}; \citealt{Baumann2022}; \citealt{Tong2019}; \citealt{Choudhury}; \citealt{Dullemond}; etc.) and have \textbf{not been reviewed by a
+human domain expert}.  They may contain errors in derivations, physical
+reasoning, or numerical estimates.  Cross-check key equations against the
+primary literature before using them in research.
+\end{tcolorbox}
+\vspace{0.5em}
 
 %----------------------------------------------------------------------
 \section{Introduction}
@@ -450,6 +464,92 @@ regions where $J < 0$ (unphysical in single-stream theory).
   flattened sheet (pancake).}
   \label{fig:pancake}
 \end{figure}
+
+\subsection{Spherical collapse and the halo threshold $\delta_c$}
+\label{sec:spherical}
+
+The Zel'dovich pancake ($\alpha>\beta=\gamma=0$) is one extreme
+of the deformation tensor: collapse along a single axis gives a
+sheet.  The opposite extreme is \emph{isotropic} compression
+$\alpha=\beta=\gamma$, a spherical overdensity, which forms a
+point-like halo.  This is the worst-case geometry for IC errors
+because the second-order correction is largest when all three
+eigenvalues coincide (\S\ref{sec:tophat_timing}).
+
+Consider a uniform spherical overdensity of initial radius $R_i$ and
+density $\rho_i=\bar\rho_i(1+\delta_i)$ embedded in an EdS background.
+By Birkhoff's theorem the interior evolves as a closed mini-universe
+with energy per unit mass
+$E=\tfrac{1}{2}\dot r^2-GM/r<0$, $M=\tfrac{4\pi}{3}\bar\rho_i R_i^3(1+\delta_i)$.
+The solution is cycloidal
+\citep[e.g.][\S3.3]{Tong2019}:
+%
+\begin{equation}
+  r(\tilde\tau)=A(1-\cos\tilde\tau),\qquad
+  t(\tilde\tau)=B(\tilde\tau-\sin\tilde\tau),
+  \qquad A^3=GMB^2.
+  \label{eq:sphcollapse}
+\end{equation}
+%
+Three milestones matter:
+\begin{itemize}
+  \item \textbf{Turn-around} ($\tilde\tau=\pi$): the sphere reaches
+    its maximum radius $r_{\rm ta}=2A$ at $t_{\rm ta}=\pi B$.  The
+    actual over-density is
+    $\delta(t_{\rm ta})=9\pi^2/16-1\approx 4.55$, while the
+    \emph{linear-extrapolated} value is
+    $\delta_{\rm lin}(t_{\rm ta})=(3/20)(6\pi)^{2/3}\approx 1.062$.
+  \item \textbf{Collapse to a point} ($\tilde\tau=2\pi$): $r\to0$,
+    so the actual density diverges.  Linear extrapolation, on the
+    other hand, is finite and gives the famous threshold
+    %
+    \begin{equation}
+      \boxed{\;
+        \delta_c \;\equiv\; \delta_{\rm lin}(t_{\rm col})
+        = \frac{3}{20}(12\pi)^{2/3}
+        \;\approx\; 1.686.
+      \;}
+      \label{eq:deltac}
+    \end{equation}
+    %
+    Any region whose smoothed linear density exceeds $\delta_c$
+    today should have already collapsed into a virialised halo.
+  \item \textbf{Virialisation}: before reaching the singularity the
+    shells shell-cross and redistribute energy until the virial
+    theorem is satisfied, $2T+V=0$, giving $r_{\rm vir}=r_{\rm ta}/2$.
+    The average density inside $r_{\rm vir}$ relative to the
+    background at that time is
+    %
+    \begin{equation}
+      \Delta_{\rm vir}\equiv
+      \frac{\rho(r_{\rm vir})}{\bar\rho(t_{\rm col})}
+      = 18\pi^2-1 \approx 177,
+      \label{eq:Delta_vir}
+    \end{equation}
+    %
+    the origin of the $\rho/\bar\rho=200$ definition used in
+    $R_{200}$, $M_{200}$.  In $\Lambda$CDM the number is closer to
+    $\Delta_{\rm vir}\approx100$--$200$ depending on $\Omm(z)$
+    \citep{Bryan1998}.
+\end{itemize}
+
+The threshold $\delta_c\approx 1.686$ is the \emph{linear}
+extrapolation of full non-linear collapse --- a point peaks with
+$\delta_{\rm lin}\!\ge\!\delta_c$ in the smoothed density field
+should be identified with collapsed halos today.
+Combined with the variance $\sigma(R)$ of \S\ref{sec:sigma8},
+this underlies the Press--Schechter and excursion-set halo mass
+functions.
+
+For IC generation the practical message is:
+(i) the spherical top-hat is the worst case for ZA-vs-2LPT
+accuracy because it saturates the bound
+$\delta^{(2)}\le\tfrac{1}{2}|\delta^{(1)}|$
+(\S\ref{sec:tophat_timing});
+(ii) $\delta_c\approx 1.69$ converts the measured
+$\sigma_8(z)$ into a typical collapse redshift, which in turn
+determines a safe $z_{\rm start}$: by $z_{\rm start}\gg 1/\sigma_8(0)$
+no mode has yet collapsed, validating the perturbative expansion.
 
 %----------------------------------------------------------------------
 \section{Second Order: 2LPT}
@@ -885,12 +985,247 @@ In summary:
 \section{Relation to the Power Spectrum}
 \label{sec:pk}
 
-\subsection{What CLASS provides}
+\subsection{Power spectrum and two-point correlation function}
+\label{sec:pk_xi}
 
-CLASS solves the linearised Boltzmann equations and outputs the
-\emph{linear} matter power spectrum $P_{\rm lin}(k)$.  This is the
-input to MUSIC2 and is the correct comparison for the 1LPT (ZA)
-density field.
+The \emph{matter power spectrum} $P(k)$ is defined by the two-point
+expectation value of the Fourier-space density contrast
+\citep[e.g.][Eq.~1.2]{Jeong2010}:
+%
+\begin{equation}
+  \langle \delta(\bk)\,\delta^*(\bk') \rangle
+  = (2\pi)^3\,P(k)\,\delta^D(\bk - \bk'),
+  \label{eq:pk_def}
+\end{equation}
+%
+where $\delta(\bx) \equiv \rho(\bx)/\bar\rho - 1$ and statistical
+isotropy restricts $P$ to depend only on $k = |\bk|$.  In linear
+theory $\delta(\bk, z) = \Dp(z)\,\delta_0(\bk)$, so the amplitude
+evolves as
+%
+\begin{equation}
+  P(k, z) = \Dp^2(z)\,P(k, 0),
+  \label{eq:pk_z}
+\end{equation}
+%
+while the shape is frozen.
+
+The real-space \emph{two-point correlation function}
+$\xi(r) \equiv \langle\delta(\bx)\,\delta(\bx+\br)\rangle$ is the
+Fourier-space transform pair of $P(k)$.  Exploiting isotropy to reduce
+the 3D integral via the spherical Bessel function
+$j_0(x) = \sin(x)/x$:
+%
+\begin{align}
+  \xi(r) &= \frac{1}{2\pi^2}\int_0^\infty dk\; k^2\, P(k)\, j_0(kr),
+  \label{eq:xi_pk} \\[4pt]
+  P(k)   &= 4\pi\int_0^\infty dr\; r^2\, \xi(r)\, j_0(kr).
+  \label{eq:pk_xi_inv}
+\end{align}
+%
+Physically, $\xi(r)$ is the excess probability of finding two mass
+elements separated by comoving distance $r$ relative to a uniform
+distribution.  It is positive where matter is clustered
+($r \lesssim 50\,h^{-1}\,\mathrm{Mpc}$ today), crosses zero, and
+shows the baryon acoustic oscillation (BAO) peak at
+$r_{\rm BAO} \approx 105\,h^{-1}\,\mathrm{Mpc}$.  The two statistics
+carry identical information for Gaussian fields; $P(k)$ is the natural
+choice for quasi-linear and non-linear scales ($k \gtrsim
+0.1\,h\,\mathrm{Mpc}^{-1}$), while $\xi(r)$ is convenient for the
+BAO feature in configuration space.
+
+\subsection{Shape of the linear $P(k)$: primordial spectrum and transfer function}
+\label{sec:pk_shape}
+
+The linear matter power spectrum factorises into a \emph{primordial}
+piece set by inflation and a \emph{transfer function} $T(k)$ that
+records how each Fourier mode evolved between horizon re-entry and
+matter--radiation equality
+\citep[see e.g.][\S3.1--3.2]{Tong2019}:
+%
+\begin{equation}
+  P_{\rm lin}(k, z)
+    = A_s\!\left(\frac{k}{k_*}\right)^{\!n_s-1}
+      \cdot k\, T^{2}(k)\cdot\Dp^{2}(z).
+  \label{eq:pk_shape}
+\end{equation}
+%
+Here $A_s$ is the scalar amplitude of curvature perturbations,
+$k_*\sim 0.05\,\mathrm{Mpc}^{-1}$ is a pivot scale, and $n_s\approx
+0.965$ is the scalar spectral tilt measured by Planck.
+
+\paragraph{Primordial power spectrum.}
+Inflation generates a near scale-invariant curvature spectrum
+$\mathcal{P}_\mathcal{R}(k)\propto k^{n_s-1}$.  The
+\emph{dimensionless} density power spectrum is
+$\Delta^2(k)\equiv k^3 P(k)/(2\pi^2)$, and ``scale invariance'' means
+the corresponding gravitational-potential spectrum
+$\Delta^2_\Phi(k)\propto k^{-1}\Delta^2(k)$ is flat (via Poisson,
+$\Phi\propto\delta/k^2$).  This picks out $P(k)\propto k^{n_s}$ with
+$n_s=1$ as the Harrison--Zel'dovich limit.  The small deviation
+$n_s-1\approx -0.035$ is a direct signature of the dynamics of
+inflation \citep[see][\S3.2.1]{Tong2019}.
+
+\paragraph{Transfer function and the Meszaros effect.}
+A mode with comoving wavenumber $k$ enters the Hubble radius when
+$k=\calH(a)$.  In matter domination the gravitational source term
+and the Hubble friction combine to give growing and decaying modes
+$\delta\propto a,\ a^{-3/2}$, so modes that enter in MD grow
+unsuppressed.  In the radiation era, however, the dark matter
+density contrast $\delta_m$ on sub-horizon scales obeys the
+\emph{Meszaros equation} \citep[][\S5.1]{Baumann2022}:
+%
+\begin{equation}
+  \frac{d^2\delta_m}{dy^2}
+    + \frac{2+3y}{2y(1+y)}\frac{d\delta_m}{dy}
+    - \frac{3}{2y(1+y)}\delta_m = 0,
+  \qquad y\equiv a/a_{\rm eq},
+  \label{eq:meszaros}
+\end{equation}
+%
+whose growing solution is $\delta_m\propto(2+3y)$: during RD
+($y\ll1$) it grows only \emph{logarithmically} in $\ln y$, because
+the radiation background is not clustered to provide a gravitational
+source.  Sub-horizon DM modes therefore ``stall'' between horizon
+entry and equality, while super-horizon modes grow normally.
+
+Define the comoving wavenumber of the horizon at equality,
+%
+\begin{equation}
+  k_{\rm eq} \;\simeq\; 0.07\,\Omm h^2\,\mathrm{Mpc}^{-1}
+              \;\approx\; 0.015\,h\,\mathrm{Mpc}^{-1}
+  \qquad\text{(Planck cosmology)}.
+  \label{eq:keq}
+\end{equation}
+%
+Modes with $k<k_{\rm eq}$ entered the horizon in the matter era and
+carry no suppression: $T(k)\to1$.  Modes with $k>k_{\rm eq}$ entered
+in RD and stalled for a factor $\sim(a_{\rm enter}/a_{\rm eq})^{2}
+=(k_{\rm eq}/k)^2$ in scale factor, giving $T(k)\propto(k_{\rm eq}/k)^2$
+at $k\gg k_{\rm eq}$.  Combining with
+Eq.~(\ref{eq:pk_shape}) yields the familiar two-limit shape
+\citep[\S5.1]{Baumann2022}:
+%
+\begin{equation}
+  P_{\rm lin}(k)\propto
+  \begin{cases}
+    k^{n_s} \approx k,        & k\ll k_{\rm eq}\\[3pt]
+    k^{n_s-4}\approx k^{-3}\ln^2(k/k_{\rm eq}), & k\gg k_{\rm eq}
+  \end{cases}
+  \label{eq:pk_limits}
+\end{equation}
+%
+with a broad turnover around $k_{\rm eq}$.  The log factor at
+$k\gg k_{\rm eq}$ is the residual Meszaros growth in RD.
+Accurate fitting formulae (BBKS, \citealt{Jeong2010};
+Eisenstein--Hu) exist, but in practice one takes $T(k)$ tabulated
+from a Boltzmann code (CLASS, CAMB).
+
+\paragraph{Baryon acoustic oscillations.}
+Before decoupling, baryons and photons oscillate as a coupled
+plasma; the resulting sound horizon at drag epoch
+($r_d\simeq 147\,\mathrm{Mpc}$) imprints small oscillatory features
+on $T(k)$ at $k\sim(1$--$4)\times10^{-1}\,h\,\mathrm{Mpc}^{-1}$ with
+amplitude $\sim 10\%$ of $\Delta^2(k)$.  They are more visible as
+the BAO peak in $\xi(r)$ at $r\approx 105\,h^{-1}\,\mathrm{Mpc}$
+(\S\ref{sec:pk_xi}).
+
+\subsection{Variance and $\sigma_8$}
+\label{sec:sigma8}
+
+The most common one-number summary of $P(k)$ is the variance of
+$\delta$ smoothed on comoving scale $R$.  Let $W_R(\bx)$ be a
+spherical filter of characteristic radius $R$ and define the
+smoothed field
+$\delta_R(\bx)\equiv\int d^3x'\,W_R(\bx-\bx')\,\delta(\bx')$.
+By the convolution theorem $\delta_R(\bk)=\tilde W_R(k)\,\delta(\bk)$,
+so the real-space variance reduces to a one-dimensional integral over
+$P(k)$ \citep[][eq.~2.21]{Jeong2010}:
+%
+\begin{equation}
+  \sigma^2(R,z) = \int\!\frac{d^3k}{(2\pi)^3}\,\tilde W_R^2(k)\,P(k,z)
+  = \int_0^\infty\!d\ln k\;\Delta^2(k,z)\,\tilde W_R^2(k).
+  \label{eq:sigmaR}
+\end{equation}
+%
+For the spherical top-hat of radius $R$, the Fourier transform is
+%
+\begin{equation}
+  \tilde W_R^{\rm TH}(k)
+    = \frac{3[\sin(kR)-kR\cos(kR)]}{(kR)^3}.
+  \label{eq:wtop}
+\end{equation}
+%
+The quantity
+$\sigma_8\equiv\sigma(R=8\,h^{-1}\,\mathrm{Mpc},\,z=0)$ is the
+standard amplitude normalisation: $\sigma_8\approx 0.81$ in Planck
+2018.  Because $\Dp(z)$ factorises, $\sigma_8(z)=\sigma_8(0)\Dp(z)$,
+and Eq.~(\ref{eq:sigmaR}) at general $R$ is the sum over modes
+that fit inside a sphere of radius $R$.  The particular choice
+$R=8\,h^{-1}\,\mathrm{Mpc}$ is historical: $\sigma\sim1$ at this
+scale today, so it marks the approximate onset of non-linear
+clustering.  Larger $\sigma_8$ means structure formation began
+earlier \citep[][\S3.2.5]{Tong2019}.
+
+\begin{tcolorbox}[colback=gray!5, colframe=gray!55!black,
+                  title={\bfseries Parseval and $\sigma_8$ in one line},
+                  coltitle=white, fonttitle=\bfseries,
+                  before skip=1em, after skip=1em]
+Setting $\tilde W_R=1$ in Eq.~(\ref{eq:sigmaR}) recovers the
+\emph{total} variance $\langle\delta^2\rangle$, so $\sigma^2(R)$ is
+literally Parseval's theorem applied to the top-hat-smoothed field.
+Novices often confuse $\sigma_8$ with ``the amplitude of $P(k)$ at
+$k=1/(8\,h^{-1}\,\mathrm{Mpc})$''.  It is not: $\sigma_8$ is an
+\emph{integral} over all $k$, weighted by the top-hat window.
+Modes at $k\ll 1/R$ contribute via $\tilde W_R\to 1$; modes at
+$k\gg 1/R$ are strongly suppressed.
+\end{tcolorbox}
+
+\subsection{What CLASS provides}
+\label{sec:class_output}
+
+CLASS solves the linearised Einstein--Boltzmann system for
+photons, baryons, CDM, neutrinos, and metric perturbations, and
+outputs the \emph{linear} matter power spectrum
+$P_{\rm lin}(k,z)$ on a user-specified $(k,z)$ grid.
+In our pipeline (\texttt{run\_pipeline.sh}) the CLASS output file
+\texttt{data/class\_pk\_z\{z\}\_pk.dat} has two columns:
+%
+\begin{center}
+\begin{tabular}{lll}
+\hline
+Column & Units & Content \\
+\hline
+$k$     & $[h\,\mathrm{Mpc}^{-1}]$ & comoving wavenumber \\
+$P(k)$  & $[(h^{-1}\,\mathrm{Mpc})^{3}]$ & linear matter $P$ at $z=z_{\rm pk}$ \\
+\hline
+\end{tabular}
+\end{center}
+%
+The $h$ factors reflect CLASS's \texttt{format=class} convention
+(which is the MUSIC2 default).  This power spectrum is the correct
+input to MUSIC2 (\S\ref{sec:icgen}) and the correct comparison for
+the 1LPT (ZA) density field.  Validation against the ICs at high
+$z$ requires the back-scaling correction of
+\S\ref{sec:backscaling_radiation}.
+
+\begin{tcolorbox}[colback=yellow!5, colframe=orange!50!black,
+                  title={\bfseries Fourier-convention pitfall},
+                  coltitle=white, fonttitle=\bfseries,
+                  before skip=1em, after skip=1em]
+CLASS defines $P(k)$ through
+$\langle\delta(\bk)\delta^*(\bk')\rangle
+ =(2\pi)^3 P(k)\,\delta^D(\bk-\bk')$
+with $\delta(\bk)=\int d^3x\,\delta(\bx)\,e^{-i\bk\cdot\bx}$
+(forward transform \emph{without} a $(2\pi)^{-3}$ prefactor).
+This is the ``physicist's / Peebles convention''
+(Appendix~\ref{app:fft}; \citealt{Jeong2010}, App.~A).  Codes in
+engineering or signal-processing conventions place the
+$(2\pi)^{-3}$ differently and require a rescaling of the CLASS
+output before use.  \emph{No rescaling is needed anywhere in this
+pipeline} --- MUSIC2, \texttt{compute\_pk.py}, and CLASS all use
+the same convention.
+\end{tcolorbox}
 
 \subsection{Non-linear corrections from 2LPT}
 
@@ -1065,6 +1400,483 @@ fidelity — saving significant computational cost, particularly
 for zoom resimulations of high-redshift structure.
 
 %----------------------------------------------------------------------
+\section{Velocity Statistics}
+\label{sec:vel_stats}
+
+\subsection{Linear velocity–density relation}
+\label{sec:vel_linear}
+
+In linear perturbation theory, the peculiar velocity field is
+irrotational: any initial vorticity decays as $\mathbf{w}\propto a^{-1}$
+under Hubble expansion and is rapidly erased.  It is therefore
+convenient to work with the single scalar
+%
+\begin{equation}
+  \theta(\bx,t) \equiv \nabla\cdot\bv_{\rm pec}(\bx,t),
+  \label{eq:theta_def}
+\end{equation}
+%
+which captures all the dynamical information \citep[][\S2.1]{Jeong2010}.
+Taking the divergence of the linearised Euler
+equation~(\ref{eq:euler_lin}) and combining with the linearised
+continuity equation~(\ref{eq:continuity_lin}):
+%
+\begin{equation}
+  \theta(\bk, z) = -H(z)\,f(z)\,\delta(\bk, z),
+  \qquad
+  P_{\theta\theta}(k) = [H(z)\,f(z)]^2\,P(k,z).
+  \label{eq:theta_delta}
+\end{equation}
+%
+Because $\bv$ is curl-free, $\theta$ determines the full velocity:
+%
+\begin{equation}
+  \bv_{\rm pec}(\bk, z)
+    = -\frac{i\bk}{k^2}\,\theta(\bk, z)
+    = -\frac{i\bk}{k^2}\, H(z)\, f(z)\, \delta(\bk, z).
+  \label{eq:vel_delta}
+\end{equation}
+%
+The $1/k$ factor means large-scale density modes drive the strongest
+velocities; small-scale modes contribute little velocity power per
+unit density power.
+
+The isotropic \emph{velocity power spectrum} follows from taking the
+trace of the velocity two-point tensor:
+%
+\begin{equation}
+  P_v(k, z) \equiv \sum_i \langle |v_{{\rm pec},i}(\bk, z)|^2 \rangle
+    = \frac{[H(z)\, f(z)]^2}{k^2}\, P(k, z).
+  \label{eq:pv}
+\end{equation}
+%
+On large scales $P(k) \propto k^{n_s} \approx k$, so
+$P_v(k) \propto k^{n_s - 2} \approx k^{-1}$: the velocity field is
+\emph{red} and dominated by the largest accessible modes, the opposite
+of the density field.
+
+\subsection{Velocity autocorrelation function \texorpdfstring{$\psi(r)$}{psi(r)}}
+\label{sec:psi}
+
+The real-space isotropic velocity autocorrelation function is
+%
+\begin{equation}
+  \psi(r, z)
+    \equiv \langle\bv_{\rm pec}(\bx, z)\cdot\bv_{\rm pec}(\bx + \br, z)\rangle.
+  \label{eq:psi_def}
+\end{equation}
+%
+Applying the Fourier-pair identity of Eq.~(\ref{eq:xi_pk}) to
+$P_v(k)$ from Eq.~(\ref{eq:pv}):
+%
+\begin{equation}
+  \psi(r, z)
+    = \frac{[H(z)\,f(z)]^2}{2\pi^2}
+      \int_0^\infty dk\; P(k, z)\, j_0(kr).
+  \label{eq:psi_r}
+\end{equation}
+%
+At $r = 0$ this gives the total 3D velocity variance:
+%
+\begin{equation}
+  \sigma_v^2(z) \equiv \psi(0, z)
+    = \frac{[H(z)\,f(z)]^2}{2\pi^2}
+      \int_0^\infty dk\; P(k, z),
+  \label{eq:sigv}
+\end{equation}
+%
+and the 1D dispersion along any axis is
+$\sigma_{v,1\mathrm{D}} = \sigma_v/\sqrt{3}$.
+
+Because $j_0(kr) \to 1$ as $r \to 0$, the integral
+converges and $\psi(0)$ is finite --- meaning $\psi(r)$
+\emph{flattens} at small separations rather than diverging.
+Pairs at $r \ll r_{\rm coherence}$ share the same bulk flow, so
+they contribute no \emph{relative} velocity, yet the absolute
+velocity correlation saturates at its maximum value $\sigma_v^2$.
+
+\subsection{Redshift scaling}
+\label{sec:psi_z}
+
+Using $P(k,z) = \Dp^2(z)\,P(k,0)$ in Eq.~(\ref{eq:psi_r}):
+%
+\begin{equation}
+  \psi(r, z) \propto [H(z)\,f(z)]^2\,\Dp^2(z).
+  \label{eq:psi_z}
+\end{equation}
+%
+In matter domination ($f = 1$, $\Dp \propto a$, $H \propto a^{-3/2}$):
+%
+\begin{equation}
+  [H(z)]^2\,\Dp^2(z)
+    \propto a^{-3} \cdot a^2 = a^{-1} \propto (1+z).
+  \label{eq:psi_z_scaling}
+\end{equation}
+%
+\textbf{The velocity correlation $\psi(r)$ grows $\propto(1+z)$ toward
+high redshift.}  The Hubble parameter grows faster
+($H \propto a^{-3/2}$) than the density fluctuations decay
+($\delta \propto a$), so peculiar velocities are larger at early times.
+In our pipeline, $\psi(r \to 0) \approx 10^8\,(\mathrm{km/s})^2$ at
+$z = 200$ versus $\psi \sim 10^5\text{--}10^6\,(\mathrm{km/s})^2$ at
+$z = 0$ for the same cosmology.
+
+\noindent\textbf{Comparison with the Hubble flow.}  At $z = 200$,
+$H(200) \approx 1.05\times10^5\,\mathrm{km\,s^{-1}\,Mpc^{-1}}$, so
+the Hubble flow across $1\,\mathrm{Mpc}$ is
+$v_H \approx 10^5\,\mathrm{km/s}$.  The 1D peculiar velocity
+dispersion $\sigma_{v,1D} \approx 5700\,\mathrm{km/s}$, giving a ratio
+$\sigma_{v,1D}/v_H \approx 6\%$: peculiar velocities are a small but
+non-negligible correction to the Hubble flow even at this epoch.
+
+\subsection{SWIFT velocity convention and the $a^2$ correction}
+\label{sec:swift_vel}
+
+SWIFT stores particle velocities as
+$\bv_{\rm int} \equiv a\,\bv_{\rm pec}$
+(not the true peculiar velocity).  The CIC velocity correlation
+measured from an IC file therefore gives
+%
+\begin{equation}
+  \psi_{\rm raw}(r)
+    = \langle\bv_{\rm int}\cdot\bv_{\rm int}'\rangle
+    = a^2\,\psi(r),
+\end{equation}
+%
+so to recover the physical velocity correlation one must divide by $a^2$:
+%
+\begin{equation}
+  \psi(r) = (1+z)^2\,\psi_{\rm raw}(r).
+  \label{eq:psi_swift}
+\end{equation}
+%
+This is applied in \texttt{plot\_ic.py} via
+\texttt{load\_vel\_cic(a=a\_run)}, which divides the raw CIC
+correlation by $a^2$ before plotting.  At $z_{\rm start} = 200$ the
+correction factor is $(1+200)^2 \approx 4\times10^4$: omitting it
+would suppress the plotted $\psi$ by four orders of magnitude and make
+the IC appear to have negligible velocity structure.
+
+%----------------------------------------------------------------------
+\section{Implementation: \texttt{MUSIC2} and \texttt{monofonIC}}
+\label{sec:implementations}
+
+The algorithms of Sections~\ref{sec:icgen}--\ref{sec:vel_stats} are
+realised in two complementary publicly-available codes,
+\texttt{MUSIC2} \citep{Hahn2011} and its unigrid sibling
+\texttt{MUSIC2--monofonIC} \citep{Michaux2020,HahnRampfUhlemann2021},
+both developed by Oliver Hahn and collaborators.  They share a
+common C++17 code base, plugin architecture (output formats,
+transfer functions, random fields, region generators), INI-style
+configuration parser, and dependencies
+(FFTW3~\citep{Frigo2005}, GSL, optionally CLASS and HDF5), but target
+different problems: \texttt{MUSIC2} produces nested-grid ICs for
+\emph{zoom-in} resimulations, while \texttt{monofonIC} produces
+single-grid ICs for \emph{full-box} cosmological runs.  This section
+sketches the main algorithmic choices each code makes and the
+numerical subtleties that matter for IC quality.
+
+%----------------------------------------------------------------------
+\subsection{\texttt{MUSIC2}: nested-grid zoom ICs}
+\label{sec:music2}
+
+The flagship use case for \texttt{MUSIC2} is a zoom-in simulation:
+low-resolution particles fill the full box to provide the correct
+large-scale tidal environment, while a small Lagrangian region
+(often shaped like a minimum bounding ellipsoid around a halo
+identified in a parent run) is resolved with $2^l$-fold more particles
+per linear dimension, for some refinement depth
+$l \!=\! \texttt{levelmax}\!-\!\texttt{levelmin}$.
+
+\paragraph{Refinement hierarchy.}  The user specifies two integers
+\texttt{levelmin} and \texttt{levelmax}: the coarsest grid has
+$2^{\texttt{levelmin}}$ cells per linear dimension and spans the full
+box, and every subsequent level halves the cell spacing within a
+progressively smaller region.  \texttt{MUSIC2} internally keeps
+\emph{two} such hierarchies, \texttt{rh\_Poisson} for solving the
+Poisson equation and a slightly padded \texttt{rh\_TF} (default
+overlap of 4 cells on each side) for convolving the white noise with
+the transfer function; the padding absorbs boundary effects from
+real-space convolution at the transition between levels.
+
+\paragraph{White noise composition.}  A Gaussian white noise field
+$n(\bq)$ is generated independently on each level.  In version~2 of
+the code the per-level white-noise fields are composed via
+\emph{Fourier splicing}: the coarse-level noise provides the modes
+below that level's Nyquist, and the finer-level noise fills modes
+between successive Nyquists.  This makes the resulting field properly
+white at every level and avoids the aliasing that plagued v1.  A side
+consequence is that v1 and v2 are \emph{not} backwards-compatible:
+a zoom generated with v1 cannot be reproduced exactly with v2, because
+the spliced noise tree differs.  The generated noise is written to
+\texttt{wnoise\_NNNN.bin} in the current working directory, one file
+per level.
+
+\paragraph{Hybrid Poisson solver.}  For a unigrid run (\texttt{levelmin
+= levelmax}) \texttt{MUSIC2} degenerates to a pure spectral solver:
+divide $\delta(\bk)$ by $-k^2$ and IFFT.  For a true nested-grid run
+it instead uses a \emph{hybrid} scheme: a spectral solve on the
+coarsest level provides the boundary conditions for a multigrid FAS
+(Full Approximation Storage) V-cycle solver that relaxes the Poisson
+equation on the refined levels with
+high-order (default 4th-order) finite-difference gradients.  This
+avoids the memory cost of an FFT at the finest level and handles the
+non-periodic interior boundary naturally.
+
+\paragraph{2LPT source on a hierarchy.}  The second-order source
+Eq.~(\ref{eq:F_source}) can be built in two ways:
+\begin{enumerate}
+  \item by finite-difference Hessians
+        $\phi^{(1)}_{,ij}$ on each level (available at 2nd, 4th, and
+        6th--8th order), which is local and naturally respects the
+        refinement structure; or
+  \item by FFTing the coarsest level and multiplying by $-k_i k_j$
+        in Fourier space (flag \texttt{kspace2LPT}).
+\end{enumerate}
+Option~(ii) is exact for modes resolved on a single grid but has no
+natural analogue at a refinement boundary.  The pipeline in this
+repository uses the FD default.
+
+\paragraph{Baryons and Local-Lagrangian Approximation.}
+When \texttt{baryons = yes}, \texttt{MUSIC2} treats CDM and baryons
+as distinct species with their own transfer functions
+(e.g.\ \texttt{delta\_cdm} and \texttt{delta\_baryon} from CLASS).
+For grid-based hydrodynamics codes the baryon \emph{density} is what
+matters, not a particle displacement: the optional Local Lagrangian
+Approximation (LLA) computes the baryon density from the 2LPT
+displacement's Jacobian as $\rho_{\rm b}/\bar\rho = 1/\det(I+\nabla\Psi)$,
+recovering density non-linearities that 1LPT/2LPT misses at fixed
+order~\citep{Bernardeau2002}.  For SPH a small constant shift is added
+between the DM and baryon lattices so that particles of different
+species do not start on top of each other.
+
+\paragraph{Counter-mode removal.}  In a zoom, the high-resolution
+region has a non-zero mean velocity set by the long-wavelength modes
+of the parent box.  If the hydro code assumes the zoom region is
+roughly stationary this bulk motion causes unnecessary numerical
+advection.  \texttt{MUSIC2} optionally subtracts the mean displacement
+and velocity over the finest level
+(\texttt{zero\_zoom\_velocity = yes}), replacing them with identical
+corrections outside the zoom so that relative positions are preserved.
+
+\paragraph{Plugins.}  Output plugins include Gadget-2/3, AREPO, SWIFT,
+RAMSES (GRAFIC-2), ENZO, ART, Pkdgrav/Gasoline, NyX, and GAMER-2.
+Transfer-function plugins include CAMB (file input), CLASS (direct
+library call), Eisenstein \& Hu fits, and BBKS.  Random-field plugins
+include the native MUSIC hierarchical white noise, externally supplied
+constraint fields, and PANPHASIA (optional Fortran dependency).
+
+%----------------------------------------------------------------------
+\subsection{\texttt{monofonIC}: unigrid, high-order ICs}
+\label{sec:monofonic}
+
+\texttt{monofonIC} (sometimes written ``\texttt{MUSIC2--monofonIC}'')
+drops the zoom machinery in favour of a single periodic box with all
+fields on one uniform grid.  The gain is access to third-order
+Lagrangian perturbation theory~\citep{Michaux2020}, aliasing-free
+convolutions via the Orszag 3/2 rule, baryon/CDM species handled
+as separate sublattices~\citep{HahnRampfUhlemann2021}, and full
+hybrid MPI+OpenMP parallelisation using FFTW's slab decomposition
+(so runs with $N \gtrsim 2048^3$ are routine on modern clusters).
+
+\paragraph{Pipeline.}
+\begin{enumerate}
+  \item Allocate a $N^3$ real-to-complex \texttt{Grid\_FFT} for the
+        white noise $n(\bq)$; fill it with the chosen RNG plugin
+        (NGenIC, PANPHASIA, or the MUSIC-1 RNG).
+  \item Apply any optional modifications to the noise: Angulo--Pontzen
+        amplitude fixing and/or phase inversion~\citep{Angulo2016},
+        external constraint modes, removal of Nyquist-corner modes.
+  \item Compute $\phi^{(1)}(\bk) = -\delta_{\rm lin}(\bk)/k^2$ by one
+        FFT of the noise and a division by $k^2$.
+  \item For \texttt{LPTorder} $\geq 2$, build $\phi^{(2)}$ by
+        convolving Hessians of $\phi^{(1)}$:
+        $\nabla^2\phi^{(2)} = \sum_{i<j}\!\bigl[
+           \phi^{(1)}_{,ii}\phi^{(1)}_{,jj}
+         - (\phi^{(1)}_{,ij})^2\bigr]$
+        (Eq.~\ref{eq:F_source}), then apply the inverse Laplacian.
+  \item For \texttt{LPTorder} $\geq 3$, build three further potentials
+        $\phi^{(3a)}, \phi^{(3b)}$, and a transversal vector
+        $\mathbf{A}^{(3)}$ from cubic Hessian convolutions following
+        eqs.~(9)--(11) of \citet{Michaux2020}.
+  \item Scale each potential by its growth factor
+        $g_n = D_n(a_{\rm start})$, then for each species and each
+        Cartesian direction evaluate
+        $\Psi_i = \nabla_i\bigl[\phi^{(1)}+\phi^{(2)}+\phi^{(3a)}
+          +\phi^{(3b)}\bigr]
+          + \epsilon_{ijk}\partial_j A^{(3)}_k$
+        by IFFT.
+  \item Place particles on the chosen pre-IC lattice (SC, BCC, FCC,
+        RSC, or glass) and displace by $\Psi_i$; velocities use the
+        analogous sum with $v$-factors $v_n(a) = d\ln D_n/dt$.
+\end{enumerate}
+
+\paragraph{Particle loads.}  The default ``simple cubic'' (SC) lattice
+places $N^3$ particles on a regular grid.  Body-centred cubic (BCC)
+adds a half-cell-shifted sublattice and doubles particle count; FCC
+adds three face-centred shifts and quadruples it.  At fixed force
+resolution, BCC and FCC reduce the power-spectrum bias at
+$k \sim k_{\rm Ny}$ due to the isotropy of their force
+kernels~\citep{Garrison2016,Michaux2020}.  A \emph{glass} pre-IC is
+loaded from an external HDF5 file and preserves Poisson-like shot
+noise down to grid scale, at the cost of a non-trivial mass
+compensation kernel applied during readout.
+
+\paragraph{Species, baryons, and the relative-velocity mode.}
+If baryons are enabled the CDM and baryon displacements are computed
+from distinct transfer functions $T_{\rm cdm}(k)$ and $T_{\rm b}(k)$
+obtained from CLASS, and particles of each species live on different
+sublattices of the chosen lattice so that the baryon/DM pair
+constitutes a diatomic crystal (e.g.\ CsCl-like when both are SC).
+The optional flag \texttt{DoBaryonVrel} activates the linear
+\emph{compensated} relative-velocity mode $v_{\rm bc}(k)$, which is a
+\emph{decaying} mode of the two-fluid system; including it is needed
+for percent-level accuracy at the BAO scale and below
+\citep{HahnRampfUhlemann2021}.
+
+\paragraph{PPT: semiclassical ICs for Eulerian codes.}
+For grid hydrodynamics codes that want densities and velocities on
+Eulerian grids rather than Lagrangian particles, \texttt{monofonIC}
+implements \emph{Propagator Perturbation Theory} (PPT), also called
+the semiclassical formulation.  One evolves the wave function
+$\psi(\bq) = \sqrt{1+\delta(\bq)}\,\exp[i\phi(\bq)/\hbar]$ by a single
+drift step in Fourier space,
+$\psi(\bx) \to \psi(\bx) \exp(-i\hbar k^2\Delta t/2)$, and recovers
+$\rho$ and $\mathbf{v}$ from $|\psi|^2$ and the phase gradient.  The
+hyperparameter $\hbar$ is set automatically from the maximum gradient
+of $\phi^{(1)}$.  PPT captures mild non-linearities beyond 2LPT while
+remaining single-stream and so avoids the shell-crossing issue that
+Lagrangian displacement suffers at late start times.
+
+\paragraph{Other features.}  Primordial non-Gaussianity of the local
+type ($f_{\rm NL}, g_{\rm NL}$) is implemented by adding the quadratic
+or cubic-in-$\phi^{(1)}$ corrections before the transfer-function step.
+Beyond-box external tides~\citep{Stuecker2021} augment $\phi^{(2)}$
+with an anisotropic term parameterised by three eigenvalues
+\texttt{LSS\_aniso\_lx,ly,lz}, so a small subvolume can mimic its
+embedding in a large-scale tidal field.
+
+%----------------------------------------------------------------------
+\subsection{Numerical subtleties worth knowing about}
+\label{sec:numerical}
+
+Three implementation details have an outsized effect on IC quality
+and are worth understanding even when using the code as a black box.
+
+\paragraph{Aliasing-free convolutions (Orszag's 3/2 rule).}
+The 2LPT source Eq.~(\ref{eq:F_source}) contains products
+$\phi^{(1)}_{,ii}\phi^{(1)}_{,jj}$ that, for Fourier modes of
+wavenumbers $k_1, k_2$, generate power at $k_1+k_2$.  On a grid with
+Nyquist $k_{\rm Ny}$, the product's output can reach $2k_{\rm Ny}$,
+but the grid only represents modes up to $k_{\rm Ny}$, so the
+high-$k$ tail of the product wraps around and is \emph{aliased} into
+lower $k$.  Multiplication in real space followed by FFT back to
+Fourier space therefore contaminates every resolved mode with a
+piece of the un-resolved product.  \citet{Orszag1971} showed that
+zero-padding the two input fields from $N$ to $3N/2$ samples per
+dimension before the multiply, and truncating the output back to $N$
+samples, eliminates this aliasing exactly for a quadratic product.
+\texttt{monofonIC} implements this as \texttt{OrszagConvolver} and
+enables it by default for \texttt{LPTorder > 1}; without it the 2LPT
+and 3LPT sources develop visible grid-scale artefacts.
+
+\paragraph{Particle-lattice corrections (PLT).}
+A uniform pre-IC lattice of $N^3$ self-gravitating particles is not
+the continuum: its linear dispersion relation
+$\omega^2(\bk)$ deviates from $-4\pi G\bar\rho$ (the continuum value)
+by a species-dependent $(\bk/k_{\rm Ny})^2$ factor, so the standard
+Zel'dovich displacement kernel $i\bk/k^2$ slightly over- or
+under-displaces modes near the grid
+scale~\citep{MarcosEtal2006,Garrison2016}.  \texttt{monofonIC}'s
+\emph{Particle-Lattice Theory} (PLT) option replaces the Fourier
+gradient $i\bk$ with the tabulated discrete eigenvectors and
+eigenfrequencies of the chosen lattice (SC, BCC, or FCC), so each
+mode is displaced with the amplitude and direction that correctly
+maps it onto the lattice's own linear growing mode.  PLT-corrected
+ICs show substantially cleaner early-time growth at $k \gtrsim
+0.3\,k_{\rm Ny}$; see figs.~4--6 of \citet{Michaux2020}.
+
+\paragraph{Back-scaling and the radiation-free growth factor.}
+Both codes expect the input transfer function at the \emph{starting
+redshift}, but CLASS is usually run at $z=0$ and contains the full
+radiation-aware transfer history.  \emph{Back-scaling} rescales the
+$z=0$ linear $P(k)$ to $z_{\rm start}$ using the matter-only
+(radiation-free) growth factor $D_{\rm mat}(z)$ that matches how the
+N-body code evolves the simulation.  Schematically,
+%
+\begin{equation}
+  P_{\rm back}(k, z_{\rm start})
+  = \Bigl[\frac{D_{\rm mat}(z_{\rm start})}{D_{\rm mat}(0)}\Bigr]^2
+    P_{\rm CLASS}(k, z\!=\!0).
+  \label{eq:backscale}
+\end{equation}
+%
+At low $k$ and $z_{\rm start} \!\lesssim\! 50$ this differs from the
+radiation-inclusive forward transfer $T(k, z_{\rm start})$ by
+$\lesssim\!1\,\%$; at higher $z$ or for boxes that reach horizon
+scales the offset grows and must be corrected explicitly.
+\texttt{monofonIC}'s \texttt{ZeroRadiation = false} flag tells the
+growth-factor ODE to include $\Omega_r(z)$; setting it to \texttt{true}
+forces the radiation-free convention used by most legacy N-body
+codes.  A fuller discussion lives in
+Section~\ref{sec:backscaling_radiation} (Appendix~B).
+
+%----------------------------------------------------------------------
+\subsection{Choosing between the two codes}
+\label{sec:implementations_choice}
+
+\begin{center}
+\small
+\begin{tabular}{@{}p{0.48\linewidth}p{0.48\linewidth}@{}}
+\toprule
+\textbf{\texttt{MUSIC2}} &
+\textbf{\texttt{monofonIC}} \\[1pt]
+\midrule
+Zoom-in or multi-mass resimulation & Full periodic box only \\
+1LPT and 2LPT & 1LPT, 2LPT, and 3LPT \\
+OpenMP only & MPI + OpenMP (for $N \gtrsim 1024^3$) \\
+Finite-difference or FFT 2LPT source on a hierarchy &
+Spectral (Orszag-padded) convolutions on one grid \\
+SC lattice only &
+SC, BCC, FCC, RSC, glass, masked \\
+Distinct CDM/baryon transfer functions, optional LLA &
+Distinct CDM/baryon sublattices, optional $v_{\rm bc}$ mode, PLT \\
+Counter-mode removal for zoom bulk flow & External-tide anisotropy \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+A practical decision procedure:
+\begin{itemize}
+  \item If the science goal is the internal structure of an object
+        identified in a parent simulation, use \texttt{MUSIC2} with
+        the minimum bounding ellipsoid or convex-hull region
+        generator.
+  \item If the science goal is statistics over a full cosmological
+        volume (halo mass function, clustering, BAO), use
+        \texttt{monofonIC}.  If the target $z_{\rm start}$ is
+        ${\lesssim}\,30$, strongly consider 3LPT and PLT; at
+        $z_{\rm start} \gtrsim 100$ 2LPT with a high-enough resolution
+        is usually sufficient.
+  \item If the simulation is hydrodynamic and uses an Eulerian grid,
+        \texttt{monofonIC}'s PPT option gives density/velocity fields
+        directly on the grid without going through particles.
+  \item For studies of primordial non-Gaussianity, fixed-amplitude
+        ICs must be disabled (see Section~\ref{sec:icgen}) and
+        \texttt{monofonIC}'s $f_{\rm NL}/g_{\rm NL}$ options can be
+        turned on.
+\end{itemize}
+
+The pipeline in this repository wraps \texttt{MUSIC2} specifically
+because the canonical test problem (25\,Mpc/$h$ box, $256^3$,
+$z_{\rm start}=127$) is small enough that the full-box uniform-grid
+path in \texttt{MUSIC2} (with \texttt{levelmin = levelmax}) and
+\texttt{monofonIC} generate essentially identical ICs for the same
+random seed, and \texttt{MUSIC2}'s lighter dependency footprint and
+slab-free FFT are a better fit for a laptop-scale testbed.
+
+%----------------------------------------------------------------------
 \section{Summary}
 
 \begin{itemize}
@@ -1096,15 +1908,19 @@ for zoom resimulations of high-redshift structure.
         The discrepancy is negligible at $z \gtrsim 10$ and a few percent
         at $z = 2$.
 
-  \item \textbf{SWIFT velocity storage}: SWIFT ICs store
-        $\bv_{\rm int} = a\,\bv_{\rm pec}$, not the peculiar velocity
-        directly.  The velocity correlation function $\psi(r) =
-        \langle\bv_{\rm pec}\cdot\bv_{\rm pec}'\rangle$ must therefore
-        be extracted by dividing the stored correlation by $a^2$.
+  \item \textbf{Velocity statistics} (Section~\ref{sec:vel_stats}):
+        the linear velocity field satisfies
+        $\bv_{\rm pec}(\bk) = -(i\bk/k^2)Hf\delta(\bk)$, giving
+        $\psi(r) = [Hf]^2/(2\pi^2)\int dk\,P(k)\,j_0(kr)$.  In matter
+        domination $\psi \propto (1+z)$; at $z=200$,
+        $\psi(0) \approx 10^8\,(\mathrm{km/s})^2$.  SWIFT ICs store
+        $\bv_{\rm int} = a\,\bv_{\rm pec}$, so the raw CIC correlation
+        must be divided by $a^2 = (1+z)^{-2}$ to recover $\psi$
+        (Eq.~\ref{eq:psi_swift}).
 \end{itemize}
 
 %----------------------------------------------------------------------
-\bibliography{lpt_review}
+\bibliography{cosmo_ic}
 
 %======================================================================
 \appendix
@@ -1238,7 +2054,7 @@ that the linear power spectrum is negligible at $k_{\rm Ny}$.
 For the FFTW conventions used when implementing the forward and
 inverse transforms, the Cooley--Tukey radix-2 algorithm, the
 row--column multi-dimensional extension, and the slab/pencil MPI
-decompositions, see the companion notes \texttt{fft\_review.pdf}.
+decompositions, see the companion notes \texttt{fft.pdf}.
 
 %======================================================================
 \section{Power Spectrum Estimation from $N$-body Simulations}
@@ -1318,7 +2134,7 @@ than NGP.
 FFTW computes the unnormalised DFT
 $\delta^{\rm FFTW}(\mathbf{n}_k) = \sum_{\mathbf{n}_r}
 \delta(\mathbf{n}_r)\,e^{-2\pi i\mathbf{n}_k\cdot\mathbf{n}_r/N}$
-(see \texttt{fft\_review.pdf} for FFTW conventions).  In the notation of
+(see \texttt{fft.pdf} for FFTW conventions).  In the notation of
 Eq.~(\ref{eq:dft_fwd}), $\delta(\bk_p) = H^3\,\delta^{\rm FFTW}(\mathbf{n}_k)$,
 so the correctly normalised Fourier mode is
 %

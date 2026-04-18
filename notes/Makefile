@@ -1,4 +1,4 @@
-NOTES  = ic_sampling_review lpt_review fft_review
+NOTES  = ic_sampling cosmo_ic fft
 PYTHON = conda run -n cosmo python
 
 # Absolute path to this Makefile's directory — pdflatex is always run from here
@@ -60,4 +60,4 @@ notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
 
 clean :
 	rm -f *.aux *.log *.bbl *.blg *.out *.toc *.fls *.synctex.gz
-	rm -f figures/*.png $(FIGURES) $(NOTES).pdf
+	rm -f figures/*.png $(FIGURES) $(addsuffix .pdf, $(NOTES))

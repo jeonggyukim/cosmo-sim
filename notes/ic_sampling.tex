@@ -7,6 +7,8 @@
 \usepackage{hyperref}
 \usepackage[margin=1in]{geometry}
 \usepackage{natbib}
+\usepackage{tcolorbox}
+\tcbuselibrary{breakable,skins}
 \bibliographystyle{aasjournal}
 
 \title{Real-Space versus Fourier-Space Sampling of Initial Conditions\\
@@ -19,6 +21,15 @@ for Cosmological $N$-body Simulations}
 \maketitle
 \tableofcontents
 \newpage
+
+\begin{tcolorbox}[colback=yellow!10!white, colframe=orange!75!black,
+                  title={\bfseries Disclaimer}]
+These notes were compiled by an AI assistant (Claude, Anthropic) and have
+\textbf{not been reviewed by a human domain expert}.  They may contain
+errors in derivations, physical reasoning, or numerical estimates.
+Cross-check key equations against the primary literature before use.
+\end{tcolorbox}
+\vspace{0.5em}
 
 %----------------------------------------------------------------------
 \section{Introduction}

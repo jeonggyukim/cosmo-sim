@@ -144,9 +144,9 @@ Three LaTeX write-ups live in `notes/`:
 
 | File | Contents |
 |------|----------|
-| `ic_sampling_review.tex` | IC sampling methods (Pen 1997, Sirko 2005, Hahn & Abel 2011): P-sampled vs ξ-sampled, box window truncation errors |
-| `lpt_review.tex` | Lagrangian perturbation theory: fluid equations, ZA, 2LPT, Zel'dovich pancake, IC generation, starting redshifts, one-loop P(k). Appendix A: Fourier conventions (CFT, Fourier series, DFT, Hermitian symmetry); see `fft_review.pdf` for implementation details. Appendix B: P(k) estimation (CIC window, deconvolution, shot noise, sub-Poissonian lattice ICs) |
-| `fft_review.tex` | FFT reference: DFT, Cooley–Tukey radix-2, FFTW mixed-radix, multi-D row-column algorithm, MPI slab vs. pencil decomposition, FFTW API, fftMPI (Plimpton 2019) and Tigris `BlockFFT` usage |
+| `cosmo_ic.tex` | Cosmological ICs: fluid equations, ZA, 2LPT, Zel'dovich pancake, IC generation, starting redshifts, P(k)/ξ(r)/ψ(r), one-loop P(k); §11 MUSIC2 / monofonIC implementation (refinement hierarchy, hybrid Poisson solve, 2LPT/3LPT source, PLT, Orszag 3/2 rule, back-scaling). Appendix A: Fourier conventions (CFT, Fourier series, DFT, Hermitian symmetry); see `fft.pdf` for implementation details. Appendix B: P(k) estimation (CIC window, deconvolution, shot noise, sub-Poissonian lattice ICs) |
+| `ic_sampling.tex` | IC sampling methods (Pen 1997, Sirko 2005, Hahn & Abel 2011): P-sampled vs ξ-sampled, box window truncation errors |
+| `fft.tex` | FFT reference: DFT, Cooley–Tukey radix-2, FFTW mixed-radix, multi-D row-column algorithm, MPI slab vs. pencil decomposition, FFTW API, fftMPI (Plimpton 2019) and Tigris `BlockFFT` usage |
 
 ```bash
 cd notes
