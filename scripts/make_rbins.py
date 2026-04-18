@@ -87,8 +87,8 @@ def main():
     parser.add_argument("--H0", type=float, default=67.11,
                         help="Hubble constant in km/s/Mpc "
                              "(default: 67.11, used to convert Mpc/h → Mpc)")
-    parser.add_argument("--nbins", type=int, default=24,
-                        help="Number of bins (default: 24)")
+    parser.add_argument("--nbins", type=int, default=60,
+                        help="Number of bins (default: 60)")
     parser.add_argument("-o", "--output", default=None,
                         help="Output filename (default: data/rbins_n{N}_z?_L{L}.txt)")
     args = parser.parse_args()

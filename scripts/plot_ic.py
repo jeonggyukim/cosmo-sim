@@ -197,6 +197,14 @@ class ICPlotter:
         Using z_ref=0 is the natural choice: D+_norad(0)=1 by definition, so
         the formula simplifies to P_ref(k, z_start) = P_CLASS(k, 0) × D+_norad(z_start)².
 
+        MUSIC2 uses Omega_r=0 (ZeroRadiation=true) because downstream N-body
+        /hydro codes (SWIFT, GADGET, ...) ignore radiation in their background
+        Friedmann evolution; the ICs must share that approximation or the
+        mode amplitudes at z_start will disagree with what the integrator
+        expects.  Boltzmann codes (CLASS, CAMB) evolve with radiation on,
+        so their D+(z) differs by ~11% at z=200 — hence the ~5-10% P(k)
+        suppression one sees without back-scaling.
+
         ξ(r) is computed via Hankel transform using mcfit (if available).
         ψ(r) = [H(z)·f(z)]²/(2π²) ∫ P(k) j₀(kr) dk is computed via direct
         trapezoid integration.  Requires that at least one pk run has been
@@ -486,11 +494,11 @@ class ICPlotter:
                           color='C3', alpha=0.7, label='no CIC correction')
 
             ax.loglog(k, run["Pk_raw"], 'o-', ms=4, lw=1.2, color=color,
-                      label=label)
+                      alpha=0.5, label=label)
             if show_shot_sub:
                 pos = run["Pk_ss"] > 0
                 ax.loglog(k[pos], run["Pk_ss"][pos], '^-', ms=4, lw=1.2,
-                          color=color, alpha=0.6,
+                          color=color, alpha=0.5,
                           label=f'− shot noise ({label})' if multi else '− shot noise')
 
             if run["P_shot"] is not None:
@@ -538,30 +546,47 @@ class ICPlotter:
         """Populate the right ξ(r) / ψ(r) panel."""
         multi = len(self.pk_runs) > 1
 
-        # Theory r²ξ(r) — linear y-axis
+        # Theory ξ(r) — log y-axis; |ξ| with dashed for ξ<0
         if self.theory_xi_r is not None:
             z = self.pk_runs[0].get("z", "?") if self.pk_runs else "?"
             r = self.theory_xi_r
-            ax2.plot(r, r**2 * self.theory_xi, 'k-', lw=1.2,
+            xi_th = self.theory_xi
+            pos = xi_th > 0
+            neg = xi_th < 0
+            ax2.plot(r[pos], xi_th[pos], 'k-', lw=1.2,
                      label=rf'Theory (CLASS, $z={z:.4g}$)', zorder=10)
+            if neg.any():
+                ax2.plot(r[neg], -xi_th[neg], 'k--', lw=1.2, zorder=10)
 
-        # Corrfunc r²ξ(r)
+        # Corrfunc ξ(r) — |ξ| with solid (ξ>0) / dashed (ξ<0)
         if self.corrfunc_xi is not None:
             d = self.corrfunc_xi
             label = 'Corrfunc'
             if d["nseeds_used"] > 0:
                 label += f' (±{d["nseeds_used"]}-seed)'
-            ax2.errorbar(d["r_mid"], d["r_mid"]**2 * d["xi"],
-                         yerr=d["r_mid"]**2 * d["err"],
+            r_c, xi_c, err_c = d["r_mid"], d["xi"], d["err"]
+            pos = xi_c > 0
+            neg = xi_c < 0
+            ax2.errorbar(r_c[pos], xi_c[pos], yerr=err_c[pos],
                          fmt='s-', ms=4, lw=1.2, elinewidth=0.8, capsize=2,
                          color='C1', mfc='none', label=label)
+            if neg.any():
+                ax2.errorbar(r_c[neg], -xi_c[neg], yerr=err_c[neg],
+                             fmt='s--', ms=4, lw=1.2, elinewidth=0.8, capsize=2,
+                             color='C1', mfc='none')
 
-        # CIC r²ξ(r) — one per pk run, matched colors
+        # CIC ξ(r) — |ξ| with solid (ξ>0) / dashed (ξ<0) segments
         for j, d in enumerate(self.xi_cic_list):
             color = f'C{j}'
             run_label = self._label_from_stem(d["stem"]) if multi else 'CIC grid'
-            ax2.plot(d["r_mid"], d["r_mid"]**2 * d["xi"], '^-', ms=4, lw=1.2,
-                     color=color, label=run_label)
+            r_m, xi_m = d["r_mid"], d["xi"]
+            pos = xi_m > 0
+            neg = xi_m < 0
+            ax2.plot(r_m[pos], xi_m[pos], '^-', ms=4, lw=1.2,
+                     color=color, alpha=0.5, label=run_label)
+            if neg.any():
+                ax2.plot(r_m[neg], -xi_m[neg], '^--', ms=4, lw=1.2,
+                         color=color, alpha=0.5)
 
         # Reference lines: L/3 and Δx per run, proxy legend entries
         if self.pk_runs:
@@ -590,11 +615,25 @@ class ICPlotter:
 
         ax2.legend(fontsize='medium', loc='lower left')
         ax2.set_xscale('log')
-        ax2.set_ylabel(r'$r^2\,\xi(r)$ [(Mpc/$h$)$^2$]')
+        ax2.set_yscale('log')
+        ax2.set_ylabel(r'$\xi(r)$')
+
+        # y-range: driven by measured |ξ|; avoids the log-axis stretching down
+        # to theory zero-crossings where |ξ| dips many decades below the signal.
+        all_xi = [np.abs(d["xi"]) for d in self.xi_cic_list]
+        if self.corrfunc_xi is not None:
+            all_xi.append(np.abs(self.corrfunc_xi["xi"]))
+        if all_xi:
+            xi_abs = np.concatenate(all_xi)
+            xi_abs = xi_abs[np.isfinite(xi_abs) & (xi_abs > 0)]
+            if xi_abs.size:
+                ymax = xi_abs.max() * 3.0
+                ymin = ymax * 1e-5
+                ax2.set_ylim(ymin, ymax)
         ngrid_str = ''
         if self.xi_cic_list and self.xi_cic_list[0].get('ngrid'):
             ngrid_str = f', CIC $N_{{\\rm grid}}={self.xi_cic_list[0]["ngrid"]}$'
-        ax2.set_title(r'$r^2\,\xi(r)$' + ngrid_str)
+        ax2.set_title(r'$\xi(r)$' + ngrid_str)
 
     def _plot_psi_panel(self, ax):
         """Populate the ψ(r) panel (third column, top row)."""
@@ -616,7 +655,7 @@ class ICPlotter:
             run_label = self._label_from_stem(d["stem"]) if multi else 'CIC grid'
             pos = d["psi"] > 0
             ax.loglog(d["r_mid"][pos], d["psi"][pos], 'D-', ms=4, lw=1.2,
-                      color=color, label=run_label)
+                      color=color, alpha=0.5, label=run_label)
 
         # Reference lines: L/2 per run
         if self.pk_runs:
@@ -680,11 +719,11 @@ class ICPlotter:
                 color = f'C{i}'
                 Pt = np.interp(k, self.theory_k, self.theory_P)
                 ax.semilogx(k, run["Pk_raw"] / Pt - 1.0,
-                            'o-', ms=3, lw=1.2, color=color)
+                            'o-', ms=3, lw=1.2, color=color, alpha=0.5)
                 if show_shot_sub:
                     pos = run["Pk_ss"] > 0
                     ax.semilogx(k[pos], run["Pk_ss"][pos] / Pt[pos] - 1.0,
-                                '^-', ms=3, lw=1.0, color=color, alpha=0.6)
+                                '^-', ms=3, lw=1.0, color=color, alpha=0.5)
 
         # Repeat k_fund / k_Ny reference lines
         if self.pk_runs:
@@ -710,7 +749,7 @@ class ICPlotter:
                 xi_th = np.interp(r, self.theory_xi_r, self.theory_xi)
                 valid = xi_th != 0
                 ax.semilogx(r[valid], d["xi"][valid] / xi_th[valid] - 1.0,
-                            '^-', ms=3, lw=1.2, color=f'C{j}')
+                            '^-', ms=3, lw=1.2, color=f'C{j}', alpha=0.5)
 
             if self.corrfunc_xi is not None:
                 d = self.corrfunc_xi
@@ -718,7 +757,7 @@ class ICPlotter:
                 xi_th = np.interp(r, self.theory_xi_r, self.theory_xi)
                 valid = xi_th != 0
                 ax.semilogx(r[valid], d["xi"][valid] / xi_th[valid] - 1.0,
-                            's-', ms=3, lw=1.2, color='C1', mfc='none')
+                            's-', ms=3, lw=1.2, color='C1', mfc='none', alpha=0.5)
 
         # Repeat L/3 and Δx reference lines for each run
         for i, run in enumerate(self.pk_runs):

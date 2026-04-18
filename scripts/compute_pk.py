@@ -245,7 +245,7 @@ def main():
     parser.add_argument("hdf5", help="SWIFT IC HDF5 file")
     parser.add_argument("--ngrid", type=int, default=None,
                         help="FFT mesh size (default: match particle grid, i.e. N^(1/3))")
-    parser.add_argument("--nkbins", type=int, default=30,
+    parser.add_argument("--nkbins", type=int, default=60,
                         help="Number of logarithmic k-bins per folding level (default: 30)")
     parser.add_argument("--H0", type=float, default=67.11,
                         help="H0 in km/s/Mpc for unit conversion (default: 67.11)")
