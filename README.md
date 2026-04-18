@@ -25,9 +25,9 @@ conda activate cosmo
 ### Run the full pipeline (recommended)
 
 ```bash
-./run_pipeline.sh                                          # defaults: N=256, L=687 Mpc/h (~1024 Mpc), z=200
-./run_pipeline.sh --ngrid 256 --lbox 344 --zstart 200      # 256³, L=344 Mpc/h (~512 Mpc), z=200
-./run_pipeline.sh --ngrid 256 --lbox 172 --zstart 200      # 256³, L=172 Mpc/h (~256 Mpc), z=200
+./run_pipeline.sh                                          # defaults: N=256, L=1024 Mpc/h, z=200
+./run_pipeline.sh --ngrid 256 --lbox 512  --zstart 200     # 256³, L=512  Mpc/h, z=200
+./run_pipeline.sh --ngrid 256 --lbox 256  --zstart 200     # 256³, L=256  Mpc/h, z=200
 ```
 
 The pipeline runs all steps below automatically, skipping any that are already complete.
@@ -63,8 +63,8 @@ Binary placed at `music_build/MUSIC`; CLASS built at `music_build/_deps/class-bu
 #### 2. Generate a MUSIC2 config
 
 ```bash
-conda run -n cosmo python scripts/make_music_conf.py -N 256 -z 2 -L 687
-# → conf/CV_22_MUSIC_n256_z2_L687.conf
+conda run -n cosmo python scripts/make_music_conf.py -N 256 -z 200 -L 1024
+# → conf/CV_22_MUSIC_n256_z200_L1024.conf
 ```
 
 Arguments: `-N` particles per side, `-z` starting redshift, `-L` box size in Mpc/h.
@@ -75,9 +75,9 @@ Uses `conf/CV_22_MUSIC_template.conf` (CV_22 cosmology, SWIFT output format).
 #### 3. Run MUSIC2
 
 ```bash
-./music_build/MUSIC conf/CV_22_MUSIC_n256_z2_L687.conf
-# → data/ics_swift_n256_z2_L687.hdf5
-# → conf/input_class_parameters_n256_z2_L687.ini  (moved from repo root by pipeline)
+./music_build/MUSIC conf/CV_22_MUSIC_n256_z200_L1024.conf
+# → data/ics_swift_n256_z200_L1024.hdf5
+# → conf/input_class_parameters_n256_z200_L1024.ini  (moved from repo root by pipeline)
 ```
 
 SWIFT stores coordinates and BoxSize in **Mpc** (not Mpc/h). Velocities are stored as
@@ -95,7 +95,7 @@ changing `output` to `mPk` and setting `z_pk` to the IC redshift. No hand-edited
 TMP=$(mktemp /tmp/class_pk_XXXXXX)
 sed -e "s/^output =.*/output = mPk/" -e "s/^z_pk =.*/z_pk = 2/" \
     -e "/^extra metric transfer functions/d" -e "/^gauge/d" \
-    conf/input_class_parameters_n256_z2_L687.ini > "$TMP"
+    conf/input_class_parameters_n256_z200_L1024.ini > "$TMP"
 echo "root = class_pk_z2_" >> "$TMP"
 ./music_build/_deps/class-build/class "$TMP"
 mv class_pk_z2_pk.dat data/
@@ -107,19 +107,19 @@ mv class_pk_z2_pk.dat data/
 
 ```bash
 conda run -n cosmo python scripts/compute_pk.py \
-    data/ics_swift_n256_z2_L687.hdf5 \
-    -o data/pk_n256_z2_L687.txt
+    data/ics_swift_n256_z200_L1024.hdf5 \
+    -o data/pk_n256_z200_L1024.txt
 
 conda run -n cosmo python scripts/plot_ic.py \
-    data/pk_n256_z2_L687.txt \
+    data/pk_n256_z200_L1024.txt \
     --theory data/class_pk_z2_pk.dat
-# → plots/pk_n256_z2_L687.png
+# → plots/pk_n256_z200_L1024.png
 ```
 
 Overlay multiple box sizes:
 ```bash
 conda run -n cosmo python scripts/plot_ic.py \
-    data/pk_n256_z2_L172.txt data/pk_n256_z2_L344.txt data/pk_n256_z2_L687.txt \
+    data/pk_n256_z2_L172.txt data/pk_n256_z2_L344.txt data/pk_n256_z200_L1024.txt \
     --theory data/class_pk_z2_pk.dat -o plots/comparison.png
 ```
 
@@ -130,22 +130,21 @@ conda run -n cosmo python scripts/plot_ic.py \
 ```bash
 # Corrfunc pair-counting ξ(r) (low z; shot-noise dominated at z ≳ 10):
 conda run -n cosmo python scripts/make_rbins.py \
-    --hdf5 data/ics_swift_n256_z2_L687.hdf5
-# → data/rbins_n256_z2_L687.txt
+    --hdf5 data/ics_swift_n256_z200_L1024.hdf5
+# → data/rbins_n256_z200_L1024.txt
 
-./compute_xi data/ics_swift_n256_z2_L687.hdf5 \
-             data/rbins_n256_z2_L687.txt 8 \
-             > data/xi_n256_z2_L687.txt
+./compute_xi data/ics_swift_n256_z200_L1024.hdf5 \
+             data/rbins_n256_z200_L1024.txt 8 \
+             > data/xi_n256_z200_L1024.txt
 
 # CIC grid ξ(r) and ψ(r) = ⟨v_pec·v_pec'⟩ (works at any z):
 ./compute_xi_cic \
-    --input    data/ics_swift_n256_z2_L687.hdf5 \
-    --Ngrid    128 \
+    --input    data/ics_swift_n256_z200_L1024.hdf5 \
     --nthreads 8 \
-    --output   data/xi_cic_n256_z2_L687.txt \
+    --output   data/xi_cic_n256_z200_L1024.txt \
     --vel
-# → data/xi_cic_n256_z2_L687.txt
-# → data/vel_cic_n256_z2_L687.txt
+# → data/xi_cic_n256_z200_L1024.txt
+# → data/vel_cic_n256_z200_L1024.txt
 ```
 
 `plot_ic.py` auto-detects all `xi_*`, `xi_cic_*`, and `vel_cic_*` files alongside the pk file
@@ -169,7 +168,7 @@ velocity units automatically.
 ```bash
 # Particle displacement histogram (dr/dx from lattice)
 conda run -n cosmo python scripts/plot_dr_histogram.py \
-    data/ics_swift_n256_z2_L687.hdf5
+    data/ics_swift_n256_z200_L1024.hdf5
 ```
 
 ---

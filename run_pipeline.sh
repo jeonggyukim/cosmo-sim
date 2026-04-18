@@ -16,8 +16,8 @@
 #   ./run_pipeline.sh [--ngrid NGRID] [--lbox LBOX] [--zstart ZSTART] [--nthreads NTHREADS]
 #
 #   --ngrid          particles per side (default: 256)
-#   --lbox           box side length in Mpc/h (default: 687)
-#   --zstart         IC starting redshift (default: 2)
+#   --lbox           box side length in Mpc/h (default: 1024)
+#   --zstart         IC starting redshift (default: 200)
 #   --nthreads       OpenMP threads for compute_xi (default: 8)
 #   --fix-amplitude  yes|no — fix Fourier mode amplitudes to sqrt(P(k)) (default: yes)
 #                    When no, '_nofix' is appended to all output stems.
