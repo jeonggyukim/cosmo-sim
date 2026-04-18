@@ -24,6 +24,9 @@ memory/
 
 # Figures (generated; only the three box/tophat/pgrid PDFs copied to notes/ root are versioned)
 plots/
+# Prevent accidental root-level figure drops (use plots/ instead)
+/*.png
+/*.pdf
 notes/*.png
 notes/*.pdf
 !notes/box_window.pdf
