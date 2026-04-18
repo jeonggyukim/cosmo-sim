@@ -244,7 +244,7 @@ class ICPlotter:
                 fz = (self.Omega_m * (1+z)**3 / Ez**2) ** 0.55   # Linder 2005
                 r_grid = self.theory_xi_r if self.theory_xi_r is not None else None
                 r_psi, psi = self._compute_theory_psi(kt, Pt, Hz_hMpc, fz,
-                                                     r_grid=r_grid)
+                                                      r_grid=r_grid)
                 self.theory_psi_r = r_psi
                 self.theory_psi = psi
                 print(f"Theory ψ(r): z={z:.4g}, H={Hz:.1f} km/s/Mpc, "
@@ -455,7 +455,7 @@ class ICPlotter:
         from matplotlib.gridspec import GridSpec
         plt.rcParams.update({'font.size': 13})
         self.fig = plt.figure(figsize=(18, 7), constrained_layout=True)
-        gs = GridSpec(2, 3, figure=self.fig, height_ratios=[4, 1], hspace=0.05)
+        gs = GridSpec(2, 3, figure=self.fig, height_ratios=[3, 1.2], hspace=0.05)
 
         self.ax = self.fig.add_subplot(gs[0, 0])
         self.ax_pk_ratio = self.fig.add_subplot(gs[1, 0], sharex=self.ax)
@@ -714,18 +714,25 @@ class ICPlotter:
         ax.set_ylabel('Measured / Theory', fontsize='medium')
         ax.set_ylim(0.0, 1.1)
 
-    _RATIO_LEVELS = [0.05, 0.10, 0.15, 0.20]
+    _RATIO_LEVELS = [0.01, 0.05, 0.10, 0.15]
 
-    def _draw_ratio_reflines(self, ax):
-        """Draw ±1/5/10/20/30/40/50 % horizontal reference lines."""
+    def _draw_ratio_reflines(self, ax, show_1pct_legend=False):
+        """Draw ±5/10/15 % reference lines and a shaded ±1% band."""
         ax.axhline(0.0, color='k', lw=1.0)
         for level in self._RATIO_LEVELS:
+            if level == 0.01:
+                continue  # ±1% shown as shaded band instead
             ax.axhline(level, color='gray', lw=0.5, ls='--', alpha=0.5)
             ax.axhline(-level, color='gray', lw=0.5, ls='--', alpha=0.5)
+        band = ax.axhspan(-0.01, 0.01, color='gray', alpha=0.2, lw=0,
+                          label=r'$\pm 1\%$')
+        if show_1pct_legend:
+            ax.legend(handles=[band], loc='lower left', fontsize='medium',
+                      framealpha=0.8)
 
     def _plot_pk_ratio_panel(self, ax, show_shot_sub=False):
         """Fractional residual (P_meas/P_theory − 1) below the P(k) panel."""
-        self._draw_ratio_reflines(ax)
+        self._draw_ratio_reflines(ax, show_1pct_legend=True)
 
         if self.theory_k is not None:
             for i, run in enumerate(self.pk_runs):
@@ -739,17 +746,17 @@ class ICPlotter:
                     ax.semilogx(k[pos], run["Pk_ss"][pos] / Pt[pos] - 1.0,
                                 '^-', ms=3, lw=1.0, color=color, alpha=0.5)
 
-        # Repeat k_fund / k_Ny reference lines
-        if self.pk_runs:
-            run = self.pk_runs[0]
-            L, n = run["boxsize_mpch"], run["npart_side"] or 256
+        # Repeat k_fund (dotted) / k_Ny (dashed) reference lines per run
+        for i, run in enumerate(self.pk_runs):
+            L = run["boxsize_mpch"]
+            n = run["npart_side"] or 256
             if L:
-                ax.axvline(2 * np.pi / L,    color='C2',   ls=':', lw=1.0)
-                ax.axvline(np.pi * n / L,    color='gray', ls='--', lw=1.0)
+                ax.axvline(2 * np.pi / L, color=f'C{i}', ls=':',  lw=1.0)
+                ax.axvline(np.pi * n / L, color=f'C{i}', ls='--', lw=1.0)
 
         ax.set_xlabel(r'$k$ [$h$ Mpc$^{-1}$]')
         ax.set_ylabel('Measured/Theory - 1', fontsize='medium')
-        ax.set_ylim(-0.22, 0.22)
+        ax.set_ylim(-0.16, 0.16)
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
 
@@ -786,7 +793,7 @@ class ICPlotter:
 
         ax.set_xlabel(r'$r$ [Mpc/$h$]')
         ax.set_ylabel('Measured/Theory - 1', fontsize='medium')
-        ax.set_ylim(-0.22, 0.22)
+        ax.set_ylim(-0.16, 0.16)
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda v, _: f'{v:+.0%}'))
 
