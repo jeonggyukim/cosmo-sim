@@ -13,11 +13,13 @@ Submodules:
 - icpipe.io             — HDF5 reading and ASCII pk_* / pv_* writers
 """
 
-from . import binning, io, windows
+from . import binning, io, theory, windows
 from .field import ICField, PowerSpectrumResult
+from .theory import LinearTheory
 
 __version__ = "0.1.0"
 __all__ = [
     "ICField", "PowerSpectrumResult",
-    "binning", "io", "windows",
+    "LinearTheory",
+    "binning", "io", "theory", "windows",
 ]
