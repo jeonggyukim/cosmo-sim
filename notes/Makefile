@@ -1,4 +1,4 @@
-NOTES  = ic_sampling cosmo_ic fft
+NOTES  = ic_sampling cosmo_ic fft restriction_lpt
 PYTHON = conda run -n cosmo python
 
 # Absolute path to this Makefile's directory — pdflatex is always run from here
@@ -16,7 +16,12 @@ TIDY = rm -f *.aux *.log *.blg *.out *.toc
 
 FIGURES = figures/box_window.pdf figures/tophat_window.pdf figures/pgrid_comparison.pdf \
           figures/pancake.pdf figures/growth.pdf figures/dft_pairs.pdf figures/cft_pairs.pdf \
-          figures/aliasing.pdf
+          figures/aliasing.pdf \
+          figures/restriction_density.pdf figures/restriction_psi.pdf \
+          figures/restriction_deformation.pdf figures/restriction_phi.pdf \
+          figures/restriction_cdm.pdf figures/window_compare.pdf \
+          figures/alias_diagram.pdf figures/zoom_ic_comparison.pdf \
+          figures/zoom_ic_pk_full.pdf
 
 all : figures notes
 
@@ -66,6 +71,33 @@ figures/cft_pairs.pdf : figures/plot_cft_pairs.py
 
 figures/aliasing.pdf : figures/plot_aliasing.py
 	cd figures && $(PYTHON) plot_aliasing.py
+
+figures/restriction_density.pdf : figures/plot_restriction_density.py
+	cd figures && $(PYTHON) plot_restriction_density.py
+
+figures/restriction_psi.pdf : figures/plot_restriction_psi.py
+	cd figures && $(PYTHON) plot_restriction_psi.py
+
+figures/restriction_deformation.pdf : figures/plot_restriction_deformation.py
+	cd figures && $(PYTHON) plot_restriction_deformation.py
+
+figures/restriction_phi.pdf : figures/plot_restriction_phi.py
+	cd figures && $(PYTHON) plot_restriction_phi.py
+
+figures/restriction_cdm.pdf : figures/plot_restriction_cdm.py ../data/class_pk_z200_pk.dat
+	cd figures && $(PYTHON) plot_restriction_cdm.py
+
+figures/window_compare.pdf : figures/plot_window_compare.py
+	cd figures && $(PYTHON) plot_window_compare.py
+
+figures/alias_diagram.pdf : figures/plot_alias_diagram.py
+	cd figures && $(PYTHON) plot_alias_diagram.py
+
+figures/zoom_ic_comparison.pdf : figures/plot_zoom_ic_comparison.py
+	cd figures && $(PYTHON) plot_zoom_ic_comparison.py
+
+figures/zoom_ic_pk_full.pdf : figures/plot_zoom_ic_pk_full.py
+	cd figures && $(PYTHON) plot_zoom_ic_pk_full.py
 
 # --- LaTeX ---
 notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
