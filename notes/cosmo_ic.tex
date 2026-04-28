@@ -12,6 +12,8 @@
 \usetikzlibrary{arrows.meta,positioning,calc,decorations.pathreplacing}
 \usepackage{tcolorbox}
 \usepackage{booktabs}
+\usepackage{lineno}
+\linenumbers
 \tcbuselibrary{breakable,skins}
 \bibliographystyle{aasjournal}
 
@@ -65,7 +67,7 @@ At first order this yields the \emph{Zel'dovich approximation} (ZA;
 used for IC codes at high redshift.  Second-order LPT (2LPT;
 \citealt{Buchert1993,Bouchet1995,Crocce2006}) adds a correction that
 accounts for mode coupling and reduces transient artefacts caused by
-initialising simulations at finite redshift.  Third-order and
+initializing simulations at finite redshift.  Third-order and
 arbitrary-order schemes have since been developed
 \citep{Michaux2020,RampfHahn2021} and are available in modern
 IC generators.  \textsc{music2}
@@ -95,12 +97,440 @@ therefore be read as the $c_s \to 0$ limit of the full two-fluid
 treatment, which is restored in Section~\ref{sec:baryons_cdm}.
 
 %----------------------------------------------------------------------
+\section{Notation}
+\label{sec:notation}
+
+A reference table of the symbols used throughout. Entries are grouped
+by topic; cross-references point to the section where each is
+introduced or used most centrally.
+
+\begin{tcolorbox}[
+  title={Notation summary},
+  colback=blue!4, colframe=blue!50!black, coltitle=white, fonttitle=\bfseries,
+  breakable, before skip=0.6em, after skip=0.6em
+]
+
+\paragraph{Coordinates and motion.}
+\begin{tabular}{l p{0.78\textwidth}}
+$\bq$           & Lagrangian (initial-time) comoving position of a fluid element \\
+$\bx$           & Eulerian (current-time) comoving position; $\bx=\bq+\bPsi$ \\
+$a(t)$, $z$     & cosmological scale factor; redshift $z = 1/a - 1$ \\
+$H(t)$          & Hubble rate, $H = \dot a/a$ \\
+$\calH(\eta)$   & conformal Hubble rate, $\calH = a'/a = aH$ (prime $= d/d\eta$) \\
+$\bv_{\rm pec}$ & peculiar velocity (deviation from Hubble flow), $\bv = a\dot{\bx}$
+\end{tabular}
+
+\paragraph{Density and gravitational potential.}
+\begin{tabular}{l p{0.78\textwidth}}
+$\rho$, $\bar\rho$ & total matter density and its background (mean) value \\
+$\delta$           & density contrast, $\delta \equiv \rho/\bar\rho - 1$ \\
+$\delta_{\rm lin}$ & linear-theory density contrast at a reference epoch \\
+$\Phi$             & Newtonian gravitational potential, $\nabla^2\Phi = 4\pi G\bar\rho a^2\delta$
+\end{tabular}
+
+\paragraph{Lagrangian perturbation theory (\S\ref{sec:lpt}).}
+\begin{tabular}{l p{0.78\textwidth}}
+$\bPsi$, $\bPsi^{(1)}$, $\bPsi^{(2)}$ & total, first-, and second-order displacements \\
+$\phi^{(1)}$, $\phi^{(2)}$            & first-, second-order displacement (Lagrangian) potentials, $\bPsi^{(n)} = -\nabla_\bq\phi^{(n)}$ \\
+$\Dp(t)$                              & linear (first-order) growth factor, $\delta\propto\Dp$ \\
+$\Dpp(t)$                             & second-order growth factor; $\Dpp\approx -\tfrac{3}{7}\Dp^2$ in matter domination \\
+$f(z)$                                & linear growth rate, $f \equiv d\ln\Dp/d\ln a$ \\
+$J_{ij}$                              & deformation Jacobian, $J_{ij} = \partial x_i/\partial q_j$ \\
+$S^{(2)}$                             & 2LPT source $\propto$ off-diagonal invariants of $\partial_i\Psi^{(1)}_j$
+\end{tabular}
+
+\paragraph{Cosmological parameters.}
+\begin{tabular}{l p{0.78\textwidth}}
+$\Omm$, $\Omega_\Lambda$, $\Omega_b$ & matter, dark-energy, baryon density parameters today \\
+$h$                                   & dimensionless Hubble parameter, $H_0 = 100h\,\mathrm{km}\,\mathrm{s}^{-1}\,\mathrm{Mpc}^{-1}$ \\
+$n_s$                                 & primordial scalar spectral tilt (typically $\approx 0.965$) \\
+$\sigma_8$                            & rms density variance in 8\,$h^{-1}$Mpc spheres
+\end{tabular}
+
+\paragraph{Spectra and grids.}
+\begin{tabular}{l p{0.78\textwidth}}
+$P(k)$, $P_{\rm lin}(k)$ & 3D matter power spectrum (and its linear-theory value) \\
+$T(k)$                    & matter transfer function, $\delta(k)\propto T(k)\delta_{\rm primordial}(k)$ \\
+$\xi(r)$                  & two-point correlation function (Fourier conjugate of $P(k)$) \\
+$L$                       & comoving box size of the simulation \\
+$N$                       & particle/grid count per side \\
+$k_{\rm Ny}=\pi N/L$      & Nyquist wavenumber (highest mode resolved on an $N^3$ grid) \\
+$k_{\rm fund}=2\pi/L$     & fundamental wavenumber (longest mode that fits in the box)
+\end{tabular}
+
+\paragraph{Length-unit conventions.}
+``$h^{-1}\,\mathrm{Mpc}$'' is the standard cosmology distance unit:
+expressing lengths in $h^{-1}\,\mathrm{Mpc}$ absorbs the uncertainty in
+$h$ so that observationally derived distances do not depend on its
+exact value. Conversions: $1\,\mathrm{Mpc} = 3.086\times 10^{24}\,\mathrm{cm}$;
+the present-day Hubble length is $c/H_0 \approx 2998\,h^{-1}\,\mathrm{Mpc}$.
+
+\end{tcolorbox}
+
+%----------------------------------------------------------------------
+\section{Preliminaries}
+\label{sec:preliminaries}
+
+This section collects background results from FLRW cosmology that the
+rest of the note draws on.  Further basic material can be added here
+as needed.
+
+\subsection{Derivation from Einstein's equations}
+\label{sec:friedmann_derivation}
+
+We derive the Friedmann equations from the Einstein field equations
+under the assumption of spatial homogeneity and isotropy.  We set
+$c=1$ for the calculation and restore factors of $c$ at the end.
+
+\paragraph{FLRW metric.}
+Homogeneity and isotropy of 3-space fix the metric up to a scale
+factor $a(t)$ and a spatial curvature constant $K$:
+%
+\begin{equation}
+  ds^2 = -dt^2
+        + a(t)^2\!\left[\frac{dr^2}{1-Kr^2}
+                      + r^2(d\theta^2 + \sin^2\!\theta\,d\phi^2)\right].
+  \label{eq:flrw_metric}
+\end{equation}
+%
+Following standard cosmology practice we normalize $a(t_0) \equiv 1$
+at the present epoch, so $a(t)$ is dimensionless, the comoving radial
+coordinate $r$ carries units of length (typically Mpc or Mpc/$h$),
+and $K$ has units of inverse length squared.  The physical curvature
+of a $t=\mathrm{const}$ hypersurface is $K/a(t)^2$ (derived in
+Appendix~\ref{app:diffgeo}), so any nonzero curvature dilutes with
+expansion.  The sign of $K$ determines the
+3-geometry:
+\begin{itemize}
+  \item $K > 0$: closed (3-sphere) --- finite volume, curvature
+    radius $R_{\rm curv} = 1/\sqrt{K}$.
+  \item $K = 0$: flat (Euclidean) --- infinite volume.
+  \item $K < 0$: open (3-hyperboloid) --- infinite volume, curvature
+    radius $R_{\rm curv} = 1/\sqrt{|K|}$.
+\end{itemize}
+Observationally one works with the dimensionless curvature density
+parameter
+%
+\begin{equation}
+  \Omega_k \equiv -\frac{Kc^2}{H_0^2}.
+\end{equation}
+%
+Watch the minus sign: $\Omega_k > 0$ means $K < 0$ (\emph{open}), and
+$\Omega_k < 0$ means $K > 0$ (closed).  To see why, use the Friedmann
+closure sum $1 = \Omm^0 + \Omega_r^0 + \Omega_\Lambda + \Omega_k^0$
+[Eq.~(\ref{eq:friedmann_omega}) below, obtained by evaluating the
+Friedmann equation at $t=t_0$ and dividing by $H_0^2$]: $\Omega_k$ is just the amount needed to make the
+densities add up to one.  If the matter, radiation, and $\Lambda$
+contributions already sum to less than one, gravity is too weak to
+curve space into a closed shape, so the universe is open and
+$\Omega_k > 0$ fills the gap.  If they sum to more than one, gravity
+is strong enough to close the universe up, and $\Omega_k < 0$
+subtracts the excess.  Planck 2018 gives $\Omega_k = 0.001\pm 0.002$,
+i.e.\ a curvature radius many times the Hubble scale; we treat the
+background as spatially flat throughout and retain $K$ only to keep
+the derivations general.  We write $g_{00}=-1$ and factor the spatial part of the metric as
+%
+\begin{equation}
+  g_{ij}(x,t) = a(t)^2\,\gamma_{ij}(x),
+\end{equation}
+%
+where $\gamma_{ij}(x)$ is the \emph{time-independent (comoving)
+3-metric of a space of constant curvature} $K$:
+%
+\begin{equation}
+  \gamma_{ij}\,dx^i dx^j
+  = \frac{dr^2}{1-Kr^2} + r^2\bigl(d\theta^2 + \sin^2\!\theta\,d\phi^2\bigr),
+  \label{eq:gamma_metric}
+\end{equation}
+%
+i.e.\ $\gamma_{ij}$ is diagonal with components
+$\gamma_{rr}=1/(1-Kr^2)$, $\gamma_{\theta\theta}=r^2$,
+$\gamma_{\phi\phi}=r^2\sin^2\!\theta$.  Two points about this split:
+\begin{itemize}
+  \item The time dependence of the full spatial geometry is carried
+    entirely by $a(t)$; $\gamma_{ij}$ depends only on the comoving
+    spatial coordinates.  The physical curvature of the $t=\mathrm{const}$
+    slice is $K/a(t)^2$: $\gamma_{ij}$ has curvature $K$, and
+    rescaling distances by $a(t)$ rescales curvatures by $1/a^2$.
+  \item Every geometric quantity that involves only spatial
+    derivatives (spatial Christoffel symbols of $\gamma$, spatial
+    Ricci tensor, etc.) can be computed once from $\gamma_{ij}$ and
+    reused at all times --- only factors of $a(t)$ need tracking.
+\end{itemize}
+%
+For $K>0$ the $r$-coordinate system is valid only for $r<1/\sqrt{K}$
+(it covers one hemisphere of the 3-sphere; $r=1/\sqrt{K}$ is a
+coordinate singularity analogous to the equator in the
+cylindrical-radius coordinate on a 2-sphere, see
+Appendix~\ref{app:diffgeo}).  To cover the whole 3-sphere one switches coordinates
+to $\chi$ via $r = \sin(\sqrt{K}\chi)/\sqrt{K}$ with
+$\chi\in[0,\pi/\sqrt{K}]$, giving $dr = \cos(\sqrt{K}\chi)\,d\chi$
+and hence $dr^2/(1-Kr^2) = d\chi^2$ --- regular everywhere.  For $K\le 0$ the
+factor $1-Kr^2\ge 1$ and no such restriction arises.
+
+\paragraph{Connection and curvature.}
+The only nonzero Christoffel symbols mixing time and space are
+%
+\begin{equation}
+  \Gamma^0_{ij} = a\dot a\,\gamma_{ij},
+  \qquad
+  \Gamma^i_{0j} = \frac{\dot a}{a}\,\delta^i{}_j,
+\end{equation}
+%
+with the purely spatial $\Gamma^i_{jk}$ inherited from $\gamma_{ij}$:
+since $g_{ij} = a^2\gamma_{ij}$ and spatial derivatives do not touch
+$a(t)$, the $a^2$ factors cancel in the Christoffel formula and
+%
+\begin{equation}
+  \Gamma^i_{jk} = \tfrac{1}{2}\gamma^{il}
+    \bigl(\partial_j\gamma_{lk} + \partial_k\gamma_{lj}
+          - \partial_l\gamma_{jk}\bigr)
+  \equiv {}^{(3)}\Gamma^i_{jk},
+\end{equation}
+%
+where $(3)$ marks a quantity intrinsic to the 3-dimensional spatial
+geometry (ADM/3+1 convention; see Appendix~\ref{app:diffgeo}).  So
+the spatial Christoffels depend only on the coordinate choice for
+$\gamma_{ij}$, not on $a(t)$.  Two chart choices are natural:
+
+\emph{Cartesian comoving ($K=0$).}  With $\gamma_{ij} = \delta_{ij}$
+constant, every spatial derivative in the Christoffel formula
+vanishes and $\Gamma^i_{jk} = 0$ identically.  Only the time-mixing
+$\Gamma^0_{ij} = a\dot a\,\delta_{ij}$ and $\Gamma^i_{0j} = H\,\delta^i_j$
+remain.  This is why cosmological perturbation theory is almost
+always set up in Cartesian comoving coordinates: the only piece of
+geometry to track is $a(t)$ and its derivatives.
+
+\emph{Spherical $(r,\theta,\phi)$, general $K$.}  The nonzero
+components are
+%
+\begin{equation}
+  \begin{aligned}
+    &\Gamma^r_{rr} = \frac{Kr}{1-Kr^2},\qquad
+    \Gamma^r_{\theta\theta} = -r(1-Kr^2),\qquad
+    \Gamma^r_{\phi\phi} = -r(1-Kr^2)\sin^2\theta,\\[2pt]
+    &\Gamma^\theta_{r\theta} = \frac{1}{r},\qquad
+    \Gamma^\theta_{\phi\phi} = -\sin\theta\cos\theta,\qquad
+    \Gamma^\phi_{r\phi} = \frac{1}{r},\qquad
+    \Gamma^\phi_{\theta\phi} = \cot\theta,
+  \end{aligned}
+  \label{eq:christoffel_spatial}
+\end{equation}
+%
+plus the symmetric permutations $\Gamma^a_{bc} = \Gamma^a_{cb}$.  In
+the flat limit $K\to 0$ these reduce to the standard Christoffels of
+Euclidean 3-space in spherical coordinates.
+
+\paragraph{Ricci tensor and scalar.}
+The Ricci tensor is defined by
+%
+\begin{equation}
+  R_{\mu\nu}
+  = \partial_\rho\Gamma^\rho_{\mu\nu}
+    - \partial_\nu\Gamma^\rho_{\mu\rho}
+    + \Gamma^\rho_{\rho\sigma}\Gamma^\sigma_{\mu\nu}
+    - \Gamma^\rho_{\nu\sigma}\Gamma^\sigma_{\mu\rho},
+  \label{eq:ricci_def}
+\end{equation}
+%
+and direct computation on Eq.~(\ref{eq:flrw_metric}) gives
+%
+\begin{equation}
+  R_{00} = -3\,\frac{\ddot a}{a},
+  \qquad
+  R_{ij} = \bigl(a\ddot a + 2\dot a^2 + 2K\bigr)\gamma_{ij},
+  \label{eq:ricci_components}
+\end{equation}
+%
+and the Ricci scalar $R = g^{\mu\nu}R_{\mu\nu}$ is
+%
+\begin{equation}
+  R = 6\!\left[\frac{\ddot a}{a}
+            + \left(\frac{\dot a}{a}\right)^{\!2}
+            + \frac{K}{a^2}\right].
+\end{equation}
+%
+$R_{\mu\nu}$ is a coordinate-independent object; only its component
+expressions change with the chart.  In particular, in Cartesian
+coordinates with $K=0$, Eq.~(\ref{eq:ricci_components}) reduces to
+$R_{ij} = (a\ddot a + 2\dot a^2)\,\delta_{ij}$, and the Ricci scalar
+is the same in both charts.
+
+\paragraph{Stress--energy.}
+For a perfect fluid at rest in comoving coordinates
+($u^\mu = (1,\mathbf{0})$), the stress--energy tensor takes the
+diagonal form
+%
+\begin{equation}
+  T^\mu{}_\nu = \mathrm{diag}(-\rho,\,p,\,p,\,p),
+  \label{eq:stress_energy}
+\end{equation}
+%
+so that $T_{00} = \rho$ and $T_{ij} = p\,a^2\gamma_{ij}$.
+
+\paragraph{What the tensors mean.}
+Before writing down the field equations it helps to recall what each
+object represents physically.  The \emph{metric} $g_{\mu\nu}$ encodes
+lengths, times, and causal structure --- it is the gravitational
+field itself in GR, with its components playing the role of
+potentials.  The \emph{Ricci tensor} $R_{\mu\nu}$ measures how the
+volume of a small ball of freely-falling test particles changes
+along the flow: positive $R_{\mu\nu}u^\mu u^\nu$ (for a timelike
+$u^\mu$) means the ball is focused inward by nearby matter, so
+$R_{\mu\nu}$ captures the ``trace'' (volume-changing) part of tidal
+gravity.  The \emph{Ricci scalar} $R = g^{\mu\nu}R_{\mu\nu}$ is its
+single scalar invariant, a coordinate-free measure of local
+curvature.  The \emph{Einstein tensor} $G_{\mu\nu}$, defined below
+(Eq.~\ref{eq:einstein_tensor}), is the unique combination of
+$R_{\mu\nu}$, $R$, and $g_{\mu\nu}$ that is symmetric, built from
+$g_{\mu\nu}$ and its first two derivatives, and automatically
+divergence-free ($\nabla_\mu G^{\mu\nu}=0$ by the contracted Bianchi
+identity) --- which is what makes it the correct geometric object
+to equate to a conserved source.  The \emph{stress--energy tensor} $T_{\mu\nu}$
+collects the energy density ($T_{00}$), energy flux/momentum density
+($T_{0i}$), and momentum flux/stresses including pressure
+($T_{ij}$) of all matter and radiation.  Its conservation
+$\nabla_\mu T^{\mu\nu}=0$ is a consequence of local
+energy--momentum balance.
+
+\paragraph{Einstein equations.}
+The Einstein tensor is defined by
+%
+\begin{equation}
+  G_{\mu\nu} \equiv R_{\mu\nu} - \tfrac{1}{2}R\,g_{\mu\nu},
+  \label{eq:einstein_tensor}
+\end{equation}
+%
+and satisfies the contracted Bianchi identity
+$\nabla_\mu G^{\mu\nu}=0$ identically.  The field equations read
+%
+\begin{equation}
+  G_{\mu\nu} + \Lambda g_{\mu\nu} = 8\pi G\,T_{\mu\nu},
+  \label{eq:einstein_eq}
+\end{equation}
+%
+so geometry (left) is sourced by energy and momentum (right), with
+the cosmological constant $\Lambda$ a term allowed by the same
+symmetry and divergence-free requirements as $G_{\mu\nu}$.
+Evaluated on Eq.~(\ref{eq:flrw_metric}) they split into two
+independent components.
+
+\emph{00 component.}  Using $g_{00}=-1$ and $T_{00}=\rho$,
+%
+\begin{equation}
+  -3\frac{\ddot a}{a}
+  + 3\!\left[\frac{\ddot a}{a}
+            + \left(\frac{\dot a}{a}\right)^{\!2}
+            + \frac{K}{a^2}\right]
+  - \Lambda
+  = 8\pi G\rho.
+\end{equation}
+%
+The $\ddot a/a$ terms cancel, leaving the \emph{first Friedmann
+equation},
+%
+\begin{equation}
+  \left(\frac{\dot a}{a}\right)^{\!2}
+  = \frac{8\pi G}{3}\rho - \frac{K}{a^2} + \frac{\Lambda}{3}.
+  \label{eq:friedmann1_natural}
+\end{equation}
+
+\emph{ii component.}  Inserting $g_{ij}=a^2\gamma_{ij}$,
+$T_{ij}=pa^2\gamma_{ij}$ and dividing through by $a^2\gamma_{ij}$
+yields, after substituting the expression for $R$ and simplifying,
+the \emph{second Friedmann equation},
+%
+\begin{equation}
+  \frac{\ddot a}{a}
+  = -\frac{4\pi G}{3}(\rho + 3p) + \frac{\Lambda}{3}.
+  \label{eq:friedmann2_natural}
+\end{equation}
+
+\paragraph{Continuity from the Bianchi identity.}
+The contracted Bianchi identity $\nabla_\mu G^{\mu\nu}=0$ and
+metric compatibility together imply $\nabla_\mu T^{\mu\nu}=0$.  The
+$\nu=0$ component in FLRW reads $\dot\rho + 3H(\rho + p) = 0$,
+which is not independent of
+Eqs.~(\ref{eq:friedmann1_natural})--(\ref{eq:friedmann2_natural}):
+it is what makes them mutually consistent.
+
+\subsection{The Friedmann equations}
+\label{sec:friedmann}
+
+Restoring factors of $c$ in
+Eqs.~(\ref{eq:friedmann1_natural})--(\ref{eq:friedmann2_natural})
+via $K\to Kc^2$, $\Lambda\to\Lambda c^2$, and $p\to p/c^2$, we
+record the two Friedmann equations in their usual form.  The first
+(constraint) sets the expansion rate from the energy budget,
+%
+\begin{equation}
+  H^2 \equiv \left(\frac{\dot a}{a}\right)^{\!2}
+  = \frac{8\pi G}{3}\rho - \frac{Kc^2}{a^2} + \frac{\Lambda c^2}{3},
+  \label{eq:friedmann1}
+\end{equation}
+%
+while the second (dynamical) sets the acceleration,
+%
+\begin{equation}
+  \frac{\ddot a}{a}
+  = -\frac{4\pi G}{3}\!\left(\rho + \frac{3p}{c^2}\right)
+    + \frac{\Lambda c^2}{3}.
+  \label{eq:friedmann2}
+\end{equation}
+%
+Pressure gravitates via the $3p/c^2$ term: positive pressure
+decelerates expansion, negative pressure (as for $\Lambda$, with
+$p=-\rho c^2$) accelerates it.  Continuity reads
+$\dot\rho + 3H(\rho + p/c^2) = 0$, from which the three canonical
+fluids scale as $\rho\propto a^{-3}$ (pressureless matter, $p=0$),
+$\rho\propto a^{-4}$ (radiation, $p=\rho c^2/3$), and
+$\rho=\text{const}$ ($\Lambda$, $p=-\rho c^2$).
+
+Dividing Eq.~(\ref{eq:friedmann1}) by $H_0^2$ and defining the
+density parameters $\Omega_i \equiv \rho_i/\rho_{\rm crit}$ with
+$\rho_{\rm crit} \equiv 3H_0^2/(8\pi G)$ gives the closure-form
+%
+\begin{equation}
+  \frac{H^2}{H_0^2}
+  = \Omm^0\,a^{-3} + \Omega_r^0\,a^{-4}
+    + \Omega_\Lambda + \Omega_k^0\,a^{-2},
+  \qquad
+  \Omm^0+\Omega_r^0+\Omega_\Lambda+\Omega_k^0 = 1.
+  \label{eq:friedmann_omega}
+\end{equation}
+%
+The matter density parameter evaluated at scale factor $a$ is given
+by Eq.~(\ref{eq:Omm_a}) below.
+
+\paragraph{Remarks and identities used below.}
+The $00$ component is a pure constraint (no $\ddot a$); the $ii$
+component is dynamical.  This mirrors the Hamiltonian constraint and
+evolution equations of the ADM $3+1$ split of GR.  A Newtonian
+heuristic --- $\tfrac{1}{2}\dot R^2 = GM/R + E$ with
+$M=\tfrac{4}{3}\pi R^3\rho$ and $R=ar$ --- reproduces
+Eq.~(\ref{eq:friedmann1}) with the curvature term playing the role
+of total energy and $\Lambda$ added by hand, but misses that
+pressure gravitates; Eq.~(\ref{eq:friedmann2}) is a genuinely
+relativistic result.
+
+Two identities derived above are used repeatedly in later sections.
+Restricted to the matter piece, Eq.~(\ref{eq:friedmann1}) gives
+%
+\begin{equation}
+  4\pi G\rho_0 = \tfrac{3}{2}H^2\Omm(a),
+  \label{eq:friedmann_id_poisson}
+\end{equation}
+%
+which converts $\nabla^2\Phi = 4\pi G\rho_0 a^2\delta$ into its
+$\Omm$-form (Eq.~\ref{eq:poisson_lin} below).
+
+%----------------------------------------------------------------------
 \section{Fluid Equations in an Expanding Universe}
 \label{sec:fluid}
 
 Before deriving the LPT displacement fields it is useful to record the
 governing fluid equations in a $\Lambda$CDM background and their
-linearised forms.
+linearized forms.
 
 \subsection{Continuity, Euler, and Poisson equations}
 
@@ -117,47 +547,357 @@ self-gravitating pressureless fluid are
   \label{eq:poisson_proper}
 \end{align}
 %
-where $d/dt = \partial/\partial t + \bv\cdot\nabla_r$ is the
+where $\bv = d\br/dt$ is the proper-frame fluid velocity,
+$d/dt = \partial/\partial t + \bv\cdot\nabla_r$ is the
 convective derivative, $\psi$ is the Newtonian gravitational potential,
 and $\nabla_r$ denotes the gradient in proper coordinates.
 
-Switching to comoving coordinates $\bx = \mathbf{r}/a$ and splitting
-each field into a homogeneous background plus a small perturbation,
-$\bv = \bv_0 + \delta\bv$,
-$\rho = \rho_0 + \delta\rho$,
-$\psi = \psi_0 + \Phi$,
-with Hubble flow $\bv_0 = H\mathbf{r}$ and $\Phi \equiv \delta\psi$
-the perturbed gravitational potential, the linearised equations become
+To obtain the equations governing inhomogeneities we carry out three
+operations in sequence: (i) a change of variables from proper to
+comoving coordinates, $\br \to \bx = \br/a$, which exposes the Hubble
+flow as a background motion rather than dynamics; (ii) a
+background-plus-perturbation split of each field, so the homogeneous
+solution can be subtracted; and (iii) linearization, dropping terms
+quadratic or higher in perturbation amplitude.  Steps (i) and (ii)
+are carried out \emph{exactly} below, producing the fully nonlinear
+fluid equations in comoving form; only at the end, in step (iii), do
+we linearize.
+
+\emph{Change of variables.}  A fluid element at comoving position
+$\bx$ sits at proper position $\br = a(t)\bx$, and its proper-frame
+velocity is therefore
+%
+\begin{equation}
+  \bv \equiv \frac{d\br}{dt}
+         = \dot a\,\bx + a\dot\bx
+         = H\br + a\dot\bx,
+  \label{eq:v_decomp}
+\end{equation}
+%
+where we have used $\dot a/a = H$ in the first term.  This expression
+isolates two physically distinct pieces: the \emph{Hubble flow}
+%
+\begin{equation}
+  \bv_0 \equiv H\br,
+\end{equation}
+%
+which represents the uniform expansion carrying a comoving fluid
+element away from the origin even when nothing else is going on, and
+the \emph{peculiar velocity}
+%
+\begin{equation}
+  \bv_{\rm pec} \equiv a\dot\bx,
+  \label{eq:peculiar_v_def}
+\end{equation}
+%
+which measures motion \emph{relative} to the comoving grid.  The
+factor of $a$ in Eq.~(\ref{eq:peculiar_v_def}) converts the
+comoving-coordinate velocity $\dot\bx$ into a proper (physical)
+velocity.  Note that Eqs.~(\ref{eq:v_decomp})--(\ref{eq:peculiar_v_def})
+are definitions; no smallness assumption on $\bv_{\rm pec}$ has been made.
+
+Two coordinate identities are needed throughout the derivation, and
+both are exact.  First, spatial gradients.  Any scalar field obeys
+$\br = a\bx \Rightarrow \partial r_i/\partial x_j = a\,\delta_{ij}$,
+so by the chain rule at fixed $t$,
+%
+\begin{equation}
+  \nabla_r = a^{-1}\nabla_x,
+  \qquad
+  \nabla_r^2 = a^{-2}\nabla_x^2.
+  \label{eq:grad_identity}
+\end{equation}
+%
+Second, the partial time derivative.  A time derivative at fixed
+proper position $\br$ is \emph{not} the same as one at fixed comoving
+position $\bx$, because $\bx = \br/a$ drifts as $a(t)$ changes.
+For any field $f$, applying the chain rule gives
+%
+\begin{equation}
+  \left.\frac{\partial f}{\partial t}\right|_\br
+  = \left.\frac{\partial f}{\partial t}\right|_\bx
+    + \left.\frac{\partial\bx}{\partial t}\right|_\br
+      \!\cdot\nabla_x f,
+\end{equation}
+%
+and $(\partial\bx/\partial t)|_\br = (\partial/\partial t)(\br/a)
+= -(\dot a/a^2)\br = -H\bx$, so
+%
+\begin{equation}
+  \left.\frac{\partial}{\partial t}\right|_\br
+  = \left.\frac{\partial}{\partial t}\right|_\bx
+    - H\bx\cdot\nabla_x.
+  \label{eq:dtdr_vs_dtdx}
+\end{equation}
+%
+The minus sign simply encodes that holding $\br$ fixed while $a$
+grows means $\bx$ shrinks at rate $-H\bx$.
+
+These two identities let us rewrite the \emph{convective derivative}
+$d/dt = \partial/\partial t|_\br + \bv\cdot\nabla_r$ in comoving form.
+Using Eqs.~(\ref{eq:v_decomp}), (\ref{eq:grad_identity}),
+(\ref{eq:dtdr_vs_dtdx}),
+%
+\begin{equation}
+  \bv\cdot\nabla_r
+  = (H\br + \bv_{\rm pec})\cdot a^{-1}\nabla_x
+  = (H\bx + \bv_{\rm pec}/a)\cdot\nabla_x,
+\end{equation}
+%
+and the $H\bx\cdot\nabla_x$ piece cancels against the same term with
+opposite sign in Eq.~(\ref{eq:dtdr_vs_dtdx}), leaving
+%
+\begin{equation}
+  \frac{d}{dt}
+  = \left.\frac{\partial}{\partial t}\right|_\bx
+    + \frac{\bv_{\rm pec}}{a}\cdot\nabla_x.
+  \label{eq:ddt_comoving}
+\end{equation}
+%
+Eq.~(\ref{eq:ddt_comoving}) is exact --- it is just the chain-rule
+rewriting of $d/dt$ in comoving $(\bx, t)$ coordinates.  From now on an unadorned
+dot denotes $\partial_t|_\bx$.
+
+\emph{Background-plus-perturbation split.}  We write each field as a
+homogeneous background (depending on $t$ but not $\bx$) plus a general
+inhomogeneous piece, \emph{without} assuming smallness:
+%
+\begin{equation}
+  \rho = \rho_0(t)\,[1+\delta(\bx,t)],
+  \qquad
+  \psi = \psi_0(\br,t) + \Phi(\bx,t),
+  \qquad
+  \bv = H\br + \bv_{\rm pec}(\bx,t),
+  \label{eq:bg_plus_pert}
+\end{equation}
+%
+where $\delta \equiv \delta\rho/\rho_0$ is the density contrast and
+$\Phi$ is the (peculiar) gravitational potential.  The background
+density evolves by mass conservation alone, $\rho_0(t) \propto
+a^{-3}$, which is equivalent to $\dot\rho_0 + 3H\rho_0 = 0$.  The
+background potential is the homogeneous sphere solution
+$\psi_0 = \tfrac{2\pi G}{3}\rho_0 r^2$, whose gradient
+$-\nabla_r\psi_0 = -\tfrac{4\pi G}{3}\rho_0\br$ drives the background
+deceleration of the Hubble flow.  (Consistency: the background piece
+of Euler requires $(\ddot a/a)\br = -\tfrac{4\pi G}{3}\rho_0\br$,
+i.e.\ the matter-only second Friedmann equation.  This determines
+$\psi_0$ above and is used below to cancel the $\mathcal{O}(1)$
+pieces.)
+
+\emph{Continuity (exact).}  Substitute
+$\rho = \rho_0(1+\delta)$ and $\bv = H\br + \bv_{\rm pec}$ into
+Eq.~(\ref{eq:continuity_proper}) and convert the time derivative to
+one at fixed $\bx$ using Eq.~(\ref{eq:dtdr_vs_dtdx}); since $\rho_0$
+is spatially uniform, $\partial_t|_\br\rho_0 = \dot\rho_0$.  Keeping
+\emph{every} term,
+%
+\begin{equation}
+  \left.\frac{\partial\rho}{\partial t}\right|_\br
+  = \dot\rho_0(1+\delta)
+    + \rho_0\bigl(\dot\delta - H\bx\cdot\nabla_x\delta\bigr).
+  \label{eq:dt_rho_expanded}
+\end{equation}
+%
+For the divergence, use $\nabla_r\cdot\br = 3$, $\nabla_r\rho_0 = 0$,
+and $\br\cdot\nabla_r = \bx\cdot\nabla_x$:
+%
+\begin{align}
+  \nabla_r\!\cdot\!\bigl[\rho_0(1+\delta)(H\br + \bv_{\rm pec})\bigr]
+  &= 3H\rho_0(1+\delta)
+    + \rho_0 H\bx\cdot\nabla_x\delta
+    \notag\\
+  &\quad{}+ \frac{\rho_0}{a}\nabla_x\!\cdot\!\bv_{\rm pec}
+    + \frac{\rho_0}{a}\nabla_x\!\cdot\!(\delta\,\bv_{\rm pec}).
+  \label{eq:div_rho_v_expanded}
+\end{align}
+%
+Summing Eqs.~(\ref{eq:dt_rho_expanded})
+and~(\ref{eq:div_rho_v_expanded}), the background combination
+$\dot\rho_0 + 3H\rho_0 = 0$ eliminates the $\mathcal{O}(1)$ piece
+(and its $\delta$-multiple), and the two $H\bx\cdot\nabla_x\delta$
+terms cancel --- the latter makes explicit that the Hubble transport
+of $\delta$ is already accounted for by switching time derivatives.
+Dividing by $\rho_0$ gives the \emph{exact nonlinear continuity
+equation in comoving coordinates}:
+%
+\begin{equation}
+  \dot\delta + \frac{1}{a}\nabla\!\cdot\!\bigl[(1+\delta)\,\bv_{\rm pec}\bigr] = 0.
+  \label{eq:continuity_nonlin}
+\end{equation}
+
+\emph{Euler (exact).}  The Euler equation~(\ref{eq:euler_proper})
+involves the material derivative $d/dt$, not $\partial_t|_\br$, so we
+work directly with it and use $d\br/dt = \bv$ (the defining property
+of the material derivative --- it follows the fluid element).
+Substituting $\bv = H\br + \bv_{\rm pec}$ on the left,
+%
+\begin{align}
+  \frac{d\bv}{dt}
+  &= \frac{d}{dt}(H\br) + \frac{d\,\bv_{\rm pec}}{dt}
+   = \dot H\br + H\,\frac{d\br}{dt} + \frac{d\,\bv_{\rm pec}}{dt}
+  \notag\\
+  &= \dot H\br + H(H\br + \bv_{\rm pec}) + \frac{d\,\bv_{\rm pec}}{dt}
+   = (\dot H + H^2)\br + H\,\bv_{\rm pec} + \frac{d\,\bv_{\rm pec}}{dt}.
+\end{align}
+%
+The combination $\dot H + H^2$ simplifies to $\ddot a/a$: from
+$H = \dot a/a$, $\dot H = \ddot a/a - H^2$, so $\dot H + H^2 = \ddot
+a/a$.  On the right-hand side, $\psi = \psi_0 + \Phi$ with
+$\psi_0 = \tfrac{2\pi G}{3}\rho_0 r^2$, so
+$\nabla_r\psi_0 = \tfrac{4\pi G}{3}\rho_0\br$ and, using
+Eq.~(\ref{eq:grad_identity}),
+%
+\begin{equation}
+  -\nabla_r\psi
+  = -\frac{4\pi G}{3}\rho_0\,\br - \frac{1}{a}\nabla_x\Phi.
+\end{equation}
+%
+Equating and separating by dependence on $\br$: the $\br$-proportional
+piece is the background relation $(\ddot a/a)\br =
+-\tfrac{4\pi G}{3}\rho_0\br$, already used to fix $\psi_0$ above.
+What remains is the \emph{exact nonlinear Euler equation}
+$d\,\bv_{\rm pec}/dt + H\,\bv_{\rm pec} = -a^{-1}\nabla\Phi$.  Expanding the
+material derivative via Eq.~(\ref{eq:ddt_comoving}),
+%
+\begin{equation}
+  \partial_t\,\bv_{\rm pec}
+  + \frac{1}{a}(\bv_{\rm pec}\cdot\nabla)\,\bv_{\rm pec}
+  + H\,\bv_{\rm pec}
+  = -\frac{1}{a}\nabla\Phi.
+  \label{eq:euler_nonlin}
+\end{equation}
+
+\emph{Poisson (exact, already linear in the field).}  The Poisson
+equation~(\ref{eq:poisson_proper}) is linear in $\rho$ and $\psi$, so
+the split $\rho = \rho_0(1+\delta)$, $\psi = \psi_0 + \Phi$ is exact.
+Checking the background: with $\psi_0 = \tfrac{2\pi G}{3}\rho_0 r^2$,
+$\nabla_r^2(r^2) = \nabla_r\cdot(2\br) = 6$, so
+$\nabla_r^2\psi_0 = 4\pi G\rho_0$, as required.  Subtracting the
+background leaves $\nabla_r^2\Phi = 4\pi G\rho_0\delta$.  Converting
+to comoving derivatives via $\nabla_r^2 = a^{-2}\nabla_x^2$ and using
+the Friedmann identity $4\pi G\rho_0 = \tfrac{3}{2}H^2\Omm(a)$
+[Eq.~(\ref{eq:friedmann_id_poisson})],
+%
+\begin{equation}
+  \nabla^2\Phi
+  = 4\pi G\rho_0\,a^2\,\delta
+  = \tfrac{3}{2}H^2\Omm(a)\,a^2\,\delta.
+  \label{eq:poisson_nonlin}
+\end{equation}
+
+\paragraph{Nonlinear fluid equations in comoving coordinates.}
+Collecting Eqs.~(\ref{eq:continuity_nonlin}), (\ref{eq:euler_nonlin}),
+(\ref{eq:poisson_nonlin}),
 %
 \begin{align}
   \dot\delta
-    &= -\nabla\cdot\delta\bv,
+    + \frac{1}{a}\nabla\!\cdot\!\bigl[(1+\delta)\,\bv_{\rm pec}\bigr]
+    &= 0,
+  \label{eq:continuity_full}\\
+  \partial_t\,\bv_{\rm pec}
+    + \frac{1}{a}(\bv_{\rm pec}\cdot\nabla)\,\bv_{\rm pec}
+    + H\,\bv_{\rm pec}
+    &= -\frac{1}{a}\nabla\Phi,
+  \label{eq:euler_full}\\
+  \nabla^2\Phi
+    &= \tfrac{3}{2}H^2\Omm(a)\,a^2\,\delta,
+  \label{eq:poisson_full}
+\end{align}
+%
+where $\nabla$ denotes the gradient in comoving coordinates and dots
+are derivatives at fixed $\bx$.  These are the starting point of
+Eulerian (SPT) perturbation theory: no smallness assumption has been
+made.  The nonlinear structure is fully encoded in two terms: the
+$\delta\,\bv_{\rm pec}$ piece inside the continuity divergence and the
+$(\bv_{\rm pec}\cdot\nabla)\bv_{\rm pec}$ advection in Euler.  Poisson is
+already linear in the fields.
+
+\paragraph{Linearization.}  Assuming $|\delta|, |\bv_{\rm pec}|,
+|\nabla\Phi|$ are all small and dropping all terms quadratic or
+higher in these quantities reduces
+Eqs.~(\ref{eq:continuity_full})--(\ref{eq:poisson_full}) to
+%
+\begin{align}
+  \dot\delta
+    &= -\frac{1}{a}\nabla\cdot\bv_{\rm pec},
   \label{eq:continuity_lin}\\
-  \frac{d\,\delta\bv}{dt} + H\,\delta\bv
+  \partial_t\,\bv_{\rm pec} + H\,\bv_{\rm pec}
     &= -\frac{1}{a}\nabla\Phi,
   \label{eq:euler_lin}\\
   \nabla^2\Phi
     &= 4\pi G\rho_0\,a^2\,\delta
-     = \tfrac{3}{2}H^2\Omm(a)\,a^2\,\delta,
+     = \tfrac{3}{2}H^2\Omm(a)\,a^2\,\delta.
   \label{eq:poisson_lin}
 \end{align}
 %
-where $\nabla$ now denotes the gradient in comoving coordinates, dots
-are derivatives with respect to cosmic time $t$, and we have used the
-Friedmann equation $4\pi G\rho_0 = \tfrac{3}{2}H^2\Omm(a)$.
+The $H\,\bv_{\rm pec}$ term in Eq.~(\ref{eq:euler_lin}) is the
+\emph{Hubble drag}: in the absence of forcing
+($\nabla\Phi = 0$) it gives $\bv_{\rm pec} \propto 1/a$, so peculiar
+velocities are diluted by the cosmic expansion even with no other
+interaction.  The Poisson equation is unchanged --- already linear in
+the fields.
 
-\subsection{Density contrast and linear growth equation}
+\subsection{Linear growth equation}
 \label{sec:growth}
 
-The density contrast is defined as
+Combining Eqs.~(\ref{eq:continuity_lin})--(\ref{eq:poisson_lin})
+yields a closed second-order ODE for the density contrast
+$\delta \equiv \delta\rho/\rho_0$.  The peculiar velocity and
+potential can be eliminated by differentiating continuity once in
+time, using Euler to replace $\partial_t\,\bv_{\rm pec}$, and then using
+Poisson to replace $\nabla^2\Phi$.  We carry this out explicitly.
+
+\emph{Step 1: time derivative of continuity.}  Taking
+$\partial_t|_\bx$ of Eq.~(\ref{eq:continuity_lin}),
 %
 \begin{equation}
-  \delta(\bx, t) \equiv \frac{\delta\rho(\bx,t)}{\rho_0(t)}.
-  \label{eq:delta_def}
+  \ddot\delta
+  = -\partial_t\!\left(\frac{1}{a}\nabla\cdot\bv_{\rm pec}\right)
+  = \frac{\dot a}{a^2}\nabla\cdot\bv_{\rm pec}
+    - \frac{1}{a}\nabla\cdot\partial_t\,\bv_{\rm pec}
+  = H\cdot\frac{1}{a}\nabla\cdot\bv_{\rm pec}
+    - \frac{1}{a}\nabla\cdot\partial_t\,\bv_{\rm pec}.
 \end{equation}
 %
-Combining Eqs.~(\ref{eq:continuity_lin})--(\ref{eq:poisson_lin}) gives
-the second-order ODE for $\delta$ in a pressureless fluid:
+The first piece is $H$ times the right-hand side of continuity
+itself, which equals $-H\dot\delta$.  Therefore
+%
+\begin{equation}
+  \ddot\delta
+  = -H\dot\delta - \frac{1}{a}\nabla\cdot\partial_t\,\bv_{\rm pec}.
+  \label{eq:growth_intermediate}
+\end{equation}
+
+\emph{Step 2: divergence of Euler.}  Taking $\nabla\cdot$ of
+Eq.~(\ref{eq:euler_lin}) and dividing by $a$,
+%
+\begin{equation}
+  \frac{1}{a}\nabla\cdot\partial_t\,\bv_{\rm pec}
+  + H\cdot\frac{1}{a}\nabla\cdot\bv_{\rm pec}
+  = -\frac{1}{a^2}\nabla^2\Phi.
+\end{equation}
+%
+Using continuity once more to trade $a^{-1}\nabla\cdot\bv_{\rm pec} =
+-\dot\delta$ on the left,
+%
+\begin{equation}
+  \frac{1}{a}\nabla\cdot\partial_t\,\bv_{\rm pec}
+  = H\dot\delta - \frac{1}{a^2}\nabla^2\Phi.
+\end{equation}
+
+\emph{Step 3: substitute into the intermediate result.}  Plugging
+this into Eq.~(\ref{eq:growth_intermediate}) the $H\dot\delta$
+pieces combine,
+%
+\begin{equation}
+  \ddot\delta + 2H\dot\delta
+  = \frac{1}{a^2}\nabla^2\Phi.
+\end{equation}
+
+\emph{Step 4: apply Poisson.}  From Eq.~(\ref{eq:poisson_lin}),
+$a^{-2}\nabla^2\Phi = 4\pi G\rho_0\,\delta
+ = \tfrac{3}{2}H^2\Omm(a)\,\delta$, giving the \emph{linear growth
+equation}
 %
 \begin{equation}
   \ddot{\delta} + 2H\dot{\delta}
@@ -165,8 +905,13 @@ the second-order ODE for $\delta$ in a pressureless fluid:
   \label{eq:growth_eq}
 \end{equation}
 %
+The equation is local in $\bx$ and identical for every Fourier mode
+--- $\delta$ grows in place, with no mode coupling at linear order,
+so any wavenumber $\bk$ evolves as $\delta(\bk,t) = \Dp(t)
+\,\delta(\bk,t_{\rm ref})/\Dp(t_{\rm ref})$.
+%
 The growing solution of Eq.~(\ref{eq:growth_eq}) defines the
-\emph{linear growth factor} $\Dp(a)$, normalised to $\Dp = 1$ at a
+\emph{linear growth factor} $\Dp(a)$, normalized to $\Dp = 1$ at a
 chosen reference epoch:
 %
 \begin{equation}
@@ -208,10 +953,12 @@ It is also convenient to define the \emph{conformal Hubble parameter}
 $\calH(a) \equiv aH(a) = \dot{a}$, so that
 $\dot\Dp = H f \Dp = (\calH/a) f \Dp$.
 
-Figure~\ref{fig:growth} shows $\Dp(z)$ and both growth rates for the
-CV\_22 cosmology ($\Omm = 0.3$, $\Omega_\Lambda = 0.7$).  Note that
-$f \to 1$ and $f^{(2)} \to 2$ in matter domination, while both
-decrease toward zero in the $\Lambda$-dominated regime.
+Figure~\ref{fig:growth} shows $\Dp(z)$ and $f(z)$ for flat
+$\Lambda$CDM with $\Omm = 0.3$, $\Omega_\Lambda = 0.7$: $f \to 1$ in
+matter domination and decreases toward zero as $\Lambda$ comes to
+dominate.  The right panel also shows the \emph{second-order} growth
+rate $f^{(2)}$ (introduced in \S\ref{sec:2lpt_growth}) for reference;
+$f^{(2)} \to 2$ in matter domination.
 
 \begin{figure}[!t]
   \centering
@@ -297,44 +1044,105 @@ matter domination; see \S\ref{sec:2lpt_growth}).
 
 \subsection{Displacement field}
 
-At first order, the displacement is the gradient of a scalar potential
-$\phi^{(1)}$:
+We derive the first-order displacement in four steps: (1) linearize
+the exact mass-conservation equation $1+\delta = |J|^{-1}$ to obtain
+$\delta = -\nabla_\bq\cdot\bPsi^{(1)}$; (2) use the linear-growth
+factorization $\delta = \Dp\,\delta_{\rm lin}$ (from
+\S\ref{sec:growth}) together with the time-separable LPT ansatz
+$\bPsi = \Dp\,\bPsi^{(1)} + \cdots$ to fix the time dependence; (3)
+argue on dynamical grounds that the growing mode of $\bPsi^{(1)}$ is
+irrotational, so $\bPsi^{(1)} = -\nabla_\bq\phi^{(1)}$; and (4)
+combine to obtain a Poisson equation for $\phi^{(1)}$.
+
+\emph{Step 1: linearize mass conservation.}  From
+Eq.~(\ref{eq:jacobian}), $1+\delta = |\det J|^{-1}$ with
+$J_{ij} = \delta_{ij} + \partial\Psi_i/\partial q_j$.  Using the
+identity $\det(\mathbf{I} + \epsilon M) = 1 + \epsilon\,\mathrm{tr}\,M +
+\mathcal{O}(\epsilon^2)$ with $M_{ij}=\partial\Psi_i/\partial q_j$,
+%
+\begin{equation}
+  \det J = 1 + \nabla_\bq\!\cdot\!\bPsi + \mathcal{O}(\bPsi^2),
+  \qquad
+  |\det J|^{-1} = 1 - \nabla_\bq\!\cdot\!\bPsi + \mathcal{O}(\bPsi^2).
+\end{equation}
+%
+At first order (using $\bPsi \approx \bPsi^{(1)}$ to leading order),
+%
+\begin{equation}
+  \delta(\bx) = -\nabla_\bq\!\cdot\!\bPsi^{(1)}(\bq) + \mathcal{O}(\bPsi^2).
+  \label{eq:delta_lin_Psi}
+\end{equation}
+%
+Physically, the divergence of the displacement measures the
+fractional change in volume of a Lagrangian fluid element, and the
+density contrast is its opposite: compression increases $\rho$.
+Also, at linear order $\bq = \bx + \mathcal{O}(\bPsi)$, so
+$\nabla_\bq \simeq \nabla_\bx$; we can evaluate
+Eq.~(\ref{eq:delta_lin_Psi}) at either argument.
+
+\emph{Step 2: fix the time dependence.}  The linear growth equation
+(\ref{eq:growth_eq}) decouples space and time: any solution of the
+linear fluid system has $\delta(\bx,t) = \Dp(t)\,\delta_{\rm lin}(\bx)$,
+where $\delta_{\rm lin}$ is the density contrast at the reference
+epoch where $\Dp = 1$.  Writing the Lagrangian displacement with the
+same time-separable form,
+%
+\begin{equation}
+  \bPsi(\bq,t) = \Dp(t)\,\bPsi^{(1)}(\bq) + \mathcal{O}(\bPsi^2),
+\end{equation}
+%
+and inserting in Eq.~(\ref{eq:delta_lin_Psi}), the two time
+dependencies must match:
+%
+\begin{equation}
+  \Dp(t)\,\delta_{\rm lin}(\bq)
+  = -\Dp(t)\,\nabla_\bq\!\cdot\!\bPsi^{(1)}(\bq)
+  \;\;\Longrightarrow\;\;
+  \nabla_\bq\!\cdot\!\bPsi^{(1)}(\bq) = -\delta_{\rm lin}(\bq).
+  \label{eq:div_psi1}
+\end{equation}
+
+\emph{Step 3: irrotationality.}  The Helmholtz decomposition writes
+$\bPsi^{(1)} = -\nabla_\bq\phi^{(1)} + \bPsi_\perp$ with
+$\nabla_\bq\!\cdot\!\bPsi_\perp = 0$.  The rotational piece
+$\bPsi_\perp$ carries the vorticity of the peculiar velocity.  From
+the linearized Euler equation~(\ref{eq:euler_lin}), taking the curl,
+$\partial_t(\nabla\!\times\!\bv_{\rm pec}) + H(\nabla\!\times\!\bv_{\rm pec})
+= 0$, which integrates to $\nabla\!\times\!\bv_{\rm pec} \propto 1/a$: any
+vorticity present initially decays away with expansion and carries
+no growing mode.  Combined with
+$\bv_{\rm pec} = a\dot\bx = a\dot{\bPsi} = a\dot\Dp\,\bPsi^{(1)}$ (so the
+vorticity of $\bv_{\rm pec}$ is proportional to that of $\bPsi^{(1)}$),
+the growing mode of $\bPsi^{(1)}$ must be curl-free.  We therefore
+set $\bPsi_\perp = 0$ and write
 %
 \begin{equation}
   \bPsi^{(1)}(\bq) = -\nabla_\bq\phi^{(1)}(\bq),
   \label{eq:psi1}
 \end{equation}
 %
-with $\phi^{(1)}$ satisfying the Poisson equation in Lagrangian space:
+introducing the \emph{displacement potential} $\phi^{(1)}$.  The
+minus sign is a convention chosen so that $\nabla_\bq^2\phi^{(1)}$
+has the sign of the density contrast.
+
+\emph{Step 4: Poisson equation for $\phi^{(1)}$.}  Substituting
+Eq.~(\ref{eq:psi1}) into~(\ref{eq:div_psi1}),
+$-\nabla_\bq^2\phi^{(1)} = -\delta_{\rm lin}$, i.e.\
 %
 \begin{equation}
   \nabla_\bq^2\phi^{(1)}(\bq) = \delta_{\rm lin}(\bq),
   \label{eq:poisson1}
 \end{equation}
 %
-where $\delta_{\rm lin}$ is the linear density contrast at the
-reference epoch at which $\Dp = 1$.
-To see where Eq.~(\ref{eq:poisson1}) comes from, linearise the exact
-mass-conservation condition $1+\delta = |J|^{-1}$
-(Eq.~\ref{eq:jacobian}).
-At first order, $J_{ij}=\delta_{ij}+\partial\Psi^{(1)}_i/\partial q_j$
-and $\det J\approx 1+\nabla_\bq\cdot\bPsi^{(1)}$, so
-%
-\begin{equation*}
-  \delta \;\approx\; -\nabla_\bq\cdot\bPsi^{(1)}.
-\end{equation*}
-%
-Substituting the potential ansatz $\bPsi^{(1)}=-\nabla_\bq\phi^{(1)}$
-gives $\delta=\nabla_\bq^2\phi^{(1)}$, which is
-Eq.~(\ref{eq:poisson1}). Physically, the displacement divergence
-$\nabla\cdot\bPsi$ measures the fractional change in volume of a
-Lagrangian fluid element, hence the local density contrast.
+formally identical to a Newtonian Poisson equation, but in
+\emph{Lagrangian} space and with source $\delta_{\rm lin}$ rather
+than $\rho$.
 
-In Fourier space this is solved trivially:
+In Fourier space Eq.~(\ref{eq:poisson1}) is solved trivially:
 %
 \begin{equation}
   \boxed{
-  \bPsi^{(1)}(\bk) = -\frac{i\bk}{k^2}\,\delta_{\rm lin}(\bk).
+  \bPsi^{(1)}(\bk) = +\frac{i\bk}{k^2}\,\delta_{\rm lin}(\bk).
   }
   \label{eq:psi1_fourier}
 \end{equation}
@@ -390,7 +1198,7 @@ by the growth factor.
 
 The displacement potential $\phi^{(1)}$ satisfies
 $\nabla^2\phi^{(1)} = \delta_{\rm lin}$.  On the other hand, the
-linearised Poisson equation~(\ref{eq:poisson_lin}) gives
+linearized Poisson equation~(\ref{eq:poisson_lin}) gives
 $\nabla^2\Phi = \tfrac{3}{2}H^2\Omm\,a^2\,\delta = \tfrac{3}{2}H^2\Omm\,a^2\Dp\,\delta_{\rm lin}$.
 Comparing the two:
 %
@@ -430,7 +1238,7 @@ statistics.
 \label{sec:pancake}
 
 The deformation tensor $\partial\Psi^{(1)}_i/\partial q_j$ is
-symmetric in the irrotational case and can therefore be diagonalised
+symmetric in the irrotational case and can therefore be diagonalized
 at each point $\bq$.  Denote its eigenvalues by $-\alpha \leq -\beta
 \leq -\gamma$ (with $\alpha \geq \beta \geq \gamma$).  The Jacobian
 decomposes as
@@ -460,7 +1268,7 @@ The ZA extends particles through the caustic without stopping them:
 once $J<0$ the single-stream assumption breaks down and the density
 formula~(\ref{eq:delta_eigen}) is no longer valid.  Higher-order LPT
 improves the pre-caustic accuracy but does not cure shell crossing.
-ICs must therefore be initialised at sufficiently high redshift that
+ICs must therefore be initialized at sufficiently high redshift that
 $\Dp(z_{\rm start})\,\alpha_{\max} < 1$ on all resolved scales.
 
 Figure~\ref{fig:pancake} illustrates this for the simplest case of a
@@ -502,61 +1310,151 @@ because the second-order correction is largest when all three
 eigenvalues coincide (\S\ref{sec:tophat_timing}).
 
 Consider a uniform spherical overdensity of initial radius $R_i$ and
-density $\rho_i=\bar\rho_i(1+\delta_i)$ embedded in an EdS background.
-By Birkhoff's theorem the interior evolves as a closed mini-universe
-with energy per unit mass
-$E=\tfrac{1}{2}\dot r^2-GM/r<0$, $M=\tfrac{4\pi}{3}\bar\rho_i R_i^3(1+\delta_i)$.
-The solution is cycloidal
-\citep[e.g.][\S3.3]{Tong2019}:
+density $\rho_i=\bar\rho_i(1+\delta_i)$ embedded in an
+Einstein--de~Sitter (EdS) background, released at $t_i$ in the Hubble
+flow ($\dot R_i/R_i = H_i$).  By Birkhoff's theorem the matter outside
+$r$ produces no net force inside, so the shell at radius $r$ obeys
+Newton's law with enclosed mass $M = \tfrac{4\pi}{3}\bar\rho_i
+R_i^3(1+\delta_i)$.  First integral (energy per unit mass):
+%
+\begin{equation}
+  E = \tfrac{1}{2}\dot r^2 - GM/r.
+  \label{eq:energy_sph}
+\end{equation}
+%
+Evaluate at $t_i$: $\dot R_i^2 = H_i^2 R_i^2$ and, using
+$H_i^2 = 8\pi G\bar\rho_i/3$ (EdS),
+$2GM/R_i = H_i^2 R_i^2(1+\delta_i)$, so
+$E = -\tfrac{1}{2}H_i^2 R_i^2\delta_i$.  Overdense ($\delta_i>0$)
+means $E<0$, i.e.\ a bound ``closed mini-universe'' --- the sphere
+will turn around and collapse.
+
+\paragraph{Cycloid solution.}  With $E<0$, separate variables in
+Eq.~(\ref{eq:energy_sph}):
+%
+\begin{equation}
+  \dot r^2 = \frac{2GM}{r} - 2|E|
+  \;\Longrightarrow\;
+  \int\!\frac{dr}{\sqrt{2GM/r - 2|E|}} = t.
+\end{equation}
+%
+The integral is evaluated by the substitution
+$r = A(1-\cos\tilde\tau)$ with $A \equiv GM/(2|E|)$, giving the
+parametric cycloid
 %
 \begin{equation}
   r(\tilde\tau)=A(1-\cos\tilde\tau),\qquad
   t(\tilde\tau)=B(\tilde\tau-\sin\tilde\tau),
-  \qquad A^3=GMB^2.
+  \qquad B \equiv \frac{GM}{(2|E|)^{3/2}}
+  \;\;(\text{so } A^3=GMB^2).
   \label{eq:sphcollapse}
 \end{equation}
 %
-Three milestones matter:
-\begin{itemize}
-  \item \textbf{Turn-around} ($\tilde\tau=\pi$): the sphere reaches
-    its maximum radius $r_{\rm ta}=2A$ at $t_{\rm ta}=\pi B$.  The
-    actual over-density is
-    $\delta(t_{\rm ta})=9\pi^2/16-1\approx 4.55$, while the
-    \emph{linear-extrapolated} value is
-    $\delta_{\rm lin}(t_{\rm ta})=(3/20)(6\pi)^{2/3}\approx 1.062$.
-  \item \textbf{Collapse to a point} ($\tilde\tau=2\pi$): $r\to0$,
-    so the actual density diverges.  Linear extrapolation, on the
-    other hand, is finite and gives the famous threshold
-    %
-    \begin{equation}
-      \boxed{\;
-        \delta_c \;\equiv\; \delta_{\rm lin}(t_{\rm col})
-        = \frac{3}{20}(12\pi)^{2/3}
-        \;\approx\; 1.686.
-      \;}
-      \label{eq:deltac}
-    \end{equation}
-    %
-    Any region whose smoothed linear density exceeds $\delta_c$
-    today should have already collapsed into a virialised halo.
-  \item \textbf{Virialisation}: before reaching the singularity the
-    shells shell-cross and redistribute energy until the virial
-    theorem is satisfied, $2T+V=0$, giving $r_{\rm vir}=r_{\rm ta}/2$.
-    The average density inside $r_{\rm vir}$ relative to the
-    background at that time is
-    %
-    \begin{equation}
-      \Delta_{\rm vir}\equiv
-      \frac{\rho(r_{\rm vir})}{\bar\rho(t_{\rm col})}
-      = 18\pi^2-1 \approx 177,
-      \label{eq:Delta_vir}
-    \end{equation}
-    %
-    the origin of the $\rho/\bar\rho=200$ definition used in
-    $R_{200}$, $M_{200}$.  In $\Lambda$CDM the number is closer to
-    $\Delta_{\rm vir}\approx100$--$200$ depending on $\Omm(z)$
-    \citep{Bryan1998}.
-\end{itemize}
+Using $E = -\tfrac{1}{2}H_i^2 R_i^2 \delta_i$,
+$2|E| = H_i^2 R_i^2 \delta_i$, so
+$A = GM/(H_i^2 R_i^2 \delta_i) = R_i(1+\delta_i)/(2\delta_i)
+\simeq R_i/(2\delta_i)$ for small $\delta_i$.
+
+\paragraph{Turn-around.}  At $\tilde\tau=\pi$, $\sin\tilde\tau=0$ and
+$\cos\tilde\tau=-1$, so $r_{\rm ta}=2A$ and $t_{\rm ta}=\pi B$.
+The enclosed density is
+$\rho_{\rm ta} = M/(\tfrac{4\pi}{3}r_{\rm ta}^3) = 3M/(32\pi A^3)$,
+while the EdS background density at the same cosmic time is
+$\bar\rho(t_{\rm ta})=1/(6\pi G t_{\rm ta}^2)=1/(6\pi^3 G B^2)$
+(using EdS $\bar\rho=1/(6\pi G t^2)$).  Their ratio is
+%
+\begin{equation}
+  1+\delta_{\rm ta}
+  = \frac{\rho_{\rm ta}}{\bar\rho(t_{\rm ta})}
+  = \frac{3M}{32\pi A^3}\cdot 6\pi^3 G B^2
+  = \frac{9\pi^2}{16}\cdot\frac{GMB^2}{A^3}
+  = \frac{9\pi^2}{16} \approx 5.55,
+\end{equation}
+%
+using $A^3 = GMB^2$.  Therefore $\delta_{\rm ta} = 9\pi^2/16 - 1
+\approx 4.55$ --- already a factor $\sim$5 non-linear, even though a
+naive linear extrapolation would give a much smaller number (below).
+
+\paragraph{Linear-extrapolated $\delta$ and $\delta_c$.}  The linear
+growth equation~(\ref{eq:growth_eq}) in EdS has solutions
+$\delta \propto t^{2/3}$ (growing) and $\delta \propto t^{-1}$
+(decaying).  An overdensity released from Hubble flow at $t_i$ has
+$\delta(t_i)=\delta_i$ and $\dot\delta(t_i)=0$ (vanishing peculiar
+velocity, via the linearized continuity equation~\ref{eq:continuity_lin}
+applied with $\nabla\cdot\bv_{\rm pec}=0$ at $t_i$).  Writing
+$\delta(t) = A_+ t^{2/3} + A_- t^{-1}$ and solving the two
+conditions, $A_+ = (3/5)\delta_i t_i^{-2/3}$, so the growing mode is
+%
+\begin{equation}
+  \delta_{\rm lin}(t) = \tfrac{3}{5}\,\delta_i\,(t/t_i)^{2/3}.
+  \label{eq:delta_lin_time}
+\end{equation}
+%
+The 3/5 factor reflects that the Hubble-flow initial condition
+distributes $\delta_i$ between growing and decaying modes, and only
+the growing piece is physical at late times.
+
+We now need $t_{\rm col}/t_i = 2\pi B/t_i$.  Using
+$B^2 = A^3/(GM) = [R_i/(2\delta_i)]^3/[(4\pi G/3)R_i^3\bar\rho_i]
+= 3/(32\pi G\bar\rho_i \delta_i^3)$ and
+$1/(G\bar\rho_i) = 6\pi t_i^2$ (EdS),
+%
+\begin{equation}
+  B = \frac{3t_i}{4\,\delta_i^{3/2}},
+  \qquad
+  t_{\rm col} = 2\pi B = \frac{3\pi\,t_i}{2\,\delta_i^{3/2}}
+  \;\Longrightarrow\;
+  (t_{\rm col}/t_i)^{2/3} = \left(\frac{3\pi}{2\delta_i^{3/2}}\right)^{\!2/3}
+  = \frac{(3\pi/2)^{2/3}}{\delta_i}.
+\end{equation}
+%
+Substituting into Eq.~(\ref{eq:delta_lin_time}) the $\delta_i$ cancels,
+%
+\begin{equation}
+  \boxed{\;
+    \delta_c \;\equiv\; \delta_{\rm lin}(t_{\rm col})
+    = \tfrac{3}{5}\,(3\pi/2)^{2/3}
+    = \tfrac{3}{20}\,(12\pi)^{2/3}
+    \;\approx\; 1.686.
+  \;}
+  \label{eq:deltac}
+\end{equation}
+%
+(The two forms are equal: $24^{2/3} = 8^{2/3}\cdot 3^{2/3}
+= 4\cdot 3^{2/3}$ gives $(3/20)(12\pi)^{2/3} = (3/5)(3\pi/2)^{2/3}$.)
+Any region whose smoothed linear density exceeds $\delta_c$ should
+have already collapsed into a virialized halo.  The same calculation
+at $t_{\rm ta}=t_{\rm col}/2$ gives
+$\delta_{\rm lin}(t_{\rm ta}) = \delta_c\cdot 2^{-2/3}
+= (3/20)(6\pi)^{2/3} \approx 1.062$.
+
+\paragraph{Virialization.}  Before reaching the singularity the
+shells cross and the system relaxes to virial equilibrium,
+$2T + V = 0$.  Evaluated at turn-around, $T_{\rm ta}=0$ (momentarily
+at rest) so total energy $E_{\rm tot} = V_{\rm ta} = -GM^2/(2r_{\rm ta})$
+(using $V = -GM^2/(2r)$ for a uniform sphere's self-energy).  After
+virialization, $E_{\rm tot} = T_{\rm vir}+V_{\rm vir} = -T_{\rm vir}
+= V_{\rm vir}/2$, so $V_{\rm vir} = 2V_{\rm ta}$, i.e.\
+$r_{\rm vir} = r_{\rm ta}/2$.  The density inside $r_{\rm vir}$
+is then $8$ times $\rho_{\rm ta}$.  Meanwhile the background
+continues to evolve: in EdS $\bar\rho \propto t^{-2}$, so between
+$t_{\rm ta}$ and $t_{\rm col}=2t_{\rm ta}$ the background dilutes by
+a factor of 4.  Combining,
+%
+\begin{equation}
+  \Delta_{\rm vir}\equiv
+  \frac{\rho(r_{\rm vir})}{\bar\rho(t_{\rm col})}
+  = 8\cdot\frac{\rho_{\rm ta}}{\bar\rho(t_{\rm ta})}\cdot 4
+  = 8\cdot\frac{9\pi^2}{16}\cdot 4
+  = 18\pi^2 \approx 178.
+  \label{eq:Delta_vir}
+\end{equation}
+%
+(Taking $\Delta_{\rm vir}-1 = 18\pi^2-1 \approx 177$ if one insists on
+excluding the background.)  This is the origin of the
+$\rho/\bar\rho=200$ definition used in $R_{200}$, $M_{200}$.  In
+$\Lambda$CDM the number is closer to $\Delta_{\rm vir}\approx
+100$--$200$ depending on $\Omm(z)$ \citep{Bryan1998}.
 
 The threshold $\delta_c\approx 1.686$ is the \emph{linear}
 extrapolation of full non-linear collapse --- a point peaks with
@@ -583,15 +1481,53 @@ no mode has yet collapsed, validating the perturbative expansion.
 \subsection{Deriving the second-order source}
 \label{sec:2lpt_derive}
 
-To find the second-order displacement, expand the Jacobian
-determinant in Eq.~(\ref{eq:jacobian}) in powers of $\bPsi$.
-Writing $J_{ij} = \delta_{ij} + \Psi_{i,j}$ and using the identity
-$\det(1+\epsilon M) = 1 + \epsilon\,\mathrm{tr}M +
-\tfrac{1}{2}\epsilon^2[(\mathrm{tr}M)^2 - \mathrm{tr}(M^2)] +
-\mathcal{O}(\epsilon^3)$, we get
+The derivation proceeds in three steps: (1) write the exact Lagrangian
+equation of motion as a combination of the Euler and Poisson equations,
+in the form $\nabla_\bx\cdot\ddot\bx + 2H\,\nabla_\bx\cdot\dot\bx =
+-(3/2)H^2\Omm\,\delta$; (2) expand both sides to second order in
+$\bPsi$ using the Jacobian expansion $\delta = J^{-1}-1$ and the
+LPT series $\bPsi = \Dp\bPsi^{(1)} + \Dpp\bPsi^{(2)} + \cdots$;
+(3) isolate the $\bPsi^{(2)}$ equation, which is a Poisson equation
+in Lagrangian space with a quadratic source.
+
+\emph{Step 1: Lagrangian equation of motion.}  The Eulerian Euler
+equation~(\ref{eq:euler_lin}) can be rewritten as $\dot{\bv_{\rm pec}} +
+H\,\bv_{\rm pec} = -a^{-1}\nabla_\bx\Phi$, which in terms of
+$\bv_{\rm pec} = a\dot\bx = a\dot\bPsi$ reads
 %
 \begin{equation}
-  J = 1
+  \ddot\bPsi + 2H\dot\bPsi = -a^{-2}\nabla_\bx\Phi.
+  \label{eq:lag_eom}
+\end{equation}
+%
+(To check: $\bv_{\rm pec} = a\dot\bPsi \Rightarrow \dot{\bv_{\rm pec}} =
+\dot a\dot\bPsi + a\ddot\bPsi = H\,\bv_{\rm pec} + a\ddot\bPsi$, so
+$a\ddot\bPsi + 2H\,\bv_{\rm pec} = -a^{-1}\nabla_\bx\Phi$; dividing by $a$
+and using $\bv_{\rm pec}/a = \dot\bPsi$ gives
+Eq.~\ref{eq:lag_eom}.)  Taking the Eulerian divergence $\nabla_\bx\cdot$
+of both sides and using the Poisson equation~(\ref{eq:poisson_lin})
+$\nabla_\bx^2\Phi = \tfrac{3}{2}H^2\Omm\,a^2\,\delta$,
+%
+\begin{equation}
+  \nabla_\bx\cdot\ddot\bPsi + 2H\,\nabla_\bx\cdot\dot\bPsi
+  = -\tfrac{3}{2}H^2\Omm\,\delta.
+  \label{eq:lag_div}
+\end{equation}
+%
+This is \emph{exact} (not yet linearized): the only inputs are the
+comoving Euler and Poisson equations, both written in the Eulerian
+frame.  The Lagrangian content is hidden in the requirement that
+Eq.~(\ref{eq:lag_div}) must hold along fluid trajectories
+$\bx = \bq + \bPsi(\bq,t)$.
+
+\emph{Step 2: expand to second order.}  Expand the Jacobian
+$J_{ij} = \delta_{ij} + \Psi_{i,j}$ using the identity
+$\det(\mathbf{I}+M) = 1 + \mathrm{tr}\,M + \tfrac{1}{2}[(\mathrm{tr}\,M)^2
+- \mathrm{tr}(M^2)] + \mathcal{O}(M^3)$ (commas denote $\partial/\partial
+q$, repeated indices summed):
+%
+\begin{equation}
+  \det J = 1
     + \underbrace{\Psi_{i,i}^{(1)}}_{J^{(1)}}
     + \underbrace{\Psi_{i,i}^{(2)}
       + \tfrac{1}{2}\bigl[(\Psi_{i,i}^{(1)})^2
@@ -600,14 +1536,77 @@ $\det(1+\epsilon M) = 1 + \epsilon\,\mathrm{tr}M +
   \label{eq:J_expand}
 \end{equation}
 %
-where commas denote partial derivatives with respect to Lagrangian
-coordinates $q_j$, and repeated indices are summed.  Mass
-conservation requires $\rho\,dV = \bar\rho\,dV_q$, i.e.\
-$1+\delta = J^{-1} \approx 1 - J^{(1)} - J^{(2)} + (J^{(1)})^2 + \cdots$.
-At first order, $\delta^{(1)} = -\Psi^{(1)}_{i,i} = \nabla^2_\bq\phi^{(1)} = \delta_{\rm lin}$,
-as expected.  At second order the equation of motion yields a
-sourced Poisson equation for the second-order potential
-$\phi^{(2)}$, whose source is precisely the quadratic part:
+so from $1+\delta = (\det J)^{-1}$,
+%
+\begin{equation}
+  \delta
+  = -J^{(1)} - J^{(2)} + (J^{(1)})^2 + \mathcal{O}(\bPsi^3)
+  = -\Psi^{(1)}_{i,i}
+    - \Psi^{(2)}_{i,i}
+    + \tfrac{1}{2}\bigl[(\Psi^{(1)}_{i,i})^2
+                        + \Psi^{(1)}_{i,j}\Psi^{(1)}_{j,i}\bigr]
+    + \cdots.
+  \label{eq:delta_expand}
+\end{equation}
+%
+Similarly the Eulerian divergence of $\bPsi$ expands as (using the
+chain rule $\partial/\partial x_i = (J^{-1})_{ji}\partial/\partial q_j$
+with $J^{-1} = \mathbf{I} - \Psi^{(1)}_{,\cdot} + \ldots$ to first order in
+$\bPsi$):
+%
+\begin{equation}
+  \nabla_\bx\!\cdot\!\bPsi
+  = \Psi^{(1)}_{i,i}
+  + \Psi^{(2)}_{i,i}
+  - \Psi^{(1)}_{i,j}\Psi^{(1)}_{j,i}
+  + \mathcal{O}(\bPsi^3).
+\end{equation}
+%
+Substituting both into Eq.~(\ref{eq:lag_div}) and using the LPT
+ansatz $\bPsi = \Dp\bPsi^{(1)} + \Dpp\bPsi^{(2)} + \cdots$ together
+with the first-order relation $\nabla_\bq\cdot\bPsi^{(1)}
+= -\delta_{\rm lin}$ (Eq.~\ref{eq:div_psi1}) and the linear growth
+equation $\ddot\Dp + 2H\dot\Dp = \tfrac{3}{2}H^2\Omm\Dp$
+(Eq.~\ref{eq:growth_D}):
+
+\emph{At first order}, both sides reduce to
+$(\ddot\Dp+2H\dot\Dp)\delta_{\rm lin} = -\tfrac{3}{2}H^2\Omm\cdot(-\Dp)\delta_{\rm lin}$,
+i.e.\ the growth ODE itself --- a consistency check.
+
+\emph{At second order}, the $\bPsi^{(2)}$ contribution on the left is
+$(\ddot\Dpp + 2H\dot\Dpp)\,\nabla_\bq\cdot\bPsi^{(2)}$, and the
+$\mathcal{O}(\bPsi^2)$ pieces that remain after cancellation can be
+tidied into
+%
+\begin{equation}
+  \bigl[\ddot\Dpp + 2H\dot\Dpp - \tfrac{3}{2}H^2\Omm\Dpp\bigr]
+  \nabla_\bq\!\cdot\!\bPsi^{(2)}
+  = -\tfrac{3}{2}H^2\Omm\,\Dp^2\,
+  \underbrace{\tfrac{1}{2}\!\bigl[(\Psi^{(1)}_{i,i})^2
+    - \Psi^{(1)}_{i,j}\Psi^{(1)}_{j,i}\bigr]}_{\mu_2[\bPsi^{(1)}]}.
+  \label{eq:psi2_ode}
+\end{equation}
+%
+The quadratic invariant $\mu_2$ is the second principal minor of the
+deformation tensor --- the same combination that appears in the
+Jacobian expansion~(\ref{eq:J_expand}).
+
+\emph{Step 3: Poisson equation for $\phi^{(2)}$.}  In EdS, a
+growing-mode solution $\Dpp = -\tfrac{3}{7}\Dp^2$ makes the bracket
+on the left of Eq.~(\ref{eq:psi2_ode}) equal to $-\tfrac{3}{2}H^2\Omm
+\cdot\Dpp\cdot[1+(\text{correction})]$, and the explicit $\Dp^2$ on
+the right cancels cleanly against the $\Dpp$ absorbed into
+$\bPsi^{(2)}$ via the LPT ansatz.  Writing the spatial piece as
+$\bPsi^{(2)}(\bq) = -\nabla_\bq\phi^{(2)}(\bq)$ (irrotational at
+second order by the same vorticity-decay argument as at first order),
+Eq.~(\ref{eq:psi2_ode}) collapses to the Lagrangian Poisson equation
+%
+\begin{equation}
+  \nabla_\bq^2\phi^{(2)}(\bq) = \mu_2[\phi^{(1)}],
+\end{equation}
+%
+with the source written equivalently in terms of $\phi^{(1)}$ using
+$\bPsi^{(1)} = -\nabla_\bq\phi^{(1)}$:
 %
 \begin{equation}
   \tfrac{1}{2}\bigl[(\Psi^{(1)}_{i,i})^2
@@ -618,9 +1617,11 @@ $\phi^{(2)}$, whose source is precisely the quadratic part:
   \label{eq:source_id}
 \end{equation}
 %
-which is the sum of $2\!\times\!2$ minors of the Hessian of
-$\phi^{(1)}$, measuring the coupling between different tidal
-components.
+the sum of $2\!\times\!2$ principal minors of the Hessian of
+$\phi^{(1)}$.  Outside matter domination the factor
+$-\tfrac{3}{7}\Dp^2$ receives small $\Omm$-dependent corrections
+(\S\ref{sec:2lpt_growth}), but the spatial structure
+Eq.~(\ref{eq:source_id}) is universal.
 
 \subsection{Second-order displacement}
 
@@ -894,7 +1895,7 @@ a flowchart.
   label/.style = {font=\footnotesize\itshape, text=gray}
 ]
 
-%% ─── Shared top chain (centred) ─────────────────────────────────
+%% ─── Shared top chain (centered) ─────────────────────────────────
 \node[box=green!12] (input)
   {$P_{\rm lin}(k)$ from CLASS\\(linear power spectrum)};
 
@@ -925,9 +1926,9 @@ a flowchart.
 \node[box, below=0.7cm of phi2k] (psi2)
   {$\Psi^{(2)}_i(\bq) = \mathcal{F}^{-1}\!\left[ik_i\phi^{(2)}\right]$};
 
-%% ─── Final: assign positions + velocities (centred) ─────────────
+%% ─── Final: assign positions + velocities (centered) ─────────────
 \node[box=green!12,
-      below=0.8cm of psi2, xshift=-2.4cm,  %% centres below phi1k
+      below=0.8cm of psi2, xshift=-2.4cm,  %% centers below phi1k
       text width=9.0cm] (final)
   {$\bx = \bq + \Dp\bPsi^{(1)} + \Dpp\bPsi^{(2)}$\\[2pt]
    $\bv_{\rm pec} = \calH\bigl[f\Dp\bPsi^{(1)}
@@ -1103,7 +2104,7 @@ BAO feature in configuration space.
 \subsection{Shape of the linear $P(k)$: primordial spectrum and transfer function}
 \label{sec:pk_shape}
 
-The linear matter power spectrum factorises into a \emph{primordial}
+The linear matter power spectrum factorizes into a \emph{primordial}
 piece set by inflation and a \emph{transfer function} $T(k)$ that
 records how each Fourier mode evolved between horizon re-entry and
 matter--radiation equality
@@ -1201,7 +2202,7 @@ the BAO peak in $\xi(r)$ at $r\approx 105\,h^{-1}\,\mathrm{Mpc}$
 
 The most common one-number summary of $P(k)$ is the variance of
 $\delta$ smoothed on comoving scale $R$.  Let $W_R(\bx)$ be a
-spherical filter of characteristic radius $R$ and define the
+spherical filter of characteriztic radius $R$ and define the
 smoothed field
 $\delta_R(\bx)\equiv\int d^3x'\,W_R(\bx-\bx')\,\delta(\bx')$.
 By the convolution theorem $\delta_R(\bk)=\tilde W_R(k)\,\delta(\bk)$,
@@ -1224,8 +2225,8 @@ For the spherical top-hat of radius $R$, the Fourier transform is
 %
 The quantity
 $\sigma_8\equiv\sigma(R=8\,h^{-1}\,\mathrm{Mpc},\,z=0)$ is the
-standard amplitude normalisation: $\sigma_8\approx 0.81$ in Planck
-2018.  Because $\Dp(z)$ factorises, $\sigma_8(z)=\sigma_8(0)\Dp(z)$,
+standard amplitude normalization: $\sigma_8\approx 0.81$ in Planck
+2018.  Because $\Dp(z)$ factorizes, $\sigma_8(z)=\sigma_8(0)\Dp(z)$,
 and Eq.~(\ref{eq:sigmaR}) at general $R$ is the sum over modes
 that fit inside a sphere of radius $R$.  The particular choice
 $R=8\,h^{-1}\,\mathrm{Mpc}$ is historical: $\sigma\sim1$ at this
@@ -1250,7 +2251,7 @@ $k\gg 1/R$ are strongly suppressed.
 \subsection{What CLASS provides}
 \label{sec:class_output}
 
-CLASS solves the linearised Einstein--Boltzmann system for
+CLASS solves the linearized Einstein--Boltzmann system for
 photons, baryons, CDM, neutrinos, and metric perturbations, and
 outputs the \emph{linear} matter power spectrum
 $P_{\rm lin}(k,z)$ on a user-specified $(k,z)$ grid.
@@ -1335,7 +2336,7 @@ Since $\sigma_8(z) = \sigma_8(0)\,\Dp(z)$ and $\Dp(z) \approx
     = \left[\frac{\sigma_8(0)}{1+z}\right]^2.
 \end{equation}
 %
-For our CV\_22 cosmology ($\sigma_8 = 0.8$):
+For flat $\Lambda$CDM with $\sigma_8 = 0.8$:
 %
 \begin{center}
 \begin{tabular}{lcc}
@@ -1483,23 +2484,27 @@ convenient to work with the single scalar
 \end{equation}
 %
 which captures all the dynamical information \citep[][\S2.1]{Jeong2010}.
-Taking the divergence of the linearised Euler
-equation~(\ref{eq:euler_lin}) and combining with the linearised
+Taking the divergence of the linearized Euler
+equation~(\ref{eq:euler_lin}) and combining with the linearized
 continuity equation~(\ref{eq:continuity_lin}):
 %
 \begin{equation}
-  \theta(\bk, z) = -H(z)\,f(z)\,\delta(\bk, z),
+  \theta(\bk, z) = -\calH(z)\,f(z)\,\delta(\bk, z),
   \qquad
-  P_{\theta\theta}(k) = [H(z)\,f(z)]^2\,P(k,z).
+  P_{\theta\theta}(k) = [\calH(z)\,f(z)]^2\,P(k,z),
   \label{eq:theta_delta}
 \end{equation}
 %
+where $\calH \equiv aH$ is the conformal Hubble parameter.  The factor
+of $a$ enters because the linearized continuity equation in
+comoving coordinates is $\dot\delta + a^{-1}\,\theta = 0$, giving
+$\theta = -a\,\dot\delta = -aHf\,\delta = -\calH f\,\delta$.
 Because $\bv$ is curl-free, $\theta$ determines the full velocity:
 %
 \begin{equation}
   \bv_{\rm pec}(\bk, z)
     = -\frac{i\bk}{k^2}\,\theta(\bk, z)
-    = -\frac{i\bk}{k^2}\, H(z)\, f(z)\, \delta(\bk, z).
+    = -\frac{i\bk}{k^2}\, \calH(z)\, f(z)\, \delta(\bk, z).
   \label{eq:vel_delta}
 \end{equation}
 %
@@ -1512,7 +2517,7 @@ trace of the velocity two-point tensor:
 %
 \begin{equation}
   P_v(k, z) \equiv \sum_i \langle |v_{{\rm pec},i}(\bk, z)|^2 \rangle
-    = \frac{[H(z)\, f(z)]^2}{k^2}\, P(k, z).
+    = \frac{[\calH(z)\, f(z)]^2}{k^2}\, P(k, z).
   \label{eq:pv}
 \end{equation}
 %
@@ -1537,7 +2542,7 @@ $P_v(k)$ from Eq.~(\ref{eq:pv}):
 %
 \begin{equation}
   \psi(r, z)
-    = \frac{[H(z)\,f(z)]^2}{2\pi^2}
+    = \frac{[\calH(z)\,f(z)]^2}{2\pi^2}
       \int_0^\infty dk\; P(k, z)\, j_0(kr).
   \label{eq:psi_r}
 \end{equation}
@@ -1546,7 +2551,7 @@ At $r = 0$ this gives the total 3D velocity variance:
 %
 \begin{equation}
   \sigma_v^2(z) \equiv \psi(0, z)
-    = \frac{[H(z)\,f(z)]^2}{2\pi^2}
+    = \frac{[\calH(z)\,f(z)]^2}{2\pi^2}
       \int_0^\infty dk\; P(k, z),
   \label{eq:sigv}
 \end{equation}
@@ -1567,61 +2572,92 @@ velocity correlation saturates at its maximum value $\sigma_v^2$.
 Using $P(k,z) = \Dp^2(z)\,P(k,0)$ in Eq.~(\ref{eq:psi_r}):
 %
 \begin{equation}
-  \psi(r, z) \propto [H(z)\,f(z)]^2\,\Dp^2(z).
+  \psi(r, z) \propto [\calH(z)\,f(z)]^2\,\Dp^2(z).
   \label{eq:psi_z}
 \end{equation}
 %
-In matter domination ($f = 1$, $\Dp \propto a$, $H \propto a^{-3/2}$):
+In matter domination ($f = 1$, $\Dp \propto a$, $H \propto a^{-3/2}$,
+$\calH = aH \propto a^{-1/2}$):
 %
 \begin{equation}
-  [H(z)]^2\,\Dp^2(z)
-    \propto a^{-3} \cdot a^2 = a^{-1} \propto (1+z).
+  [\calH(z)]^2\,\Dp^2(z)
+    \propto a^{-1} \cdot a^2 = a \propto (1+z)^{-1}.
   \label{eq:psi_z_scaling}
 \end{equation}
 %
-\textbf{The velocity correlation $\psi(r)$ grows $\propto(1+z)$ toward
-high redshift.}  The Hubble parameter grows faster
-($H \propto a^{-3/2}$) than the density fluctuations decay
-($\delta \propto a$), so peculiar velocities are larger at early times.
-In our pipeline, $\psi(r \to 0) \approx 10^8\,(\mathrm{km/s})^2$ at
+\textbf{The peculiar-velocity correlation $\psi(r)$ \emph{decreases}
+$\propto a = 1/(1+z)$ toward high redshift.}  Although the conformal
+Hubble parameter $\calH = aH \propto a^{-1/2}$ does grow at early
+times, it grows more slowly than the density fluctuations decay
+($\delta \propto a$), so peculiar velocities are smaller at early
+times.  In our pipeline, $\psi(r \to 0)
+\approx 2\text{--}3 \times 10^3\,(\mathrm{km/s})^2$ at
 $z = 200$ versus $\psi \sim 10^5\text{--}10^6\,(\mathrm{km/s})^2$ at
 $z = 0$ for the same cosmology.
 
 \noindent\textbf{Comparison with the Hubble flow.}  At $z = 200$,
 $H(200) \approx 1.05\times10^5\,\mathrm{km\,s^{-1}\,Mpc^{-1}}$, so
-the Hubble flow across $1\,\mathrm{Mpc}$ is
+the (proper) Hubble flow across $1\,\mathrm{Mpc}$ is
 $v_H \approx 10^5\,\mathrm{km/s}$.  The 1D peculiar velocity
-dispersion $\sigma_{v,1D} \approx 5700\,\mathrm{km/s}$, giving a ratio
-$\sigma_{v,1D}/v_H \approx 6\%$: peculiar velocities are a small but
-non-negligible correction to the Hubble flow even at this epoch.
+dispersion $\sigma_{v,1D} \approx 28\,\mathrm{km/s}$, giving a ratio
+$\sigma_{v,1D}/v_H \approx 3\times10^{-4}$: at this early epoch
+peculiar velocities are utterly subdominant to the Hubble flow,
+consistent with linear theory not yet having had time to build up
+significant streaming motions.
 
-\subsection{SWIFT velocity convention and the $a^2$ correction}
+\subsection{SWIFT velocity conventions: on-disk vs.~internal}
 \label{sec:swift_vel}
 
-SWIFT stores particle velocities as
-$\bv_{\rm int} \equiv a\,\bv_{\rm pec}$
-(not the true peculiar velocity).  The CIC velocity correlation
-measured from an IC file therefore gives
+There are two distinct velocity variables in the SWIFT pipeline that
+must not be confused:
+
+\paragraph{On-disk (IC HDF5).}
+\texttt{MUSIC2}'s SWIFT plugin writes the \texttt{Velocities} dataset as
+the proper peculiar velocity in $\mathrm{km/s}$:
 %
 \begin{equation}
-  \psi_{\rm raw}(r)
-    = \langle\bv_{\rm int}\cdot\bv_{\rm int}'\rangle
-    = a^2\,\psi(r),
+  \bv_{\rm out} \;=\; a\,H(a)\,f(a)\,\bPsi_{\rm comov}
+              \;=\; \bv_{\rm pec}.
+  \label{eq:vout}
 \end{equation}
 %
-so to recover the physical velocity correlation one must divide by $a^2$:
+The construction is direct: the displacement field $\bPsi$ is in
+$\mathrm{Mpc}/h$, multiplied by
+\texttt{vfact} $\equiv f\,a\,H(a)/h$ (in $\mathrm{(km/s)}/(\mathrm{Mpc}/h)$) inside
+\texttt{cosmology\_calculator.hh:get\_vfact}, which yields
+$\bv_{\rm pec}$ in $\mathrm{km/s}$.
+
+\paragraph{SWIFT-internal (canonical momentum).}
+At IC read time SWIFT converts to its symplectic integration variable
 %
 \begin{equation}
-  \psi(r) = (1+z)^2\,\psi_{\rm raw}(r).
-  \label{eq:psi_swift}
+  \mathbf{u} \;\equiv\; a\,\bv_{\rm pec},
 \end{equation}
 %
-This is applied in \texttt{plot\_ic.py} via
-\texttt{load\_vel\_cic(a=a\_run)}, which divides the raw CIC
-correlation by $a^2$ before plotting.  At $z_{\rm start} = 200$ the
-correction factor is $(1+200)^2 \approx 4\times10^4$: omitting it
-would suppress the plotted $\psi$ by four orders of magnitude and make
-the IC appear to have negligible velocity structure.
+which is the canonical momentum per unit mass associated with comoving
+position $\bx$ in the cosmological Lagrangian
+$L = \tfrac12 m a^2 \dot{\bx}^2 - m\phi$.  This $a$-rescaling is
+applied internally; it is not present in the file.
+
+\paragraph{Consequence for $\psi(r)$ measurements.}
+Because the on-disk velocities are already $\bv_{\rm pec}$, the CIC
+correlation
+$\psi_{\rm raw}(r) = \langle\bv\cdot\bv'\rangle$ produced by
+\texttt{compute\_xi\_cic} from a MUSIC2-generated SWIFT IC is in
+$\mathrm{(km/s)^2}$ and is directly comparable to the linear-theory
+prediction
+%
+\begin{equation}
+  \psi_{\rm theory}(r) \;=\; \frac{[a\,H(a)\,f(a)]^2}{2\pi^2}
+        \int_0^\infty\!dk\, P(k,a)\, j_0(kr).
+  \label{eq:psi_theory_v2}
+\end{equation}
+%
+No $a^2$ rescaling is applied to either side.  An earlier version of
+this pipeline mistakenly divided $\psi_{\rm raw}$ by $a^2$ \emph{and}
+omitted the $a^2$ in~\eqref{eq:psi_theory_v2}; the two errors
+cancelled at the comparison stage but inflated the plotted
+$\psi$ by $1/a^2 \approx 4\times10^4$ at $z_{\rm start}=200$.
 
 %----------------------------------------------------------------------
 \section{Implementation: \texttt{MUSIC2} and \texttt{monofonIC}}
@@ -1687,7 +2723,12 @@ coarsest level provides the boundary conditions for a multigrid FAS
 equation on the refined levels with
 high-order (default 4th-order) finite-difference gradients.  This
 avoids the memory cost of an FFT at the finest level and handles the
-non-periodic interior boundary naturally.
+non-periodic interior boundary naturally.  (For a complementary
+discussion of what goes wrong if one tries to construct the lo-res
+region of a zoom-in IC by simple bin-averaging --- of either $\delta$
+or the displacement potential $\phi^{(1)}$ --- rather than via the
+k-truncation+per-level convolution that \texttt{MUSIC2} uses, see
+\texttt{notes/restriction\_lpt.tex}.)
 
 \paragraph{2LPT source on a hierarchy.}  The second-order source
 Eq.~(\ref{eq:F_source}) can be built in two ways:
@@ -1737,7 +2778,7 @@ constraint fields, and PANPHASIA (optional Fortran dependency).
 \label{sec:monofonic}
 
 \texttt{monofonIC} (sometimes written ``\texttt{MUSIC2--monofonIC}'')
-drops the zoom machinery in favour of a single periodic box with all
+drops the zoom machinery in favor of a single periodic box with all
 fields on one uniform grid.  The gain is access to third-order
 Lagrangian perturbation theory~\citep{Michaux2020}---extended to
 arbitrary order by \citet{RampfHahn2021}, who demonstrated rapid
@@ -1781,9 +2822,9 @@ hybrid MPI+OpenMP parallelisation using FFTW's slab decomposition
 \end{enumerate}
 
 \paragraph{Particle loads.}  The default ``simple cubic'' (SC) lattice
-places $N^3$ particles on a regular grid.  Body-centred cubic (BCC)
+places $N^3$ particles on a regular grid.  Body-centered cubic (BCC)
 adds a half-cell-shifted sublattice and doubles particle count; FCC
-adds three face-centred shifts and quadruples it.  At fixed force
+adds three face-centered shifts and quadruples it.  At fixed force
 resolution, BCC and FCC reduce the power-spectrum bias at
 $k \sim k_{\rm Ny}$ due to the isotropy of their force
 kernels~\citep{Garrison2016,Michaux2020}.  A \emph{glass} pre-IC is
@@ -1821,7 +2862,7 @@ Lagrangian displacement suffers at late start times.
 type ($f_{\rm NL}, g_{\rm NL}$) is implemented by adding the quadratic
 or cubic-in-$\phi^{(1)}$ corrections before the transfer-function step.
 Beyond-box external tides~\citep{Stuecker2021} augment $\phi^{(2)}$
-with an anisotropic term parameterised by three eigenvalues
+with an anisotropic term parameterized by three eigenvalues
 \texttt{LSS\_aniso\_lx,ly,lz}, so a small subvolume can mimic its
 embedding in a large-scale tidal field.
 
@@ -1950,7 +2991,7 @@ same value divided by $(1+z_{\rm pivot})$.
 \label{sec:ic_landscape}
 
 \texttt{MUSIC2}/\texttt{monofonIC} sit inside a wider ecosystem of IC
-techniques that address specific modelling problems.  The Living Review
+techniques that address specific modeling problems.  The Living Review
 by \citet{Angulo2022} covers these in depth; we summarise the
 essentials that set context for the choices made above.
 
@@ -2089,7 +3130,7 @@ prescriptions incorporate them:
         $\bar\rho = (1+\delta_b)\bar\rho_{\rm global}$.
   \item \textbf{External-tide mode}~\citep{Stuecker2021} augments the
         second-order displacement with an anisotropic term
-        $\tfrac{1}{2}\lambda_{ij}q_i q_j$ parameterised by three
+        $\tfrac{1}{2}\lambda_{ij}q_i q_j$ parameterized by three
         eigenvalues $\lambda_i$ with $\sum \lambda_i = 0$, which
         \texttt{monofonIC} accepts as \texttt{LSS\_aniso\_lx/ly/lz}.
 \end{itemize}
@@ -2176,7 +3217,7 @@ leaves out:
 \section{Summary}
 
 \begin{itemize}
-  \item \textbf{Fluid equations}: the linearised continuity, Euler, and
+  \item \textbf{Fluid equations}: the linearized continuity, Euler, and
         Poisson equations in an expanding background lead to the growth
         equation~(\ref{eq:growth_D}).  The growing solution $\Dp(a)$
         has logarithmic growth rate $f \approx \Omm(a)^{0.55}$
@@ -2206,13 +3247,16 @@ leaves out:
 
   \item \textbf{Velocity statistics} (Section~\ref{sec:vel_stats}):
         the linear velocity field satisfies
-        $\bv_{\rm pec}(\bk) = -(i\bk/k^2)Hf\delta(\bk)$, giving
-        $\psi(r) = [Hf]^2/(2\pi^2)\int dk\,P(k)\,j_0(kr)$.  In matter
-        domination $\psi \propto (1+z)$; at $z=200$,
-        $\psi(0) \approx 10^8\,(\mathrm{km/s})^2$.  SWIFT ICs store
-        $\bv_{\rm int} = a\,\bv_{\rm pec}$, so the raw CIC correlation
-        must be divided by $a^2 = (1+z)^{-2}$ to recover $\psi$
-        (Eq.~\ref{eq:psi_swift}).
+        $\bv_{\rm pec}(\bk) = -(i\bk/k^2)\,\calH f\,\delta(\bk)$ with
+        $\calH = aH$, giving
+        $\psi(r) = [\calH f]^2/(2\pi^2)\int dk\,P(k)\,j_0(kr)$.  In
+        matter domination $\psi \propto a = (1+z)^{-1}$; at $z=200$,
+        $\psi(0) \approx 2\text{--}3 \times 10^3\,(\mathrm{km/s})^2$.
+        \texttt{MUSIC2}'s SWIFT plugin writes the on-disk
+        \texttt{Velocities} dataset as $\bv_{\rm pec}$ in $\mathrm{km/s}$
+        directly (Section~\ref{sec:swift_vel}); SWIFT only converts to
+        its internal canonical-momentum variable
+        $\mathbf{u} = a\,\bv_{\rm pec}$ at IC read time.
 \end{itemize}
 
 %----------------------------------------------------------------------
@@ -2221,6 +3265,314 @@ leaves out:
 %======================================================================
 \appendix
 
+\section{Differential-Geometry Primer}
+\label{app:diffgeo}
+
+This appendix is a self-contained primer on the differential-geometry
+tools used in \S\ref{sec:einstein}.  It covers, in order: (i)~the
+metric and what it means to have an inner product on a manifold;
+(ii)~connections, parallel transport, and the Levi-Civita choice;
+(iii)~Christoffel symbols and their computation; (iv)~the 3+1 split
+and the $(3)$-superscript convention used for purely spatial
+quantities; and (v)~an analogy between the $r$-coordinate of a
+closed FLRW slice and a familiar coordinate singularity on the
+2-sphere.  Readers already comfortable with GR can skip ahead.
+
+\subsection{The metric as a bilinear form on tangent vectors}
+\label{app:metric}
+
+On a smooth manifold, tangent vectors at different points live in
+different tangent spaces and cannot, a priori, be added, subtracted,
+or inner-producted.  The \emph{metric} $g$ is the extra structure
+that endows each tangent space $T_pM$ with a symmetric bilinear form,
+i.e.\ a notion of inner product.  Given two vectors
+$u,v \in T_pM$, the metric assigns a scalar
+$g(u,v)$ with $g(u,v) = g(v,u)$; specializing $u=v$ gives the squared
+length $|u|^2 = g(u,u)$, and the angle between $u$ and $v$ is
+$\cos\theta = g(u,v)/(|u||v|)$.
+
+\paragraph{Components in a basis.}  Choose a basis $\{e_\mu\}$ of
+$T_pM$.  Any vector is $u = u^\mu e_\mu$, and by bilinearity
+%
+\begin{equation}
+  g(u,v) = u^\mu v^\nu\,g(e_\mu, e_\nu),
+  \qquad
+  g_{\mu\nu} \equiv g(e_\mu, e_\nu).
+  \label{eq:metric_components}
+\end{equation}
+%
+The metric components $g_{\mu\nu}$ are thus the \emph{table of inner
+products of the basis vectors}, and the familiar formula
+$u\cdot v = g_{\mu\nu}u^\mu v^\nu$ is just Eq.~(\ref{eq:metric_components})
+written with index notation.  $g_{\mu\nu}$ is symmetric in its two
+indices because $g$ is.
+
+\paragraph{Coordinate basis and the line element.}  In a coordinate
+basis $e_\mu = \partial/\partial x^\mu$, the components are
+$g_{\mu\nu}(x) = g(\partial_\mu,\partial_\nu)$ at each point $x$.
+An infinitesimal displacement $dx^\mu$ (components in the dual
+one-form basis) has squared length
+%
+\begin{equation}
+  ds^2 = g_{\mu\nu}(x)\,dx^\mu dx^\nu,
+\end{equation}
+%
+which is how the metric is usually written in practice.
+
+\paragraph{Other bases.}  In an \emph{orthonormal tetrad} (or
+vielbein) basis $e_{\hat a}$, the basis vectors are chosen so that
+$g(e_{\hat a}, e_{\hat b}) = \eta_{\hat a\hat b}$ equals the flat-space
+(Minkowski) metric; converting between bases is done via the tetrad
+components $e^{\hat a}_\mu$, and the two forms of $g$ are related by
+$g_{\mu\nu} = \eta_{\hat a\hat b}\,e^{\hat a}_\mu e^{\hat b}_\nu$.  For
+a surface embedded in a higher-dimensional flat space, the
+\emph{induced} metric is $g_{\mu\nu} = \partial_\mu X\cdot\partial_\nu X$,
+where $X$ is the embedding map and the dot is the ambient flat-space
+inner product; this is the ``honest'' dot-product interpretation
+when an ambient space is available (e.g.\ the 2-sphere in $\mathbb{R}^3$).
+
+\subsection{Connections, parallel transport, and Levi-Civita}
+\label{app:connection}
+
+Tangent spaces at different points are \emph{separate} vector spaces,
+so there is no canonical way to compare a vector at $p$ to a vector
+at a nearby point $q$ --- even infinitesimally close.  A
+\emph{connection} supplies the missing rule: given a curve from $p$
+to $q$, it tells you how to transport a vector along the curve while
+keeping it ``the same.''  This operation is called
+\emph{parallel transport}.  Once a connection is chosen, the partial
+derivative $\partial_\mu$, which is not a tensor on a curved
+manifold, is promoted to a tensorial \emph{covariant derivative}
+$\nabla_\mu$.  In a coordinate basis the connection is encoded in a
+set of coefficients $\Gamma^\lambda_{\mu\nu}(x)$, acting on a vector
+field as
+%
+\begin{equation}
+  \nabla_\mu V^\nu
+  = \partial_\mu V^\nu + \Gamma^\nu_{\mu\rho}V^\rho.
+\end{equation}
+%
+Extension to tensors of higher rank introduces one $+\Gamma$ for each
+upper index and one $-\Gamma$ for each lower index.
+
+On a (pseudo-)Riemannian manifold (one equipped with a metric $g$),
+there is a \emph{unique} connection satisfying:
+\begin{enumerate}
+  \item \emph{Torsion-free}:
+    $\Gamma^\lambda_{\mu\nu} = \Gamma^\lambda_{\nu\mu}$.
+    Equivalently, parallel transport around an infinitesimal
+    parallelogram closes up --- no intrinsic twisting.
+  \item \emph{Metric-compatible}:
+    $\nabla_\mu g_{\alpha\beta} = 0$.
+    Equivalently, parallel transport preserves lengths and angles
+    (proof below).
+\end{enumerate}
+This is the \emph{Levi-Civita connection}, the default choice in
+standard GR.  Modified theories sometimes drop one of (1) or (2)
+(e.g.\ teleparallel gravity has zero curvature but nonzero torsion;
+Einstein--Cartan theory sources torsion by intrinsic spin), but we
+do not consider those here.
+
+\paragraph{Why (2) preserves lengths and angles.}
+Consider parallel-transporting two vectors $u,v$ along a curve
+$\gamma(t)$.  By definition, each vector evolves so that its
+covariant derivative along the curve vanishes:
+$\dot\gamma^\rho\nabla_\rho u^\mu = 0$ and similarly for $v$.  The
+rate of change of their inner product is
+%
+\begin{equation}
+  \frac{d}{dt}(g_{\mu\nu}u^\mu v^\nu)
+  = \dot\gamma^\rho\nabla_\rho(g_{\mu\nu}u^\mu v^\nu)
+  = (\dot\gamma^\rho\nabla_\rho g_{\mu\nu})\,u^\mu v^\nu,
+\end{equation}
+%
+where the two terms from $\nabla u$ and $\nabla v$ vanish by the
+parallel-transport condition.  If $\nabla_\rho g_{\mu\nu} = 0$, this
+derivative is zero, so $u\cdot v$ is conserved along the curve, and
+hence so are lengths and angles.  A rigid ruler parallel-transported
+between two points does not stretch or shrink; the angle between two
+rulers transported together does not change.
+
+A direct application: free-falling particles follow geodesics
+$\dot\gamma^\mu\nabla_\mu\dot\gamma^\nu = 0$, meaning their 4-velocity
+is parallel-transported along their trajectory.  Metric compatibility
+then guarantees $g_{\mu\nu}\dot\gamma^\mu\dot\gamma^\nu = -1$ stays
+constant, so ``proper time'' along a world line is a well-defined
+notion.
+
+\subsection{Christoffel symbols}
+\label{app:christoffel}
+
+Conditions (1)--(2) of \S\ref{app:connection} determine the
+Christoffel symbols uniquely, by an algebraic trick.  Write out
+metric compatibility in full,
+%
+\begin{equation}
+  \partial_\mu g_{\alpha\beta}
+  = \Gamma^\lambda_{\mu\alpha}\,g_{\lambda\beta}
+  + \Gamma^\lambda_{\mu\beta}\,g_{\alpha\lambda},
+  \label{eq:metric_comp}
+\end{equation}
+%
+cyclically permute $(\mu,\alpha,\beta)$ to obtain two more relations,
+add two of them and subtract the third, and use the symmetry
+$\Gamma^\lambda_{\mu\nu} = \Gamma^\lambda_{\nu\mu}$.  The various
+terms rearrange into
+%
+\begin{equation}
+  \boxed{\;
+  \Gamma^\lambda_{\mu\nu}
+  = \tfrac{1}{2}g^{\lambda\rho}\bigl(\partial_\mu g_{\rho\nu}
+    + \partial_\nu g_{\rho\mu} - \partial_\rho g_{\mu\nu}\bigr),
+  \;}
+  \label{eq:christoffel_formula}
+\end{equation}
+%
+the formula used throughout the main text.
+
+\paragraph{Basic properties.}
+\begin{itemize}
+  \item \emph{Symmetry}: $\Gamma^\lambda_{\mu\nu} = \Gamma^\lambda_{\nu\mu}$
+    (torsion-free).  In $D$ dimensions there are $D\cdot D(D+1)/2$
+    independent components --- $40$ in spacetime ($D=4$), $18$ in
+    3-space.  In FLRW most of these vanish in any sensible chart.
+  \item \emph{Not a tensor}: under a coordinate change $x^\mu\to
+    x'^{\mu'}$,
+    %
+    \begin{equation}
+      \Gamma'^{\lambda'}_{\mu'\nu'}
+      = \frac{\partial x'^{\lambda'}}{\partial x^\lambda}
+        \frac{\partial x^\mu}{\partial x'^{\mu'}}
+        \frac{\partial x^\nu}{\partial x'^{\nu'}}\,
+        \Gamma^\lambda_{\mu\nu}
+      + \frac{\partial x'^{\lambda'}}{\partial x^\lambda}
+        \frac{\partial^2 x^\lambda}{\partial x'^{\mu'}\partial x'^{\nu'}}.
+    \end{equation}
+    %
+    The inhomogeneous second term means $\Gamma$ can always be made
+    to vanish at a single point by choosing locally inertial (Riemann
+    normal) coordinates, even in curved spacetime.  Genuine tensors
+    built from $\Gamma$, notably the Riemann tensor
+    $R^\rho{}_{\sigma\mu\nu}$, cannot be removed this way.
+\end{itemize}
+
+\paragraph{Two practical consequences of $\nabla g = 0$.}
+(i) The metric passes freely through covariant derivatives, so
+raising/lowering indices commutes with $\nabla$.  (ii) The contracted
+Bianchi identity $\nabla_\mu G^{\mu\nu} = 0$ combined with
+$\nabla g = 0$ gives automatic energy--momentum conservation
+$\nabla_\mu T^{\mu\nu} = 0$, which underlies the continuity equation
+in \S\ref{sec:einstein}.
+
+\paragraph{Diagonal metrics.}
+For a diagonal metric (e.g.\ FLRW in spherical coordinates, or
+Schwarzschild) the contraction in Eq.~(\ref{eq:christoffel_formula})
+reduces to the single diagonal term,
+%
+\begin{equation}
+  \Gamma^\lambda_{\mu\nu}
+  = \tfrac{1}{2}g^{\lambda\lambda}\bigl(\partial_\mu g_{\lambda\nu}
+    + \partial_\nu g_{\lambda\mu} - \partial_\lambda g_{\mu\nu}\bigr)
+  \quad\text{(no sum on $\lambda$).}
+\end{equation}
+%
+For instance, using the FLRW 3-metric $\gamma_{rr}=1/(1-Kr^2)$,
+$\gamma_{\theta\theta}=r^2$, $\gamma_{\phi\phi}=r^2\sin^2\theta$,
+%
+\begin{equation}
+  \Gamma^r_{rr}
+  = \tfrac{1}{2}\gamma^{rr}\,\partial_r\gamma_{rr}
+  = \tfrac{1}{2}(1-Kr^2)\cdot\frac{2Kr}{(1-Kr^2)^2}
+  = \frac{Kr}{1-Kr^2},
+\end{equation}
+%
+matching Eq.~(\ref{eq:christoffel_spatial}).  Other nonzero components
+follow identically.
+
+\paragraph{FLRW: Christoffels from the conformal split.}
+The FLRW split $g_{ij} = a(t)^2\gamma_{ij}(x)$ is a time-dependent
+conformal rescaling of the spatial metric.  Applying
+Eq.~(\ref{eq:christoffel_formula}) and separating components:
+\begin{itemize}
+  \item $\Gamma^i_{jk}$: every term carries two $a^2$ factors
+    (numerator) and one $a^{-2}$ (from $g^{ij}$), netting $a^0$; only
+    spatial derivatives of $\gamma_{ij}$ remain.  Hence $\Gamma^i_{jk}
+    = {}^{(3)}\Gamma^i_{jk}$, independent of $a(t)$.
+  \item $\Gamma^0_{ij}$: $g^{00}=-1$ picks up a time derivative of
+    $g_{ij}=a^2\gamma_{ij}$, giving $\Gamma^0_{ij} = a\dot
+    a\,\gamma_{ij}$.
+  \item $\Gamma^i_{0j}$: $g^{ik}$ contracts with $\partial_0 g_{kj} =
+    2a\dot a\,\gamma_{kj}$, giving $\Gamma^i_{0j} = H\,\delta^i_j$.
+\end{itemize}
+These match the values quoted in \S\ref{sec:einstein}.
+
+\subsection{The 3+1 split and the $(3)$ notation}
+\label{app:3plus1}
+
+It is useful to decompose spacetime quantities into ``time'' and
+``space'' pieces relative to the $t=\mathrm{const}$ slices.  The
+standard convention is to label quantities intrinsic to a slice with
+a leading superscript $(3)$, distinguishing them from their full
+4-dimensional counterparts.  Thus ${}^{(3)}\Gamma^i_{jk}$ is the
+Christoffel symbol of the 3-metric $\gamma_{ij}$ (built from spatial
+derivatives of $\gamma$ alone), ${}^{(3)}R_{ij}$ is its spatial Ricci
+tensor, and ${}^{(3)}R$ its spatial Ricci scalar.  In a general
+spacetime these differ from their 4D counterparts by extrinsic
+curvature terms; in FLRW, the spatial \emph{Christoffels} happen to
+coincide ($\Gamma^i_{jk} = {}^{(3)}\Gamma^i_{jk}$, the $a^2$ factors
+cancel), but the spatial \emph{Ricci} components do not.
+
+\paragraph{Physical spatial curvature is $K/a^2$.}
+The intrinsic curvature of a $t=\mathrm{const}$ slice is
+$K/a(t)^2$.  Two derivations:
+
+\emph{(i) Scaling.}  Curvature has units of inverse length squared.
+The split $g_{ij} = a^2\gamma_{ij}$ rescales physical distances by a
+factor $a$ relative to the comoving 3-metric $\gamma_{ij}$, so
+inverse-length-squared quantities scale as $1/a^2$.  Since
+$\gamma_{ij}$ has curvature $K$ by construction, the physical spatial
+metric has curvature $K/a^2$.  A balloon inflated from radius $R$ to
+$aR$ has surface curvature $1/(aR)^2$ for the same reason.
+
+\emph{(ii) Direct computation.}  The Ricci scalar of $\gamma_{ij}$ is
+${}^{(3)}R_\gamma = 6K$ (standard result for a maximally symmetric
+3-space).  Under a \emph{spatially constant} conformal rescaling
+$g_{ij} = \Omega^2\gamma_{ij}$ with $\Omega=a(t)$, all gradient terms
+in the conformal transformation vanish, leaving
+${}^{(3)}R_g = \Omega^{-2}\,{}^{(3)}R_\gamma = 6K/a^2$.
+
+\subsection{Coordinate singularities: the 2-sphere analogy}
+\label{app:coord_sing}
+
+The FLRW metric in $(r,\theta,\phi)$ coordinates has
+$g_{rr} = a^2/(1-Kr^2)$, which blows up at $r = 1/\sqrt{K}$ for
+$K>0$.  This is a \emph{coordinate} singularity, not a physical one:
+the geometry is perfectly smooth there, and switching to the
+$\chi$-coordinate used in \S\ref{sec:einstein} removes the
+pathology.
+
+A clean 2D analogue lives on the unit 2-sphere.  The
+latitude--longitude chart $(\theta,\phi)$ has metric
+$d\theta^2 + \sin^2\theta\,d\phi^2$, regular everywhere except at the
+poles (where $\phi$ is degenerate).  Switch to the
+\emph{cylindrical-radius coordinate} $r \equiv \sin\theta$ --- the
+perpendicular distance from the polar axis, not the polar angle
+itself.  Then $d\theta = dr/\sqrt{1-r^2}$ and the 2-sphere metric
+becomes
+%
+\begin{equation}
+  ds^2 = \frac{dr^2}{1-r^2} + r^2\,d\phi^2,
+\end{equation}
+%
+exactly the $K=1$ form of Eq.~(\ref{eq:gamma_metric}).  But now the
+$r$-coordinate is problematic: as $\theta$ sweeps from $0$ (north
+pole) through $\pi/2$ (equator) to $\pi$ (south pole), $r$ runs
+$0\to 1\to 0$.  It is double-valued --- north and south hemispheres
+have the same $r$ --- and $g_{rr}$ diverges at the equator $r=1$.
+The well-behaved $(\theta,\phi)$ chart on the 2-sphere is the
+analogue of the $\chi$-chart on the 3-sphere in the FLRW case.
+
+%----------------------------------------------------------------------
 \section{Fourier Transforms}
 \label{app:fft}
 
@@ -2254,7 +3606,7 @@ requires the Dirac delta representation
 
 The convolution theorem states that for the convolution
 $h(\bx) = \int d^3x_1\,f(\bx_1)g(\bx-\bx_1)$, the Fourier transform
-factorises: $h(\bk) = f(\bk)g(\bk)$.
+factorizes: $h(\bk) = f(\bk)g(\bk)$.
 Conversely, the Fourier transform of a product $h(\bx) = f(\bx)g(\bx)$
 is a convolution in $\bk$-space:
 %
@@ -2432,7 +3784,7 @@ $\delta^{\rm FFTW}(\mathbf{n}_k) = \sum_{\mathbf{n}_r}
 \delta(\mathbf{n}_r)\,e^{-2\pi i\mathbf{n}_k\cdot\mathbf{n}_r/N}$
 (see \texttt{fft.pdf} for FFTW conventions).  In the notation of
 Eq.~(\ref{eq:dft_fwd}), $\delta(\bk_p) = H^3\,\delta^{\rm FFTW}(\mathbf{n}_k)$,
-so the correctly normalised Fourier mode is
+so the correctly normalized Fourier mode is
 %
 \begin{equation}
   \delta(\bk_p) = H^3\,\delta^{\rm FFTW}(\mathbf{n}_k).
@@ -2441,7 +3793,7 @@ so the correctly normalised Fourier mode is
 %
 Using the definition $\langle\delta(\bk_1)\delta(\bk_2)\rangle =
 (2\pi)^3 P(k)\,\delta^D(\bk_1+\bk_2)$ together with the discrete
-normalisation $k_F^3 \to k_F^3/(2\pi)^3$ yields \citep{Jeong2010}
+normalization $k_F^3 \to k_F^3/(2\pi)^3$ yields \citep{Jeong2010}
 %
 \begin{equation}
   \hat{P}(k) = \frac{V}{N^6}
@@ -2663,7 +4015,7 @@ coincides with the ensemble two-point function, and the DFT pair
 %
 is \emph{exactly} equal to Eq.~(\ref{eq:xi_direct_grid}), not merely an
 approximation: the DFT is, by construction, the unique basis that
-diagonalises the cyclic convolution operator.  Computed via FFT the
+diagonalizes the cyclic convolution operator.  Computed via FFT the
 cost drops to $\mathcal{O}(N_{\rm grid}^3 \log N_{\rm grid})$, with the
 radial binning step adding a single sweep over the $N_{\rm grid}^3$
 output values.  At $N_{\rm grid}=256$ this is a $\sim\!10^5\times$
@@ -2809,7 +4161,7 @@ ICs were instead back-scaled with a radiation-inclusive $D_+(z)$,
 the mode amplitudes at $z_{\rm start}$ would disagree with what
 the integrator treats as a linearly evolving perturbation at that
 redshift, and the simulation would undo part of the back-scaling
-as it re-linearises the growing mode onto its own (no-radiation)
+as it re-linearizes the growing mode onto its own (no-radiation)
 growth history.  The IC generator therefore adopts the same
 $\Omega_r = 0$ convention so that linear modes carry over
 continuously from the Boltzmann solution at $z=0$ into the
