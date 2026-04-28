@@ -55,8 +55,8 @@ F_d = np.abs(cft(f_d, x, k))
 
 datasets = [
     (f_a, F_a,
-     r"(a) $f(x) \approx \delta(x)$  (narrow Gaussian)",
-     r"$|\hat{f}(k)| \approx 1$  (flat)"),
+     r"(a) $f(x) = e^{-x^2/(2\sigma^2)}/(\sigma\sqrt{2\pi})$,  $\sigma=0.15$  ($\approx\delta(x)$)",
+     r"$|\hat{f}(k)| = e^{-k^2\sigma^2/2}\,\approx\,1$  (flat)"),
     (f_b, F_b,
      r"(b) $f(x) = e^{-x^2/(2\sigma^2)}$,  $\sigma=0.7$",
      r"$|\hat{f}(k)| = \sigma\sqrt{2\pi}\,e^{-k^2\sigma^2/2}$"),
