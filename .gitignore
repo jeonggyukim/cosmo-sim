@@ -48,3 +48,6 @@ notes/figures/*.png
 # Python
 __pycache__/
 *.pyc
+
+# Exploratory script outputs (regenerable)
+scripts/restriction_*.png
