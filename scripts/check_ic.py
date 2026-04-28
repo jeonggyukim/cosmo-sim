@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-check_ic_dc_mode.py — Verify that the DC (k=0) modes of the displacement
+check_ic.py — Verify that the DC (k=0) modes of the displacement
 and velocity fields in a MUSIC2-generated IC are zero.
 
 Reports two independent diagnostics:
@@ -107,9 +107,9 @@ def check(path, ngrid=None):
     print(f'    <disp>      [Mpc]      = {d_mean}')
     print(f'      / disp_RMS           = {d_mean / d_rms}')
     print(f'    disp RMS    [Mpc]      = {d_rms}')
-    print(f'    <vel>  [a km/s]        = {v_mean}')
+    print(f'    <vel>      [km/s]      = {v_mean}')
     print(f'      / vel_RMS            = {v_mean / v_rms}')
-    print(f'    vel  RMS [a km/s]      = {v_rms}')
+    print(f'    vel  RMS   [km/s]      = {v_rms}')
 
     # ---- 2. Eulerian CIC-grid-based DC check ----------------------------
     rho = cic_deposit(pos, L, ngrid)
@@ -126,10 +126,110 @@ def check(path, ngrid=None):
     print(f'    δ̃(k=0) / ngrid³       = {delta_dc:.3e}   (≡0 by ρ/ρ̄ − 1)')
     print(f'    δ RMS                  = {delta.std():.3e}')
     v_grid_rms = v_grid.reshape(-1, 3).std(axis=0)
-    print(f'    ṽ_grid(k=0) [a km/s]   = {v_grid_dc}')
+    print(f'    ṽ_grid(k=0) [km/s]     = {v_grid_dc}')
     print(f'      / v_grid_RMS         = {v_grid_dc / v_grid_rms}')
-    print(f'    v_grid RMS [a km/s]    = {v_grid_rms}')
+    print(f'    v_grid RMS [km/s]      = {v_grid_rms}')
     print()
+
+    return {'vel': vel, 'disp': disp, 'delta': delta, 'path': path,
+            'L': L, 'n': n, 'dx': dx_lat}
+
+
+def plot_histograms(results, output):
+    """
+    2x3 panel of IC histograms; supports multi-IC overlay.
+
+      [0,0]  d_x, d_y, d_z   (per-IC, components stacked)
+      [0,1]  v_x, v_y, v_z   (per-IC, components stacked)
+      [0,2]  δ (CIC)         log-y, with Gaussian reference
+      [1,0]  |d|             log-y, with Maxwell-Boltzmann reference
+      [1,1]  |v|             log-y, with Maxwell-Boltzmann reference
+      [1,2]  σ / skew / kurt summary table
+    """
+    import matplotlib.pyplot as plt
+    from scipy.stats import skew, kurtosis
+
+    fig, axes = plt.subplots(2, 3, figsize=(14, 8))
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    comp_ls = ['-', '--', ':']
+    comp_lbl = ['x', 'y', 'z']
+
+    summary_rows = []
+    for ir, r in enumerate(results):
+        stem = r['path'].split('/')[-1].replace('.hdf5', '').replace('ics_swift_', '')
+        c = colors[ir % len(colors)]
+        d = r['disp']
+        v = r['vel']
+        delta = r['delta'].ravel()
+
+        # [0,0] displacement components — one IC = one color, three linestyles
+        for a in range(3):
+            x = d[:, a]
+            axes[0, 0].hist(x, bins=120, histtype='step', density=True,
+                            color=c, ls=comp_ls[a],
+                            label=f'{stem} d_{comp_lbl[a]}' if a == 0 else None)
+
+        # [0,1] velocity components
+        for a in range(3):
+            x = v[:, a]
+            axes[0, 1].hist(x, bins=120, histtype='step', density=True,
+                            color=c, ls=comp_ls[a],
+                            label=f'{stem} v_{comp_lbl[a]}' if a == 0 else None)
+
+        # [0,2] δ
+        sig_d = delta.std()
+        axes[0, 2].hist(delta, bins=200, histtype='step', density=True,
+                        color=c, label=stem)
+
+        # [1,0] |d|  (mark mean inter-particle spacing dx = L/N)
+        d_mag = np.linalg.norm(d, axis=1)
+        axes[1, 0].hist(d_mag, bins=120, histtype='step', density=True,
+                        color=c, label=stem)
+        axes[1, 0].axvline(r['dx'], color=c, ls=':', alpha=0.7,
+                           label=f'{stem}  dx={r["dx"]:.3g} Mpc')
+
+        # [1,1] |v|
+        v_mag = np.linalg.norm(v, axis=1)
+        axes[1, 1].hist(v_mag, bins=120, histtype='step', density=True,
+                        color=c, label=stem)
+
+        summary_rows.append((stem, c,
+                             d.std(axis=0), v.std(axis=0),
+                             sig_d, skew(delta), kurtosis(delta)))
+
+    axes[0, 0].set(xlabel='displacement [Mpc]', ylabel='PDF',
+                   title='d_x, d_y, d_z (per IC)')
+    axes[0, 1].set(xlabel='velocity [km/s]', ylabel='PDF',
+                   title='v_x, v_y, v_z (per IC)')
+    axes[0, 2].set(xlabel=r'$\delta$ (CIC)', ylabel='PDF',
+                   title=r'Density contrast $\delta$', yscale='log')
+    axes[1, 0].set(xlabel='|d| [Mpc]', ylabel='PDF',
+                   title='Displacement magnitude |d|  (dotted: dx = L/N)',
+                   xscale='log', yscale='log')
+    axes[1, 1].set(xlabel='|v| [km/s]', ylabel='PDF',
+                   title='Velocity magnitude |v|', yscale='log')
+
+    for ax in [axes[0, 0], axes[0, 1], axes[0, 2], axes[1, 0], axes[1, 1]]:
+        ax.legend(fontsize=7, loc='best')
+
+    # Summary table panel
+    ax = axes[1, 2]
+    ax.axis('off')
+    lines = ['σ (per axis), skew, kurt:', '']
+    for stem, c, sd, sv, sig_d, sk_d, ku_d in summary_rows:
+        lines.append(stem)
+        lines.append(f'  σ_d   = ({sd[0]:.3g}, {sd[1]:.3g}, {sd[2]:.3g}) Mpc')
+        lines.append(f'  σ_v   = ({sv[0]:.3g}, {sv[1]:.3g}, {sv[2]:.3g}) km/s')
+        lines.append(f'  σ_δ   = {sig_d:.3e}')
+        lines.append(f'  skew  = {sk_d:+.2e},  kurt = {ku_d:+.2e}')
+        lines.append('')
+    ax.text(0.0, 1.0, '\n'.join(lines), fontfamily='monospace',
+            fontsize=8, va='top', ha='left', transform=ax.transAxes)
+
+    fig.suptitle('IC histograms: displacement, velocity, density contrast')
+    fig.tight_layout()
+    fig.savefig(output, dpi=140)
+    print(f'Saved histogram plot → {output}')
 
 
 PREAMBLE = """\
@@ -194,11 +294,15 @@ def main():
                     help='CIC grid size per side (default: N^(1/3))')
     ap.add_argument('--explain', action='store_true',
                     help='Print preamble explaining what is measured and why')
+    ap.add_argument('--hist', metavar='PNG', default=None,
+                    help='Plot histograms of peculiar-velocity components and '
+                         'CIC δ to PNG.')
     args = ap.parse_args()
     if args.explain:
         print(PREAMBLE)
-    for path in args.ic_files:
-        check(path, ngrid=args.ngrid)
+    results = [check(p, ngrid=args.ngrid) for p in args.ic_files]
+    if args.hist:
+        plot_histograms(results, args.hist)
 
 
 if __name__ == '__main__':

@@ -44,7 +44,7 @@ Currently a placeholder.  To cover:
 
 ## 3. Validation
 
-- **`scripts/check_ic_dc_mode.py`**: extend to both species.
+- **`scripts/check_ic.py`**: extend to both species.
 - **New diagnostic** (most important): recover $T_b(k)/T_c(k)$ from
   the IC and compare to CLASS.  This is the real test that the
   two-species sampling is *coherent* — the same random seed must
