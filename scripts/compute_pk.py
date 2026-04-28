@@ -270,8 +270,8 @@ def main():
 
     # --- Read HDF5 ---
     with h5py.File(args.hdf5, "r") as f:
-        boxsize_mpc = float(f["Header"].attrs["BoxSize"])    # Mpc
-        redshift = float(f["Header"].attrs["Redshift"])
+        boxsize_mpc = float(np.asarray(f["Header"].attrs["BoxSize"]).reshape(-1)[0])    # Mpc
+        redshift = float(np.asarray(f["Header"].attrs["Redshift"]).reshape(-1)[0])
         coords = f["PartType1/Coordinates"][:]          # (N, 3), Mpc
 
     N = len(coords)
