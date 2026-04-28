@@ -80,8 +80,10 @@ Uses `conf/CV_22_MUSIC_template.conf` (CV_22 cosmology, SWIFT output format).
 # → conf/input_class_parameters_n256_z200_L1024.ini  (moved from repo root by pipeline)
 ```
 
-SWIFT stores coordinates and BoxSize in **Mpc** (not Mpc/h). Velocities are stored as
-`v_int = a × v_pec` (canonical momentum convention); divide by a² when computing ψ(r).
+SWIFT stores coordinates and BoxSize in **Mpc** (not Mpc/h). The on-disk `Velocities`
+dataset written by MUSIC2 is the **peculiar velocity in km/s** (`v_pec = a·H·f·Ψ`); SWIFT
+itself converts to its internal canonical-momentum variable `u = a·v_pec` only at IC read
+time. So measured ψ(r) from `compute_xi_cic` is already in (km/s)² — no a² rescaling.
 
 ---
 
@@ -148,9 +150,9 @@ conda run -n cosmo python scripts/make_rbins.py \
 ```
 
 `plot_ic.py` auto-detects all `xi_*`, `xi_cic_*`, and `vel_cic_*` files alongside the pk file
-and overlays them. Theory ψ(r) = [H(z)f(z)]²/(2π²) ∫ P(k) j₀(kr) dk is computed from
-CLASS P(k); the measured ψ is corrected from SWIFT internal units (a·v_pec) to peculiar
-velocity units automatically.
+and overlays them. Theory ψ(r) = [a·H(z)·f(z)]²/(2π²) ∫ P(k) j₀(kr) dk is computed from
+CLASS P(k); the measured ψ is already in (km/s)² since MUSIC2 writes peculiar velocities
+to disk in km/s.
 
 ---
 

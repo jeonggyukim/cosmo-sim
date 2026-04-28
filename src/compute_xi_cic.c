@@ -372,9 +372,11 @@ static void cic_assign(const double *coords, long long npart,
  * For cells with zero mass (empty cells — extremely rare in IC files), the
  * velocity is set to 0 (the linear-theory mean is zero, so this is unbiased).
  *
- * Note on SWIFT velocity units: SWIFT ICs store a·v_pec (km/s) where a is
- * the scale factor at the IC snapshot.  For cosmological ICs the velocities
- * are already in the frame needed for ψ(r) = ⟨v·v'⟩ in (km/s)².
+ * Note on SWIFT velocity units: MUSIC2's SWIFT plugin writes the on-disk
+ * Velocities dataset in peculiar-velocity units (km/s), i.e. v_pec itself,
+ * not a·v_pec.  (SWIFT's *internal* code variable is u = a·v_pec, but the
+ * conversion happens at IC read time.)  So ψ(r) = ⟨v·v'⟩ comes out in
+ * (km/s)² directly and is comparable to linear theory ψ_pec.
  */
 static void cic_vel_assign(const double *coords, const double *vels,
                            long long npart, double boxsize, int Ngrid,
@@ -876,7 +878,7 @@ static void accumulate_pairs(const double *den, int Ngrid,
  *
  * In linear theory (for an irrotational velocity field):
  *
- *   ψ(r) = [H(z)·f(z)]² / (2π²) ∫₀^∞ dk P(k,z) j₀(kr)
+ *   ψ(r) = [a·H(z)·f(z)]² / (2π²) ∫₀^∞ dk P(k,z) j₀(kr)
  *
  * where f = d ln D / d ln a ≈ Ω_m(z)^0.55 and P(k,z) is the matter power
  * spectrum.  This is the same Hankel transform as ξ(r) but without the k²

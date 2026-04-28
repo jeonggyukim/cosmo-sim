@@ -242,34 +242,38 @@ class ICPlotter:
                 Hz = self.H0 * Ez           # km/s/Mpc
                 Hz_hMpc = Hz / self.h            # km/s/(Mpc/h) — consistent with k in h/Mpc
                 fz = (self.Omega_m * (1+z)**3 / Ez**2) ** 0.55   # Linder 2005
+                a = 1.0 / (1.0 + z)
                 r_grid = self.theory_xi_r if self.theory_xi_r is not None else None
-                r_psi, psi = self._compute_theory_psi(kt, Pt, Hz_hMpc, fz,
+                r_psi, psi = self._compute_theory_psi(kt, Pt, a, Hz_hMpc, fz,
                                                       r_grid=r_grid)
                 self.theory_psi_r = r_psi
                 self.theory_psi = psi
-                print(f"Theory ψ(r): z={z:.4g}, H={Hz:.1f} km/s/Mpc, "
-                      f"f={fz:.4f}, H·f/(h)={Hz_hMpc*fz:.2f} km/s/(Mpc/h)")
+                print(f"Theory ψ(r): z={z:.4g}, a={a:.4g}, H={Hz:.1f} km/s/Mpc, "
+                      f"f={fz:.4f}, aHf/(h)={a*Hz_hMpc*fz:.2f} km/s/(Mpc/h)")
 
     @staticmethod
-    def _compute_theory_psi(kt, Pt, Hz_hMpc, fz, r_grid=None):
+    def _compute_theory_psi(kt, Pt, a, Hz_hMpc, fz, r_grid=None):
         """
         Compute the true peculiar-velocity correlation ψ(r) = ⟨v_pec(x)·v_pec(x+r)⟩.
 
-        In linear theory the velocity field is irrotational:
-            v_k = i (H·f/k) k̂ δ_k
-        so the isotropic scalar correlation is:
-            ψ_true(r) = [H·f]²/(2π²) ∫ P(k) j₀(kr) dk
+        In linear theory the proper peculiar velocity is irrotational with
+            v_pec,k = i (a·H·f/k) k̂ δ_k
+        (since v_pec = a·ẋ_comoving and δ̇ = -∇·v_pec/a = H·f·δ for ZA).
+        The isotropic scalar correlation is:
+            ψ_true(r) = [a·H·f]²/(2π²) ∫ P(k) j₀(kr) dk
 
         The k²/k² factor (from the velocity power spectrum vs the angular
         measure) cancels, unlike ξ(r) which has an extra k² in the integrand.
 
-        Note on SWIFT velocity convention: SWIFT stores v_int = a × v_pec.
-        The measured CIC correlation must be divided by a² before comparing
-        to this theory curve (see load_vel_cic).
+        MUSIC2's SWIFT plugin writes the on-disk Velocities dataset in
+        peculiar-velocity units (km/s), so the CIC correlation from
+        compute_xi_cic is already ψ_pec — no a-rescaling needed on the
+        measurement side either.
 
         Parameters
         ----------
         kt, Pt  : CLASS P(k): k in h/Mpc, P in (Mpc/h)³
+        a       : scale factor 1/(1+z) at the IC redshift
         Hz_hMpc : H(z) in km/s/(Mpc/h)
         fz      : growth rate f ≈ Ω_m(z)^0.55
 
@@ -292,7 +296,7 @@ class ICPlotter:
             x = kt * ri
             j0 = np.where(np.abs(x) < 1e-8, 1.0, np.sin(x) / x)
             psi[i] = np.trapezoid(Pt * j0, kt)
-        psi *= (Hz_hMpc * fz) ** 2 / (2 * np.pi**2)
+        psi *= (a * Hz_hMpc * fz) ** 2 / (2 * np.pi**2)
         return r, psi
 
     def load_corrfunc_xi(self, xi_file, hdf5_file=None, rbins_file=None,
@@ -360,13 +364,15 @@ class ICPlotter:
         """
         Load CIC velocity correlation ψ(r) from vel_cic_*.txt.
 
-        SWIFT stores velocities as v_int = a × v_pec, so the raw correlation
-        from compute_xi_cic is ψ_raw = a² × ψ_pec.  Pass a=1/(1+z) to
-        convert to true peculiar-velocity units: ψ_pec = ψ_raw / a².
+        MUSIC2's SWIFT plugin writes Velocities in peculiar-velocity units
+        (km/s), so the raw correlation from compute_xi_cic is already
+        ψ_pec(r) in (km/s)². The `a` argument is kept for API compatibility
+        but is unused.
         """
+        del a  # SWIFT IC velocities are already v_pec; no rescaling needed
         vel = np.loadtxt(vel_cic_file, comments='#')
         r_mid = np.sqrt(vel[:, 1] * vel[:, 2]) * self.h   # Mpc → Mpc/h
-        psi = vel[:, 3] / a**2                           # convert to v_pec units
+        psi = vel[:, 3]
         self.vel_cic_list.append({
             "r_mid": r_mid, "psi": psi,
             "stem": stem or os.path.basename(vel_cic_file),
