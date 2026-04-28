@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "icpipe"
+version = "0.1.0"
+description = "Initial-condition (IC) analysis utilities for SWIFT/MUSIC2 cosmological simulations"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "cosmo-pipeline contributors" }]
+dependencies = [
+    "numpy>=1.20",
+    "scipy>=1.7",
+    "h5py>=3.0",
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.5"]
+test = ["pytest>=7"]
+
+[tool.setuptools]
+packages = ["icpipe"]
+
+[tool.pytest.ini_options]
+testpaths = ["icpipe/tests"]
