@@ -2,13 +2,40 @@
 
 LaTeX write-ups on topics related to cosmological simulations and IC generation.
 
+## Quick start
+
+Build all PDFs (and regenerate figures as needed):
+
+```bash
+cd notes
+make
+```
+
+This compiles `fft.pdf`, `cosmo_ic.pdf`, `ic_sampling.pdf`, and
+`restriction_lpt.pdf` and opens them automatically.
+
 ## Files
 
-| File | Title | Contents |
+(Source `.tex` files live alongside; readers should open the
+compiled `.pdf`, built by running `make` in this directory.)
+
+| Note | Title | Contents |
 |------|-------|----------|
-| `cosmo_ic.tex` | Cosmological Initial Conditions: Theory and Validation | LPT (ZA, 2LPT), IC generation, P(k), ξ(r), ψ(r), starting redshifts, P(k) estimation; §11 MUSIC2 / monofonIC implementation details |
-| `ic_sampling.tex` | Real-Space vs Fourier-Space IC Sampling | Pen 1997, Sirko 2005, Hahn 2011: P-sampled vs ξ-sampled ICs, box window errors |
-| `fft.tex` | Fourier Transforms in Practice | DFT, FFTW, multi-D, MPI (fftMPI/Tigris BlockFFT) |
+| `fft.pdf` | Fourier Transforms in Practice | DFT, FFTW, multi-D, MPI (fftMPI/Tigris BlockFFT) |
+| `cosmo_ic.pdf` | Cosmological Initial Conditions: Theory and Practice | FLRW background, fluid equations, LPT (ZA, 2LPT), IC generation, P(k), ξ(r), ψ(r), starting redshifts; §11 MUSIC2 / monofonIC implementation details. Notation table at the start (§1). |
+| `ic_sampling.pdf` | Real-Space vs Fourier-Space IC Sampling | Pen 1997, Sirko 2005, Hahn 2011: P-sampled vs ξ-sampled ICs, box window errors |
+| `restriction_lpt.pdf` | Restriction of a Density Field and the 1LPT Displacement | Bin-averaging restriction (cell window + aliasing), effect on δ / Ψ⁽¹⁾ / deformation tensor / S⁽²⁾, why restricting the displacement potential is Poisson-inconsistent, application to zoom-in IC generation |
+
+## Reading order
+
+Suggested progression for self-study:
+
+1. **`fft.pdf`** — foundational Fourier-analysis tools used by everything else (sampling, Nyquist, aliasing, convolution theorem). Skim if you already know this material.
+2. **`cosmo_ic.pdf`** — the spine: cosmology background → linear theory → LPT → IC generation pipeline → MUSIC2 internals. Start here if you have a Fourier-analysis background.
+3. **`ic_sampling.pdf`** — focused deep dive into how white noise is generated in IC codes (P-sampled vs ξ-sampled, box window). Reads naturally after `cosmo_ic.pdf` but is largely self-contained.
+4. **`restriction_lpt.pdf`** — focused application: what restriction (block-averaging) does to fields and why bin-averaging shouldn't be used to construct zoom-in lo-res ICs. Builds on the LPT machinery from `cosmo_ic.pdf` and the Fourier tools from `fft.pdf`; cross-references both.
+
+Within each note the sections are ordered linearly; `cosmo_ic.pdf` (the longest) opens with a notation table for readers who want to jump in mid-document.
 
 ## Building
 
