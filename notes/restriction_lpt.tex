@@ -38,13 +38,13 @@ of the eight (in 3D; four in 2D) fine cells inside it, which makes the
 restriction \emph{locally} mass conserving: the mass in any coarse cell
 $[I,J,K]$ equals the sum of the masses in its child fine cells,
 \begin{equation}\label{eq:local-mass}
-  (1 + \delta_N[I,J,K])\,\Delta x_c^3
+  (1 + \delta_{N,IJK})\,\Delta x_c^3
   \;=\;\!\!\!\sum_{(i,j,k)\in\,\mathrm{block}(I,J,K)}\!\!\!
-        (1 + \delta_{2N}[i,j,k])\,\Delta x_f^3,
+        (1 + \delta_{2N,ijk})\,\Delta x_f^3,
 \end{equation}
 where the block contains the eight fine cells $\{(2I+a,2J+b,2K+c)\}_{a,b,c\in\{0,1\}}$.
 Because $\Delta x_c^3 = 8\Delta x_f^3$, equation~(\ref{eq:local-mass})
-reduces to $\delta_N[I,J,K] = \tfrac{1}{8}\sum_{\rm block}\delta_{2N}$,
+reduces to $\delta_{N,IJK} = \tfrac{1}{8}\sum_{\rm block}\delta_{2N}$,
 i.e.\ block averaging. Summing (\ref{eq:local-mass}) over all coarse
 cells recovers global mass conservation as an immediate consequence.
 
@@ -92,13 +92,13 @@ see \texttt{notes/fft.tex}.)
 The discrete convolution is the grid analogue of the familiar
 continuous convolution
 $(h*f)(x)=\int h(x-x')f(x')\,dx'$: replace the integral by a sum and
-the continuous kernel $h(x)$ by a finite list of weights $h[n]$. For
+the continuous kernel $h(x)$ by a finite list of weights $h_n$. For
 each output position $m$, the convolved value is a weighted sum of
 nearby input samples,
 \begin{equation}
-  y[m] \;=\; \sum_n h[n]\,\delta_{2N}[m+n].
+  y_m \;=\; \sum_n h_n\,\delta_{2N,m+n}.
 \end{equation}
-The list $\{h[n]\}$ is called a \emph{kernel}; for our restriction
+The list $\{h_n\}$ is called a \emph{kernel}; for our restriction
 operation it is the simplest possible smoothing kernel, an equal-weight
 average over two adjacent fine cells.
 
@@ -107,7 +107,7 @@ position label on the fine grid, in units of the fine spacing $\Delta x_f$:
 $n=0$ refers to the sample at position $x=0$, $n=1$ to the sample at
 $x=\Delta x_f$, and so on.}
 \begin{equation}
-  h[n] \;=\;
+  h_n \;=\;
   \begin{cases}
     \tfrac12 & n=0,\\
     \tfrac12 & n=1,\\
@@ -115,13 +115,13 @@ $x=\Delta x_f$, and so on.}
   \end{cases}
 \end{equation}
 Plugging this into the convolution formula gives
-$y[m] = \tfrac12\bigl(\delta_{2N}[m] + \delta_{2N}[m+1]\bigr)$,
+$y_m = \tfrac12\bigl(\delta_{2N,m} + \delta_{2N,m+1}\bigr)$,
 the moving average of two adjacent fine samples (defined on the same
 fine grid as $\delta_{2N}$). Subsampling means we then keep only the
 even-indexed entries:
 \begin{equation}\label{eq:discrete-restrict}
-  \delta_N[I] \;=\; y[2I]
-              \;=\; \tfrac12\bigl(\delta_{2N}[2I] + \delta_{2N}[2I+1]\bigr).
+  \delta_{N,I} \;=\; y_{2I}
+              \;=\; \tfrac12\bigl(\delta_{2N,2I} + \delta_{2N,2I+1}\bigr).
 \end{equation}
 Equation~(\ref{eq:discrete-restrict}) is exactly $2{:}1$ block averaging:
 the coarse cell with index $I$ is the mean of the two fine cells with
@@ -132,7 +132,7 @@ field is mapped to itself.
 In 3D the same construction applies separately along each axis. The
 kernel \emph{factorizes} into a tensor product,
 \begin{equation}
-  h_{3{\rm D}}[a,b,c] \;=\; h[a]\,h[b]\,h[c]
+  h_{3{\rm D},\,abc} \;=\; h_a\,h_b\,h_c
                      \;=\; \begin{cases}
                               1/8 & a,b,c\in\{0,1\},\\
                               0   & \text{otherwise},
@@ -142,24 +142,24 @@ i.e.\ a $2\!\times\!2\!\times\!2$ array of value $1/8$ (which is
 $1/8 = (1/2)^3$, the per-cell weight that makes the kernel sum to
 unity). The convolution is
 \begin{equation}
-  y[\ell,m,n] \;=\; \sum_{a,b,c} h_{3{\rm D}}[a,b,c]\,
-                    \delta_{2N}[\ell+a, m+b, n+c],
+  y_{\ell,m,n} \;=\; \sum_{a,b,c} h_{3{\rm D},\,abc}\,
+                    \delta_{2N,\,\ell+a,\,m+b,\,n+c},
 \end{equation}
 a moving average of the eight fine samples in a $2\!\times\!2\!\times\!2$
 window. Subsampling $2{:}1$ in each direction then keeps only the
 even-indexed entries, so
 \begin{equation}
-  \delta_N[I,J,K] \;=\; y[2I,2J,2K]
+  \delta_{N,IJK} \;=\; y_{2I,2J,2K}
                   \;=\; \frac{1}{8}\!\!\sum_{a,b,c\in\{0,1\}}\!\!
-                        \delta_{2N}[2I+a, 2J+b, 2K+c],
+                        \delta_{2N,\,2I+a,\,2J+b,\,2K+c},
 \end{equation}
 exactly the local mass-conservation formula~(\ref{eq:local-mass}). The
 2D version is the same construction with $h_{2{\rm D}}[a,b]=1/4$ on a
 $2\!\times\!2$ block. To name the two steps explicitly: forming
-$y[\ell,m,n]$ via the convolution is the \emph{smoothing} step (it
+$y_{\ell,m,n}$ via the convolution is the \emph{smoothing} step (it
 stays on the fine grid and replaces each fine sample by a moving
 average of its $2{\times}2{\times}2$ neighbourhood), and keeping only
-the entries $y[2I,2J,2K]$ is the \emph{subsampling} step (it discards
+the entries $y_{2I,2J,2K}$ is the \emph{subsampling} step (it discards
 every other sample along each axis to land on the coarse grid).
 
 In the continuous-volume limit (many fine samples per coarse cell, so
@@ -168,12 +168,12 @@ a real-space top-hat of width $\Delta x_c$ along each axis (one coarse
 cell), followed by point sampling at the coarse-cell centres.
 
 \paragraph{Smoothing step in Fourier space.}
-The continuous-$k$ Fourier transform of the discrete kernel $h[n]$
+The continuous-$k$ Fourier transform of the discrete kernel $h_n$
 (discrete in samples $n$, continuous in $k$ --- not to be confused with
 the finite-in/finite-out discrete Fourier transform computed by FFT
 routines) is
 \begin{equation}
-  H(k)\;=\;\sum_n h[n]\,e^{-i k n \Delta x_f}
+  H(k)\;=\;\sum_n h_n\,e^{-i k n \Delta x_f}
        \;=\;\tfrac12\bigl(1 + e^{-ik\Delta x_f}\bigr)
        \;=\;e^{-ik\Delta x_f/2}\cos\!\left(\tfrac{k\Delta x_f}{2}\right).
 \end{equation}
@@ -194,7 +194,7 @@ written as a convolution
 \begin{align}
   y(\mathbf x) &\;=\; \int h(\mathbf x - \mathbf x')\,f(\mathbf x')\,d^d x'
                  \quad\text{(continuous)},\\
-  y[\mathbf m] &\;=\; \sum_{\mathbf n} h[\mathbf n]\,f[\mathbf m + \mathbf n]
+  y_{\mathbf m} &\;=\; \sum_{\mathbf n} h_{\mathbf n}\,f_{\mathbf m + \mathbf n}
                  \quad\text{(discrete)},
 \end{align}
 the cell window is
@@ -1032,24 +1032,24 @@ The two factors are just $\hat h(k)$ and $\hat f(k)$, so
 \end{equation}
 
 \paragraph{Discrete case.}
-Now the inputs are sequences $h[n], f[n]$ on a grid of spacing
+Now the inputs are sequences $h_n, f_n$ on a grid of spacing
 $\Delta x$. Define the continuous-$k$ Fourier transform of a sequence
-by $\hat g(k) = \sum_n g[n]\,e^{-ikn\Delta x}$ (the same formula used
+by $\hat g(k) = \sum_n g_n\,e^{-ikn\Delta x}$ (the same formula used
 for $H(k)$ in the main text), and the discrete convolution
 \begin{equation}
-  y[m] \;=\; (h*f)[m] \;\equiv\; \sum_n h[n]\,f[m-n].
+  y_m \;=\; (h*f)_m \;\equiv\; \sum_n h_n\,f_{m-n}.
 \end{equation}
 Take the Fourier transform of $y$:
 \begin{equation}
-  \hat y(k) \;=\; \sum_m y[m]\,e^{-ikm\Delta x}
-            \;=\; \sum_{m,n} h[n]\,f[m-n]\,e^{-ikm\Delta x}.
+  \hat y(k) \;=\; \sum_m y_m\,e^{-ikm\Delta x}
+            \;=\; \sum_{m,n} h_n\,f_{m-n}\,e^{-ikm\Delta x}.
 \end{equation}
 Substitute $m' = m-n$ (so $m = m'+n$, exponent
 $e^{-ikm\Delta x} = e^{-ikn\Delta x}\,e^{-ikm'\Delta x}$):
 \begin{equation}
-  \hat y(k) \;=\; \sum_{n,m'} h[n]\,f[m']\,e^{-ikn\Delta x}\,e^{-ikm'\Delta x}
-            \;=\; \Bigl(\sum_n h[n]\,e^{-ikn\Delta x}\Bigr)
-                  \Bigl(\sum_{m'} f[m']\,e^{-ikm'\Delta x}\Bigr),
+  \hat y(k) \;=\; \sum_{n,m'} h_n\,f_{m'}\,e^{-ikn\Delta x}\,e^{-ikm'\Delta x}
+            \;=\; \Bigl(\sum_n h_n\,e^{-ikn\Delta x}\Bigr)
+                  \Bigl(\sum_{m'} f_{m'}\,e^{-ikm'\Delta x}\Bigr),
 \end{equation}
 which gives the same product law,
 \begin{equation}\label{eq:convthm-disc}
@@ -1061,7 +1061,7 @@ the argument is identical: the double sum factors into a product of
 single sums.
 
 \paragraph{Convolution vs cross-correlation.}
-The main text wrote the smoothing step as $y[m]=\sum_n h[n]\,f[m+n]$
+The main text wrote the smoothing step as $y_m=\sum_n h_n\,f_{m+n}$
 (a moving average), which is technically the discrete
 \emph{cross-correlation} of $h$ with $f$, not the convolution. The two
 differ by a sign-flip in $n$. For a kernel that is symmetric about its
@@ -1083,10 +1083,10 @@ space, tracking the normalization prefactor explicitly.
 
 \paragraph{Convention.}
 We use the unnormalized continuous-$k$ Fourier transform of a discrete
-sequence (consistent with App.~A): for a sequence $g[n]$ on a grid of
+sequence (consistent with App.~A): for a sequence $g_n$ on a grid of
 spacing $\Delta x$,
 \begin{equation}
-  \hat g(k) = \sum_n g[n]\,e^{-ikn\Delta x}.
+  \hat g(k) = \sum_n g_n\,e^{-ikn\Delta x}.
 \end{equation}
 This is the convention that makes the convolution
 theorem~(\ref{eq:convthm-disc}) read as a clean product, and it is the
@@ -1104,8 +1104,8 @@ $\hat y$ still lives on the fine grid --- same wavenumbers as
 $\hat\delta_{2N}$.
 
 \paragraph{Step 2 --- subsampling.}
-For a sequence $g[n]$ on the fine grid (spacing $\Delta x_f$), the
-subsampled sequence $g'[I]=g[2I]$ on the coarse grid (spacing
+For a sequence $g_n$ on the fine grid (spacing $\Delta x_f$), the
+subsampled sequence $g'_I=g_{2I}$ on the coarse grid (spacing
 $\Delta x_c=2\Delta x_f$) has the Fourier transform (this is the
 standard ``decimation'' identity for Fourier transforms of discrete
 sequences, derivable in one line from the even-mask trick
