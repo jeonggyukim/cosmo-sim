@@ -175,6 +175,23 @@ conda run -n cosmo python scripts/plot_dr_histogram.py \
 
 ---
 
+## Python package: `icpipe`
+
+Reusable IC-analysis library used by the `compute_pk.py` /
+`compute_pv.py` CLIs and by the example notebooks. Install once:
+
+```bash
+pip install -e .                 # icpipe + numpy/scipy/h5py
+pip install -e ".[plot,test]"    # also matplotlib + pytest
+pytest icpipe/tests/             # 17 tests
+```
+
+API entry points:
+- `from icpipe import ICField` — load HDF5, build CIC grids, compute `power('delta')` / `power('velocity')`.
+- `from icpipe import LinearTheory` — `LinearTheory.from_class(...)` gives `Pk`, `Pv`, `xi`, `psi` from a single CLASS table.
+
+Worked examples in `notebooks/` (see `notebooks/README.md`).
+
 ## Notes
 
 Four LaTeX write-ups live in `notes/`. Source `.tex` files are tracked

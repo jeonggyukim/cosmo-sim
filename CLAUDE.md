@@ -64,8 +64,18 @@ Remove outputs with `./clean.sh` (or `--all` to also remove IC HDF5 files).
 - `music_build/MUSIC` — compiled MUSIC2 binary (gitignored)
 - `music_build/_deps/class-build/class` — CLASS binary (built by MUSIC2's CMake)
 
+### Python package: `icpipe`
+Reusable analysis library for IC fields. Install once with `pip install -e .` from the project root.
+- `icpipe.ICField(hdf5, ngrid=..., interlace=True, h=..., load_velocities=True)` — main class. Loads positions/velocities, exposes cached CIC density/momentum/velocity Fourier fields, and `.power(field, ...)` for δ or velocity spectra.
+- `icpipe.LinearTheory.from_class(class_pk_dat, z=..., h=..., Omega_m=...)` — linear-theory `Pk`, `Pv`, `xi`, `psi` from a single CLASS table (units consistent across all four).
+- `icpipe.io.read_pk` / `read_pv` / `write_pk` / `write_pv` — ASCII I/O for the table formats below.
+- Tests: `pytest icpipe/tests/` (17 tests).
+- Examples: `notebooks/01_quickstart.ipynb` and `notebooks/02_box_size_sensitivity.ipynb`.
+
 ### IC validation
-- `scripts/compute_pk.py` — estimates P(k) from IC particles via CIC + FFT; saves `pk_*.txt` (no plotting)
+- `scripts/compute_pk.py` — estimates P(k) from IC particles via CIC + FFT; saves `pk_*.txt` (no plotting). Thin wrapper around `icpipe.ICField.power('delta')`.
+- `scripts/compute_pv.py` — estimates the velocity power spectrum P_v(k) via CIC velocity assignment + FFT; saves `pv_*.txt` (k[h/Mpc], Pv_raw[(km/s)²(Mpc/h)³], Pv_nodeconv, sigma_Pv, nmodes). Uses `icpipe.ICField.power('velocity')`.
+- `scripts/plot_box_size_comparison.py` — 4-panel figure (P_δ, P_v, ξ, ψ across box sizes) showing density-vs-velocity sensitivity to L.
 - `scripts/plot_ic.py` — IC diagnostics plotter: reads `pk_*.txt`, auto-detects `xi_*.txt` / `xi_cic_*.txt` / `vel_cic_*.txt`; overlays CLASS theory P(k), ξ(r), ψ(r); class-based (`ICPlotter`)
 - `scripts/make_rbins.py` — generates Corrfunc bin file appropriate for a given IC run (rmin=2×mean spacing, rmax=L/3)
 - `src/compute_xi.c` / `compute_xi` — measures ξ(r) from IC particles using Corrfunc (C, compiled via `make`)
