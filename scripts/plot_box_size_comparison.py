@@ -82,8 +82,8 @@ def main():
                    help="CLASS P(k) file for theory curves")
     p.add_argument("--H0", type=float, default=67.11,
                    help="H0 in km/s/Mpc")
-    p.add_argument("--Omega-m", type=float, default=0.3158,
-                   help="Omega_m today")
+    p.add_argument("--Omega-m", type=float, default=0.3,
+                   help="Omega_m today (matches conf/CV_22_MUSIC_template.conf)")
     p.add_argument("-o", "--output", default="plots/box_size_comparison.png",
                    help="Output PNG path (default: plots/box_size_comparison.png)")
     args = p.parse_args()
