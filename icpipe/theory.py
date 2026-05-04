@@ -50,6 +50,25 @@ class LinearTheory:
         kt, Pt = np.loadtxt(path, comments="#", unpack=True)
         return cls(k_table=kt, Pk_table=Pt, z=z, h=h, Omega_m=Omega_m)
 
+    @classmethod
+    def from_class_backscaled(cls, z0_path: str, *, z_target: float,
+                              h: float = 0.6711,
+                              Omega_m: float = 0.3158) -> "LinearTheory":
+        """Load a CLASS table assumed at z=0 and back-scale to z_target via
+
+            P(k, z_target) = D_norad(z_target)^2 * P_CLASS(k, z=0)
+
+        using the no-radiation linear growth factor (matches MUSIC2's
+        ``ZeroRadiation = true`` convention; see ``D_norad``). Returns a
+        LinearTheory whose ``.z = z_target`` and ``.Pk(k)`` already gives
+        the back-scaled prediction.
+        """
+        kt, Pt = np.loadtxt(z0_path, comments="#", unpack=True)
+        tmp = cls(k_table=kt, Pk_table=Pt, z=0.0, h=h, Omega_m=Omega_m)
+        D2 = tmp.D_norad(z_target) ** 2
+        return cls(k_table=kt, Pk_table=Pt * D2, z=z_target,
+                   h=h, Omega_m=Omega_m)
+
     # ----- background scalars -----------------------------------------
     @property
     def a(self) -> float:
@@ -79,6 +98,30 @@ class LinearTheory:
     def f_growth(self) -> float:
         """Linear growth rate f ≈ Omega_m(z)^0.55 (Linder 2005)."""
         return float((self.Omega_m * (1 + self.z)**3 / self.Ez**2) ** 0.55)
+
+    def D_norad(self, z: float | None = None) -> float:
+        """Linear growth factor D+(z) in flat ΛCDM with Omega_r=0,
+        normalised to D+(0)=1. Matches MUSIC2's ``ZeroRadiation=true``
+        convention (and the assumption made by SWIFT/GADGET in their
+        background Friedmann evolution).
+
+            D+(z) ∝ H(a) * ∫_0^a da' / [a' H(a')]^3
+        """
+        from scipy.integrate import quad
+        if z is None:
+            z = self.z
+        Om, OL = self.Omega_m, 1.0 - self.Omega_m
+
+        def H_over_H0(a):
+            return np.sqrt(Om / a**3 + OL)
+
+        def integrand(a):
+            return 1.0 / (a * H_over_H0(a)) ** 3
+
+        a = 1.0 / (1.0 + z)
+        D_a, _ = quad(integrand, 1e-6, a,   limit=500)
+        D_0, _ = quad(integrand, 1e-6, 1.0, limit=500)
+        return float((H_over_H0(a) * D_a) / (H_over_H0(1.0) * D_0))
 
     @property
     def aHf(self) -> float:
