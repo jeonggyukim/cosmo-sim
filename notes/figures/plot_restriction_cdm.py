@@ -9,19 +9,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+from icpipe import LinearTheory
+
 CLASS_PK = Path(__file__).resolve().parents[2] / 'data' / 'class_pk_z200_pk.dat'
 
 rng = np.random.default_rng(42)
 N, N2, L = 64, 128, 500.0   # L in Mpc/h, large enough that small-k modes have CDM peak
 n_toy = -2.0   # slope of the toy P(k) ~ k^n_toy used in earlier figures
 
-# --- load and interpolate CLASS P(k) ---
-ktab, Ptab = np.loadtxt(CLASS_PK, comments='#', unpack=True)
-def Pk_of_k(k):
-    out = np.zeros_like(k)
-    m = (k > 0) & (k >= ktab.min()) & (k <= ktab.max())
-    out[m] = np.exp(np.interp(np.log(k[m]), np.log(ktab), np.log(Ptab)))
-    return out
+th = LinearTheory.from_class(CLASS_PK, z=200)
+ktab, Ptab = th.k_table, th.Pk_table
+Pk_of_k = th.Pk
 
 # --- generate fine field ---
 kx = np.fft.fftfreq(N2, d=L/N2) * 2*np.pi
