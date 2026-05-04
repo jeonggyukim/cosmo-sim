@@ -34,5 +34,6 @@ for L in 256 512 1024; do
 done
 ```
 
-The pipeline already runs `compute_pk.py` and `compute_xi_cic.py`;
-`compute_pv.py` (new in this branch) is the velocity counterpart.
+The pipeline already runs `compute_pk.py` and the `compute_xi_cic`
+binary; `compute_pv.py` is the velocity counterpart and is invoked
+separately.
