@@ -19,8 +19,13 @@ launched Jupyter from this `notebooks/` directory.
 
 | Notebook | What it shows |
 |---|---|
+| `00_generate_ic_from_scratch.ipynb` | Walks the IC algorithm end-to-end on a 2D grid: CLASS P(k) → Gaussian δ → ZA displacement Ψ from a Fourier Poisson solve → particles at q+Ψ with v=aHfΨ → CIC P(k) recovers the input. Bridges the theory in `notes/cosmo_ic.pdf` and the validation notebooks below. |
 | `01_quickstart.ipynb` | Load one IC HDF5, compute `P_δ(k)` and `P_v(k)` via `ICField`, overlay against `LinearTheory` from CLASS. The "ratio to theory" plot at the end previews the box-size effect. |
 | `02_box_size_sensitivity.ipynb` | Same observables across multiple box sizes. The velocity ratio drops below 1 (more for smaller boxes); the density ratio stays at 1. Ends with the analytic missing-variance integral that explains the suppression. References Klypin & Prada 2019 and Chuang+ 2026. |
+
+`00` is a self-contained tutorial that only needs `data/class_pk_z200_pk.dat`;
+`01` and `02` are validation runs on real IC HDF5 files produced by the
+pipeline.
 
 ## Reproducing the data
 
