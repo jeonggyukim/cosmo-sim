@@ -1,4 +1,10 @@
-"""Figure: 1LPT displacement Psi^(1) under restriction — fine-then-restrict vs restrict-then-solve."""
+"""Figure: 1LPT displacement Psi^(1) under restriction.
+
+Four panels in a single row: maps of Psi_x^(1) computed two ways, their
+difference, and a histogram of the per-cell relative error in units of
+RMS(Psi_a). The histogram quantifies the "percent-level agreement"
+claimed in the body text.
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -18,37 +24,53 @@ delta_2N -= delta_2N.mean()
 delta_N  = delta_2N.reshape(N, 2, N, 2).mean(axis=(1, 3))
 
 def psi1(delta, kx_g, ky_g):
-    K2 = kx_g**2 + ky_g**2
-    inv = np.where(K2 > 0, 1.0/K2, 0.0)
+    K2g = kx_g**2 + ky_g**2
+    inv = np.where(K2g > 0, 1.0/K2g, 0.0)
     dh  = np.fft.fftn(delta)
     return (np.fft.ifftn(1j*kx_g*inv*dh).real,
             np.fft.ifftn(1j*ky_g*inv*dh).real)
 
 psix_2N, psiy_2N = psi1(delta_2N, KX, KY)
 psix_2N_avg = psix_2N.reshape(N, 2, N, 2).mean(axis=(1, 3))
-psiy_2N_avg = psiy_2N.reshape(N, 2, N, 2).mean(axis=(1, 3))
 
 kc = np.fft.fftfreq(N, d=L/N) * 2*np.pi
 KXc, KYc = np.meshgrid(kc, kc, indexing='ij')
-psix_N, psiy_N = psi1(delta_N, KXc, KYc)
+psix_N, _ = psi1(delta_N, KXc, KYc)
 
-fig, ax = plt.subplots(1, 3, figsize=(13, 4))
+# ---- figure ----
+fig, ax = plt.subplots(1, 4, figsize=(17, 4.2))
 
 vmax = max(abs(psix_2N_avg).max(), abs(psix_N).max())
 im = ax[0].imshow(psix_2N_avg, cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
-ax[0].set_title(r'$\overline{\Psi_x^{(1)}[\delta_{2N}]}$ (fine, then restrict)')
+ax[0].set_title('(a) solve on the fine $2N$ grid,\n'
+                r'then restrict $\Psi$ to $N$:  $\mathcal{R}\,\Psi_x^{(1)}[\delta_{2N}]$')
 plt.colorbar(im, ax=ax[0], fraction=0.045)
 
 im = ax[1].imshow(psix_N, cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
-ax[1].set_title(r'$\Psi_x^{(1)}[\delta_N]$ (restrict, then solve)')
+ax[1].set_title(r'(b) restrict $\delta$ to the coarse $N$ grid,' + '\n'
+                r'then solve:  $\Psi_x^{(1)}[\mathcal{R}\,\delta_{2N}]$')
 plt.colorbar(im, ax=ax[1], fraction=0.045)
 
 diff = psix_2N_avg - psix_N
 dmax = max(abs(diff).max(), 1e-30)
 im = ax[2].imshow(diff, cmap='RdBu_r', vmin=-dmax, vmax=dmax, origin='lower')
-ax[2].set_title('difference')
+ax[2].set_title('(a) $-$ (b)\n(colour scale rescaled)')
 plt.colorbar(im, ax=ax[2], fraction=0.045)
 
+# Histogram of relative pointwise error.
+rms_a = np.sqrt((psix_2N_avg**2).mean())
+relerr = diff.ravel() / rms_a
+rms_rel = np.sqrt((relerr**2).mean())
+maxabs = np.max(np.abs(relerr))
+ax[3].hist(relerr, bins=60, color='C0', edgecolor='k', linewidth=0.3)
+ax[3].set_xlabel(r'$[\,\Psi^{(1)}_{x,(a)} - \Psi^{(1)}_{x,(b)}\,]'
+                 r'\,/\,\mathrm{RMS}(\Psi^{(1)}_{x,(a)})$')
+ax[3].set_ylabel('number of coarse-grid cells')
+ax[3].set_title('per-cell relative error of (b) vs (a)\n'
+                f'(RMS = {rms_rel:.1%}, max = {maxabs:.1%})')
+
+fig.suptitle(rf'Power-law input $P(k)\propto k^{{n}}$ with $n={n_pk:g}$')
 plt.tight_layout()
 plt.savefig('restriction_psi.pdf')
-print("wrote restriction_psi.pdf")
+print('wrote restriction_psi.pdf')
+print(f'rms_rel = {rms_rel:.4%}, max_rel = {maxabs:.4%}')

@@ -13,6 +13,7 @@ CLASS_PK = Path(__file__).resolve().parents[2] / 'data' / 'class_pk_z200_pk.dat'
 
 rng = np.random.default_rng(42)
 N, N2, L = 64, 128, 500.0   # L in Mpc/h, large enough that small-k modes have CDM peak
+n_toy = -2.0   # slope of the toy P(k) ~ k^n_toy used in earlier figures
 
 # --- load and interpolate CLASS P(k) ---
 ktab, Ptab = np.loadtxt(CLASS_PK, comments='#', unpack=True)
@@ -75,8 +76,9 @@ fig, ax = plt.subplots(2, 3, figsize=(13, 8))
 kshow = np.logspace(np.log10(ktab.min()), np.log10(ktab.max()), 400)
 Pshow = Pk_of_k(kshow)
 ax[0,0].loglog(kshow, Pshow, 'k-', label='CLASS $P(k)$, $z=200$')
-norm = Pshow[200] * kshow[200]
-ax[0,0].loglog(kshow, norm/kshow, 'r--', label=r'toy $\propto k^{-1}$')
+norm = Pshow[200] * kshow[200]**(-n_toy)
+ax[0,0].loglog(kshow, norm * kshow**n_toy, 'r--',
+               label=rf'toy $\propto k^{{{n_toy:g}}}$')
 ax[0,0].axvline(np.pi*N/L,  color='C0', ls=':', label=r'$k_{Ny,N}$')
 ax[0,0].axvline(np.pi*N2/L, color='C1', ls=':', label=r'$k_{Ny,2N}$')
 ax[0,0].set_xlabel('k [h/Mpc]'); ax[0,0].set_ylabel('P(k)')

@@ -19,6 +19,7 @@ FIGURES = figures/box_window.pdf figures/tophat_window.pdf figures/pgrid_compari
           figures/aliasing.pdf \
           figures/restriction_density.pdf figures/restriction_psi.pdf \
           figures/restriction_deformation.pdf figures/restriction_phi.pdf \
+          figures/restriction_phi_spectral.pdf \
           figures/restriction_cdm.pdf figures/window_compare.pdf \
           figures/alias_diagram.pdf figures/zoom_ic_comparison.pdf \
           figures/zoom_ic_pk_full.pdf
@@ -83,6 +84,9 @@ figures/restriction_deformation.pdf : figures/plot_restriction_deformation.py
 
 figures/restriction_phi.pdf : figures/plot_restriction_phi.py
 	cd figures && $(PYTHON) plot_restriction_phi.py
+
+figures/restriction_phi_spectral.pdf : figures/plot_restriction_phi_spectral.py
+	cd figures && $(PYTHON) plot_restriction_phi_spectral.py
 
 figures/restriction_cdm.pdf : figures/plot_restriction_cdm.py ../data/class_pk_z200_pk.dat
 	cd figures && $(PYTHON) plot_restriction_cdm.py

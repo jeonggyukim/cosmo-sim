@@ -43,16 +43,16 @@ psix_rd, _ = grad(-phi_N_rd, KXc, KYc)
 # (3) restrict phi
 phi_N_rp = restrict(phi_2N)
 psix_rp, _ = grad(-phi_N_rp, KXc, KYc)
-delta_eff = -lap(phi_N_rp, KXc, KYc)
+delta_eff = lap(phi_N_rp, KXc, KYc)
 
 fig, ax = plt.subplots(2, 3, figsize=(13, 8))
 
 vmax = max(abs(psix_ref).max(), abs(psix_rd).max(), abs(psix_rp).max())
 for a, fld, title in zip(
         ax[0], (psix_ref, psix_rd, psix_rp),
-        (r'(1) reference: $\overline{\Psi_x}$ from fine',
-         r'(2) restrict $\delta$, then Poisson',
-         r'(3) restrict $\phi$, then $-\nabla\phi$')):
+        (r'(1) fine $\Psi$, then restrict' + '\n' + r'($\mathcal{R}\,\Psi_x^{(1)}[\delta_{2N}]$)',
+         r'(2) restrict $\delta$, then solve' + '\n' + r'($\Psi_x^{(1)}[\mathcal{R}\,\delta_{2N}]$)',
+         r'(3) restrict $\phi$, then $-\nabla\phi$' + '\n' + r'($-\partial_x(\mathcal{R}\,\phi^{(1)}_{2N})$)')):
     im = a.imshow(fld, cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
     a.set_title(title); plt.colorbar(im, ax=a, fraction=0.045)
 
@@ -64,9 +64,10 @@ ax[1,1].set_title('error: (1) - (3)'); plt.colorbar(im, ax=ax[1,1], fraction=0.0
 
 dmax = max(abs(delta_N).max(), abs(delta_eff).max())
 im = ax[1,2].imshow(delta_eff - delta_N, cmap='RdBu_r', vmin=-dmax, vmax=dmax, origin='lower')
-ax[1,2].set_title(r'$-\nabla^2\phi_N^{\rm (restrict\,\phi)} - \delta_N$' + '\n(Poisson inconsistency)')
+ax[1,2].set_title(r'$\nabla^2(\mathcal{R}\,\phi^{(1)}_{2N}) - \delta_N$' + '\n(Poisson inconsistency)')
 plt.colorbar(im, ax=ax[1,2], fraction=0.045)
 
+fig.suptitle(rf'Power-law input $P(k)\propto k^{{n}}$ with $n={n_pk:g}$')
 plt.tight_layout()
 plt.savefig('restriction_phi.pdf')
 print("wrote restriction_phi.pdf")

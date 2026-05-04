@@ -2,6 +2,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+plt.rcParams.update({
+    'axes.labelsize': 14,
+    'axes.titlesize': 14,
+    'xtick.labelsize': 12,
+    'ytick.labelsize': 12,
+    'legend.fontsize': 10,
+})
+
 rng = np.random.default_rng(42)
 N, N2, L = 64, 128, 1.0
 n_pk = -2.0
@@ -48,47 +56,66 @@ plt.colorbar(im, ax=ax[1], fraction=0.045)
 def shifted_log(d):
     return np.log10(np.abs(np.fft.fftshift(d)) + 1e-12)
 kfund = 2*np.pi / L
-kNy_f = np.pi / dx_f
-fourier_ext = [-kNy_f, kNy_f, -kNy_f, kNy_f]
+kNy_f = np.pi / dx_f  # fine Nyquist; used to normalize all Fourier axes
+fourier_ext = [-1, 1, -1, 1]
 im = ax[2].imshow(shifted_log(dk_2N), cmap='viridis', origin='lower',
                   extent=fourier_ext)
 ax[2].set_title(r'$\log_{10}|\hat\delta_{2N}(k)|$')
-ax[2].set_xlabel(r'$k_x$'); ax[2].set_ylabel(r'$k_y$')
+ax[2].set_xlabel(r'$k_x / k_{\mathrm{Ny},2N}$')
+ax[2].set_ylabel(r'$k_y / k_{\mathrm{Ny},2N}$')
 plt.colorbar(im, ax=ax[2], fraction=0.045)
 
-Kflat = Kc.ravel(); Rflat = ratio.ravel()
+Kflat = Kc.ravel() / kNy_f; Rflat = ratio.ravel()
 W2_2d = (np.cos(KXc*dx_f/2) * np.cos(KYc*dx_f/2))**2  # exact 2D W^2
 W2flat = W2_2d.ravel()
 m = Kflat > 0
-ax[3].semilogy(Kflat[m], Rflat[m], '.', ms=2, alpha=0.3,
+ax[3].semilogy(Kflat[m], Rflat[m], '.', ms=3, alpha=0.4,
                color='C0', label='measured')
-ax[3].semilogy(Kflat[m], W2flat[m], '.', ms=2, alpha=0.3,
-               color='green', label=r'$W^2(k_x,k_y)$ (no aliases)')
-ks = np.linspace(0, Kc.max(), 400)
-ax[3].semilogy(ks, np.cos(ks*dx_f/2)**2, 'r-',
-               label=r'$\cos^2(k\Delta x_f/2)$ (1D proxy)')
-ax[3].set_xlabel(r'$|k|$')
+# Bin W^2 in |k| and shade min/max as a band: at fixed |k|, axis-aligned
+# vs diagonal modes feel different cell-window suppression.
+nbins_W = 40
+kmax_W = Kflat[m].max()
+Wbins = np.linspace(0, kmax_W, nbins_W+1)
+Widx  = np.digitize(Kflat[m], Wbins) - 1
+kmid, Wmin, Wmax = [], [], []
+for i in range(nbins_W):
+    sel = Widx == i
+    if sel.sum() >= 2:
+        kmid.append(0.5*(Wbins[i]+Wbins[i+1]))
+        Wmin.append(W2flat[m][sel].min())
+        Wmax.append(W2flat[m][sel].max())
+kmid = np.array(kmid); Wmin = np.array(Wmin); Wmax = np.array(Wmax)
+ax[3].fill_between(kmid, Wmin, Wmax, color='green', alpha=0.3,
+                   label=r'$W^2(k_x,k_y)$ band (no aliases)')
+ks_tilde = np.linspace(0, Kflat.max(), 400)
+ax[3].semilogy(ks_tilde, np.cos(ks_tilde*np.pi/2)**2, 'r-',
+               label=r'$\cos^2(\pi \tilde k / 2)$ (1D proxy)')
+ax[3].set_xlabel(r'$|k_c| / k_{\mathrm{Ny},2N}$')
 ax[3].set_ylabel(r'$|\hat\delta_N|/|\hat\delta_{2N}|$')
-ax[3].set_ylim(1e-3, 3); ax[3].legend(fontsize=8)
+ax[3].set_ylim(0.1, 10)
 
 # Panel 5: binned P_N / P_2N ratio with theory prediction.
 # Need P_2N at all fine modes and P_N at coarse modes (per-mode |dk|^2).
 P_2N = (np.abs(dk_2N)**2)
 P_N  = (np.abs(dk_N )**2)
-# Theory prediction: alias-sum / P_2N_at_coarse, computed mode by mode.
-# theory_PN(k_c) = sum_n W^2(k_c + pi n / dx_f) * P_2N(k_c + pi n / dx_f)
-# Loop over n in {0,1}^2.
-theory_PN = np.zeros_like(P_N)
+# Analytic alias-sum theory (no realization dependence):
+# <|dk_N(k_c)|^2> = sum_n W^2(k_c + pi n / dx_f) * P(k_c + pi n / dx_f),
+# where P(k') = |k'|^n_pk is the input power-law spectrum.
+# We then divide by P(k_c) = |k_c|^n_pk to form the ratio plotted in
+# panel 4.
+theory_PN_analytic = np.zeros_like(P_N)
 for nx in (0, 1):
     for ny in (0, 1):
-        # Shift each fine-grid index axis by N*nx (= pi/dx_f in mode units).
         ix_shift = (ix + N*nx) % N2
         iy_shift = (ix + N*ny) % N2
-        KX_at = kx[ix_shift][:, None]            # k_x at the shifted modes
+        KX_at = kx[ix_shift][:, None]
         KY_at = kx[iy_shift][None, :]
+        Kmag_at = np.sqrt(KX_at**2 + KY_at**2)
         W2_at = (np.cos(KX_at*dx_f/2) * np.cos(KY_at*dx_f/2))**2
-        P2N_at = P_2N[np.ix_(ix_shift, iy_shift)]
-        theory_PN += W2_at * P2N_at
+        with np.errstate(divide='ignore'):
+            P_at = np.where(Kmag_at > 0, Kmag_at**n_pk, 0.0)
+        theory_PN_analytic += W2_at * P_at
+P_input_at_coarse = np.where(Kc > 0, Kc**n_pk, np.inf)
 
 # Bin both PN and theory_PN by |k_c|.
 def radial_mean(field, K, nbins=20, kmax=None):
@@ -110,40 +137,84 @@ def radial_mean(field, K, nbins=20, kmax=None):
 
 kbar, PN_bar     = radial_mean(P_N,      Kc)
 _,    P2N_at_bar = radial_mean(P_2N[np.ix_(ix, ix)], Kc)
-_,    th_bar     = radial_mean(theory_PN, Kc)
 
-ax[4].plot(kbar, PN_bar/P2N_at_bar, 'o-', color='C0',
-           label=r'measured $P_N/P_{2N}$ (binned)')
-ax[4].plot(kbar, th_bar/P2N_at_bar, 's--', color='red',
-           label=r'theory: $\sum_{\bf n}|W|^2 P_{2N}/P_{2N}$')
+# Smooth analytic alias-sum prediction: evaluate on a dense (k_x, k_y)
+# Brillouin-zone grid (no need for the coarse-mode lattice), then bin
+# radially with many bins. Independent of the random realization.
+def analytic_aliassum_ratio(n_pk, kny_coarse, kny_fine, ngrid=512, nbins=200):
+    # Square coarse Brillouin zone, k_x, k_y in [-kny_coarse, kny_coarse].
+    # Radial |k_c| extends up to the corner kny_coarse * sqrt(2).
+    kc_grid = np.linspace(-kny_coarse, kny_coarse, ngrid)
+    KXg, KYg = np.meshgrid(kc_grid, kc_grid, indexing='ij')
+    Kg = np.sqrt(KXg**2 + KYg**2)
+    num = np.zeros_like(Kg)
+    for nx in (0, 1):
+        for ny in (0, 1):
+            kx_a = KXg + nx*2*kny_coarse
+            ky_a = KYg + ny*2*kny_coarse
+            Kmag_a = np.sqrt(kx_a**2 + ky_a**2)
+            W2_a = (np.cos(kx_a*np.pi/(2*kny_fine)) *
+                    np.cos(ky_a*np.pi/(2*kny_fine)))**2
+            with np.errstate(divide='ignore'):
+                P_a = np.where(Kmag_a > 0, Kmag_a**n_pk, 0.0)
+            num += W2_a * P_a
+    with np.errstate(divide='ignore'):
+        denom = np.where(Kg > 0, Kg**n_pk, np.inf)
+    ratio = num / denom
+    # Stop at the axis-aligned coarse Nyquist: above k_Ny,N the radial
+    # ring is entirely inside the BZ corners (diagonal-only modes), and
+    # the bin average drops abruptly because W^2 is smallest there.
+    # Truncating avoids that geometric artefact and matches how the
+    # measured curve is typically interpreted.
+    kmax = kny_coarse
+    bins = np.linspace(0, kmax, nbins+1)
+    idx = np.digitize(Kg.ravel(), bins) - 1
+    rflat = ratio.ravel()
+    kbins = 0.5*(bins[:-1] + bins[1:])
+    rbar = np.full(nbins, np.nan)
+    for i in range(nbins):
+        sel = idx == i
+        if sel.any():
+            rbar[i] = rflat[sel].mean()
+    keep = ~np.isnan(rbar)
+    return kbins[keep], rbar[keep]
+
+kny_coarse = np.pi * N / L
+k_smooth, ratio_smooth = analytic_aliassum_ratio(n_pk, kny_coarse, kNy_f)
+
+# Overlay smooth analytic prediction on bottom-left panel.
+ax[3].semilogy(k_smooth/kNy_f, ratio_smooth, '-', color='red', lw=1.5,
+               label=r'analytic $\langle P_N\rangle/P(k_c)$ (alias sum)')
+ax[3].legend(fontsize=8, loc='lower left')
+
+ax[4].plot(kbar/kNy_f, PN_bar/P2N_at_bar, 'o-', color='C0',
+           label=r'measured (single realization)')
+ax[4].plot(k_smooth/kNy_f, ratio_smooth, '-', color='red', lw=1.5,
+           label=r'analytic: $\sum_{\bf n}|W|^2 P(k_c{+}\pi{\bf n}/\Delta x_f)\,/\,P(k_c)$')
 ax[4].axhline(1, color='gray', lw=0.5)
-ax[4].set_xlabel(r'$|k_c|$')
+ax[4].set_xlabel(r'$|k_c| / k_{\mathrm{Ny},2N}$')
 ax[4].set_ylabel(r'$P_N(k_c) / P_{2N}(k_c)$')
 ax[4].set_title('binned power ratio (alias-sum check)')
-ax[4].legend(fontsize=8)
+ax[4].legend()
 
-# Panel 6: binned P_N(k), P_2N(k), with theory predictions overlaid.
-kbar_2N, P2N_bar = radial_mean(P_2N, np.sqrt(KX**2+KY**2))
-# Theory P_2N from the analytical normalization: with the FFT convention
-# dk = fftn(delta) / N2**2, the per-mode expectation is <|dk|^2> = P(k)/N2**2.
-P_input = (kbar_2N**n_pk) / N2**2
-# Theory P_N: alias-sum prediction, already binned as `th_bar`.
-ax[5].loglog(kbar_2N, P2N_bar, 'o', color='gray', alpha=0.7,
-             label=r'$P_{2N}(k)$ measured')
-ax[5].loglog(kbar_2N, P_input, '-', color='black', lw=1,
-             label=r'theory $\propto k^{n}$')
-ax[5].loglog(kbar,    PN_bar,  's', color='C0', alpha=0.7,
-             label=r'$P_N(k_c)$ measured')
-ax[5].loglog(kbar,    th_bar,  '--', color='red',
-             label=r'$P_N$ theory (alias-sum)')
-ax[5].axvline(np.pi/dx_f/2, color='C1', ls=':', lw=0.8,
-              label=r'coarse Nyquist')
-ax[5].axvline(np.pi/dx_f,   color='C2', ls=':', lw=0.8,
-              label=r'fine Nyquist')
-ax[5].set_xlabel(r'$|k|$')
-ax[5].set_ylabel(r'$P(k)$')
-ax[5].set_title('binned power spectra')
-ax[5].legend(fontsize=7)
+# Bottom-right: smooth analytic alias-sum prediction P_N/P_2N for
+# several spectral slopes n.
+n_compare = [0.0, -2.0, -5.0]
+colors    = ['C0', 'C1', 'C3']
+for n_val, col in zip(n_compare, colors):
+    k_n, ratio_n = analytic_aliassum_ratio(n_val, kny_coarse, kNy_f)
+    ax[5].plot(k_n/kNy_f, ratio_n, '-', color=col, lw=1.5,
+               label=fr'$n={n_val:g}$')
+# W^2 band (axis-aligned vs body-diagonal extremes) for reference.
+ax[5].fill_between(kmid, Wmin, Wmax, color='green', alpha=0.3,
+                   label=r'$W^2(k_x,k_y)$ band')
+ax[5].axhline(1, color='gray', lw=0.5)
+ax[5].set_xlabel(r'$|k_c| / k_{\mathrm{Ny},2N}$')
+ax[5].set_ylabel(r'$P_N(k_c) / P_{2N}(k_c)$')
+ax[5].set_title(r'alias-sum ratio vs slope $n$')
+ax[5].set_yscale('log')
+ax[5].set_ylim(0.05, 10)
+ax[5].legend(fontsize=9, loc='lower left')
 
 plt.tight_layout()
 plt.savefig('restriction_density.pdf')

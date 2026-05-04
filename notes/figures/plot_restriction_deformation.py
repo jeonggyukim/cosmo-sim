@@ -43,34 +43,60 @@ S2_ref = restrict(S2_f)
 dxx_N, dxy_N, dyy_N = deformation(delta_N, KXc, KYc)
 S2_N = dxx_N * dyy_N - dxy_N**2
 
-fig, ax = plt.subplots(2, 3, figsize=(13, 8))
+fig, ax = plt.subplots(2, 4, figsize=(17, 8))
 
-vmax = max(abs(dxx_ref).max(), abs(dxx_N).max())
-im = ax[0,0].imshow(dxx_ref, cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
-ax[0,0].set_title(r'$\overline{\partial_x \Psi_x^{(1)}[\delta_{2N}]}$')
-plt.colorbar(im, ax=ax[0,0], fraction=0.045)
-im = ax[0,1].imshow(dxx_N, cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
-ax[0,1].set_title(r'$\partial_x \Psi_x^{(1)}[\delta_N]$')
-plt.colorbar(im, ax=ax[0,1], fraction=0.045)
-diff = dxx_ref - dxx_N
-dmax = max(abs(diff).max(), 1e-30)
-im = ax[0,2].imshow(diff, cmap='RdBu_r', vmin=-dmax, vmax=dmax, origin='lower')
-ax[0,2].set_title(r'difference')
-plt.colorbar(im, ax=ax[0,2], fraction=0.045)
+def panel_row(row_axes, field_a, field_b, name_a, name_b, hist_label, hist_title_quantity):
+    vmax = max(abs(field_a).max(), abs(field_b).max())
+    im = row_axes[0].imshow(field_a, cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
+    row_axes[0].set_title(name_a)
+    plt.colorbar(im, ax=row_axes[0], fraction=0.045)
 
-vmax = max(abs(S2_ref).max(), abs(S2_N).max())
-im = ax[1,0].imshow(S2_ref, cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
-ax[1,0].set_title(r'$\overline{S^{(2)}[\delta_{2N}]}$')
-plt.colorbar(im, ax=ax[1,0], fraction=0.045)
-im = ax[1,1].imshow(S2_N, cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
-ax[1,1].set_title(r'$S^{(2)}[\delta_N]$')
-plt.colorbar(im, ax=ax[1,1], fraction=0.045)
-diff = S2_ref - S2_N
-dmax = max(abs(diff).max(), 1e-30)
-im = ax[1,2].imshow(diff, cmap='RdBu_r', vmin=-dmax, vmax=dmax, origin='lower')
-ax[1,2].set_title(r'difference')
-plt.colorbar(im, ax=ax[1,2], fraction=0.045)
+    im = row_axes[1].imshow(field_b, cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
+    row_axes[1].set_title(name_b)
+    plt.colorbar(im, ax=row_axes[1], fraction=0.045)
 
+    diff = field_a - field_b
+    dmax = max(abs(diff).max(), 1e-30)
+    im = row_axes[2].imshow(diff, cmap='RdBu_r', vmin=-dmax, vmax=dmax, origin='lower')
+    row_axes[2].set_title('(a) $-$ (b)\n(colour scale rescaled)')
+    plt.colorbar(im, ax=row_axes[2], fraction=0.045)
+
+    rms_a = np.sqrt((field_a**2).mean())
+    relerr = diff.ravel() / rms_a
+    rms_rel = np.sqrt((relerr**2).mean())
+    maxabs = np.max(np.abs(relerr))
+    row_axes[3].hist(relerr, bins=60, color='C0', edgecolor='k', linewidth=0.3)
+    row_axes[3].set_xlabel(hist_label)
+    row_axes[3].set_ylabel('number of coarse-grid cells')
+    row_axes[3].set_title(f'per-cell relative error of (b) vs (a)\n'
+                          f'for {hist_title_quantity}  '
+                          f'(RMS = {rms_rel:.1%}, max = {maxabs:.1%})')
+    return rms_rel, maxabs
+
+# top row: deformation tensor diagonal d_x Psi_x.
+rms_dxx, max_dxx = panel_row(
+    ax[0],
+    dxx_ref, dxx_N,
+    r'(a) $\mathcal{R}\,\partial_x \Psi_x^{(1)}[\delta_{2N}]$',
+    r'(b) $\partial_x \Psi_x^{(1)}[\mathcal{R}\,\delta_{2N}]$',
+    r'$[\,(\partial_x\Psi_x)_{(a)} - (\partial_x\Psi_x)_{(b)}\,]'
+    r'\,/\,\mathrm{RMS}((\partial_x\Psi_x)_{(a)})$',
+    r'$\partial_x\Psi_x^{(1)}$',
+)
+
+# bottom row: 2LPT source S^(2).
+rms_S2, max_S2 = panel_row(
+    ax[1],
+    S2_ref, S2_N,
+    r'(a) $\mathcal{R}\,S^{(2)}[\delta_{2N}]$',
+    r'(b) $S^{(2)}[\mathcal{R}\,\delta_{2N}]$',
+    r'$[\,S^{(2)}_{(a)} - S^{(2)}_{(b)}\,]\,/\,\mathrm{RMS}(S^{(2)}_{(a)})$',
+    r'$S^{(2)}$',
+)
+
+fig.suptitle(rf'Power-law input $P(k)\propto k^{{n}}$ with $n={n_pk:g}$')
 plt.tight_layout()
 plt.savefig('restriction_deformation.pdf')
-print("wrote restriction_deformation.pdf")
+print('wrote restriction_deformation.pdf')
+print(f'rms_rel(d_x Psi_x) = {rms_dxx:.4%}, max = {max_dxx:.4%}')
+print(f'rms_rel(S^(2))     = {rms_S2:.4%}, max = {max_S2:.4%}')

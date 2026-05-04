@@ -119,7 +119,7 @@ res_coarse_B  = delta_N_B        - delta_N_B   # exactly zero by construction
 # (For A1 and A2 we also keep the fine-grid composite for the IC visualization.)
 
 # Poisson-inconsistency residual on the coarse grid for each approach:
-# poisson_resid = -nabla^2(phi_lo) - delta_lo_as-built.
+# poisson_resid = nabla^2(phi_lo) - delta_lo_as-built.
 # A1 and B are Poisson-consistent (zero); A2 is not.
 poisson_resid_A1 = laplacian(phi_N_A1, KXc, KYc) - delta_N_A1
 poisson_resid_A2 = laplacian(phi_N_A2, KXc, KYc) - delta_N_A2_naive
