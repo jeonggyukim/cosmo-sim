@@ -51,7 +51,7 @@ CLASS_INI  := $(firstword $(wildcard $(REPO_ROOT)/conf/input_class_parameters_*.
 	@test -n "$(CLASS_INI)" || { echo "ERROR: no conf/input_class_parameters_*.ini found; run ./run_pipeline.sh once to produce one." >&2; exit 1; }
 	@test -x "$(CLASS_BIN)"  || { echo "ERROR: no CLASS binary found (looked in music_build/_deps/class-build/ and \$$PATH); run ./build-music.sh or install CLASS." >&2; exit 1; }
 	TMP=$$(mktemp /tmp/class_pk_XXXXXX) && mv "$$TMP" "$$TMP.ini" && TMP="$$TMP.ini" && \
-	sed -e 's/^output =.*/output = mPk/' -e 's/^z_pk =.*/z_pk = 200/' \
+	LC_ALL=C sed -e 's/^output =.*/output = mPk/' -e 's/^z_pk =.*/z_pk = 200/' \
 	    -e '/^extra metric transfer functions/d' -e '/^gauge/d' \
 	    $(CLASS_INI) > $$TMP && \
 	echo "root = class_pk_z200_" >> $$TMP && \
