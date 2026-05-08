@@ -6,6 +6,7 @@
 \graphicspath{{figures/}}
 \usepackage{hyperref}
 \usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
 \usepackage{tcolorbox}
 \tcbuselibrary{breakable,skins}
 \usepackage{natbib}
@@ -21,9 +22,10 @@
 % Cross-references to companion PDFs in the notes/ directory. Centralised
 % here so a rename or reformat (e.g. switching to hyperref \href) only
 % needs to happen in one place.
-\newcommand{\notecosmoic}{\texttt{notes/cosmo\_ic.pdf}}
-\newcommand{\noteicsampling}{\texttt{notes/ic\_sampling.pdf}}
-\newcommand{\notefft}{\texttt{notes/fft.pdf}}
+\usepackage{xspace}
+\newcommand{\notecosmoic}{\texttt{notes/cosmo\_ic.pdf}\xspace}
+\newcommand{\noteicsampling}{\texttt{notes/ic\_sampling.pdf}\xspace}
+\newcommand{\notefft}{\texttt{notes/fft.pdf}\xspace}
 
 \title{Restriction of a Density Field and the 1LPT Displacement}
 \author{}
@@ -337,9 +339,9 @@ $\sim\!11\%$ disagreement.
 \begin{figure}[!t]
 \centering
 \includegraphics[width=\textwidth]{window_compare.pdf}
-\caption{Comparison of the centered discrete restriction kernel (blue,
+\caption{\textbf{Comparison of the centered discrete restriction kernel (blue,
 2-sample at $x=\pm\Delta x_f/2$) and the centered continuous top-hat of
-width $\Delta x_c$ (red, over $[-\Delta x_c/2,\Delta x_c/2]$). Left:
+width $\Delta x_c$ (red, over $[-\Delta x_c/2,\Delta x_c/2]$).} Left:
 real-space shapes, with axes in units of $\Delta x_f$. Both have the
 same total ``mass'' (sum of stem weights $=$ area under top-hat $=1$)
 and the same centroid (the origin). Right: their 1D Fourier-space
@@ -391,7 +393,7 @@ aliases, one in each of the seven other octants.
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.7\textwidth]{alias_diagram.pdf}
-\caption{Alias pairing under $2{:}1$ subsampling in 2D. The fine-mode
+\caption{\textbf{Alias pairing under $2{:}1$ subsampling in 2D.} The fine-mode
 region (light red square) splits into a central coarse zone (light blue,
 $|k_a|\le k_{\rm Ny,N}$) and three outer-wing regions. A representative
 coarse mode $k_c$ in the coarse zone (filled blue circle) receives
@@ -684,11 +686,19 @@ $\delta_{2N}$ (blue circles); the scatter on blue is cosmic variance.
 spectral slopes $n\in\{0,-2,-5\}$, illustrating that the ratio
 saturates at $1$ for white noise and drops onto the $W^2$ band as the
 spectrum steepens, except near the coarse Nyquist where aliasing is
-unavoidable.}
+unavoidable. \textbf{The three bottom panels together expose the
+two ingredients of the alias-sum formula~(\ref{eq:Pk-alias}): a
+principal-mode suppression by $W^2$, plus an alias contamination from
+$|\mathbf k'|>\pi/\Delta x_c$ whose size is set by how much
+fine-grid power lives at high $k$ (i.e.\ by the spectral slope). For
+red spectra the ratio collapses onto the $W^2$ band; for white noise
+the alias sum exactly cancels $W^2$ and the ratio is~1; in all cases
+the principal-mode information is irretrievably mixed with aliased
+power.}}
 \label{fig:density}
 \end{figure}
 
-\section{1LPT displacement under restriction}
+\section{1LPT displacement under restriction}\label{sec:psi}
 
 \emph{Lagrangian perturbation theory} (LPT) describes structure
 formation by following individual fluid elements through their
@@ -778,15 +788,25 @@ $aHf$, the same diagnostic applies to the velocity unchanged.
 The residual is small but not exactly zero, and its sign and scale
 dependence have a simple origin in the alias-sum formula. Both
 constructions fold aliased fine-grid contributions into each coarse
-mode $\mathbf k_c$, but with different prefactors. In construction
-(a) the gradient acts on the fine grid, so each fine alias
-$\mathbf k' = \mathbf k_c + 2\pi\mathbf n/\Delta x_c$ enters with
-kernel $i\mathbf k'/(k')^2$, whose magnitude is $1/k'$. In
-construction (b) the gradient acts on the coarse grid, so the same
-alias enters with kernel $i\mathbf k_c/k_c^{\,2}$, whose magnitude is
-$1/k_c$. Near the coarse Nyquist this replaces a small $1/k'$ by a
-larger $1/k_c$ and amplifies the aliased contribution; at low $k_c$
-the alias terms are negligible and the two constructions agree. The
+mode $\mathbf k_c$, but with different prefactors. The kernel
+magnitude $1/|\mathbf k|$ \emph{falls} with $|\mathbf k|$, and the
+aliased modes live at high $|\mathbf k'| > |\mathbf k_c|$. So the
+question is at which $k$ the kernel is evaluated:
+\begin{itemize}
+  \item[(a)] The gradient acts on the fine grid, so each fine alias
+        $\mathbf k' = \mathbf k_c + 2\pi\mathbf n/\Delta x_c$ enters
+        with kernel $i\mathbf k'/(k')^2$, magnitude $1/k'$ ---
+        \textbf{small}, because $k'$ is large.
+  \item[(b)] The gradient acts on the coarse grid, so the alias has
+        already been folded onto $\mathbf k_c$ before the inverse
+        Laplacian is applied, and it enters with kernel
+        $i\mathbf k_c/k_c^{\,2}$, magnitude $1/k_c$ --- \textbf{larger},
+        because $k_c < k'$.
+\end{itemize}
+\textbf{Construction (b) therefore amplifies aliases relative to (a)}:
+near the coarse Nyquist the suppression factor $1/k'$ is replaced by
+the larger $1/k_c$. At low $k_c$ the alias terms are negligible and
+the two constructions agree. The
 same prefactor difference appears in the table of \S\ref{sec:phi},
 where it sets the alias entries of constructions (1) and (2). For
 redder spectra the residual is small (a few percent at $n=\toyn$);
@@ -829,7 +849,16 @@ second Poisson-like equation
 $\nabla_q^2\phi^{(2)} = S^{(2)}$ for the second-order displacement
 potential $\phi^{(2)}$ (with $\boldsymbol\Psi^{(2)} = -\nabla_q\phi^{(2)}$).
 In any dimension the source is the second principal invariant of the
-deformation tensor,
+deformation tensor,\footnote{For a $3\times 3$ matrix $A$ the
+\emph{principal invariants} are the coefficients of its characteristic
+polynomial $\det(\lambda I - A) = \lambda^3 - I_1\lambda^2 + I_2\lambda - I_3$:
+$I_1 = \mathrm{tr}\, A$, $I_2 = \tfrac{1}{2}[(\mathrm{tr}\, A)^2 - \mathrm{tr}\,(A^2)] = \sum_{i<j}(A_{ii}A_{jj}-A_{ij}A_{ji})$,
+and $I_3 = \det A$. They are ``invariants'' because they are unchanged
+by rotations of the coordinate frame; equivalently, in terms of
+eigenvalues, $I_1=\sum_i\lambda_i$, $I_2=\sum_{i<j}\lambda_i\lambda_j$,
+$I_3=\prod_i\lambda_i$. For 1LPT the deformation tensor is symmetric
+(it is the Hessian of $-\phi^{(1)}$), so $A_{ij}A_{ji}=(A_{ij})^2$ and
+$I_2$ takes the form below.}
 \begin{equation}
   S^{(2)}(\mathbf q) \;=\;
     \sum_{i<j}\!\Bigl[\,\Psi^{(1)}_{i,i}\,\Psi^{(1)}_{j,j}
@@ -865,18 +894,18 @@ dominated by small scales) or $\boldsymbol\Psi^{(1)}$ (kernel
 $i\mathbf k/k^2$, weighted by $1/|\mathbf k|$ and so dominated by
 large scales), the deformation tensor has no preferred scale. Each
 Fourier mode of $\delta$ contributes to $\Psi^{(1)}_{i,j}$ with at
-most unit amplitude, regardless of $|\mathbf k|$. Restriction errors
-near the coarse Nyquist therefore enter $\Psi^{(1)}_{i,j}$ at their
-full amplitude, without the $1/|\mathbf k|$ damping that protects
-$\boldsymbol\Psi^{(1)}$.
+most unit amplitude, regardless of $|\mathbf k|$. \textbf{Restriction
+errors near the coarse Nyquist therefore enter $\Psi^{(1)}_{i,j}$ at
+their full amplitude, without the $1/|\mathbf k|$ damping that
+protects $\boldsymbol\Psi^{(1)}$.}
 
 This error propagates into $S^{(2)}$ at second order. Each product
 $\Psi^{(1)}_{i,i}\Psi^{(1)}_{j,j}$ or $(\Psi^{(1)}_{i,j})^2$ in
 (\ref{eq:s2}) has a fractional error of approximately $2\epsilon$ when
 the input deformation tensor has fractional error $\epsilon$. Where
 the two products in (\ref{eq:s2}) nearly cancel, the relative error in
-$S^{(2)}$ can be larger still. As a result, $S^{(2)}$ is the LPT object
-most sensitive to restriction.
+$S^{(2)}$ can be larger still. \textbf{As a result, $S^{(2)}$ is the LPT object
+most sensitive to restriction.}
 
 Figure~\ref{fig:deformation} confirms this hierarchy. The top row
 shows $\Psi^{(1)}_{x,x}$ computed by (a) solving for $\Psi^{(1)}$ on
@@ -921,7 +950,8 @@ The table below summarises three coarse-grid constructions of $\Psi_x^{(1)}$.
 Writing the contribution of a fine-grid mode $\mathbf k'=\mathbf k_c +
 2\pi\mathbf n/\Delta x_c$ to the coarse mode $\mathbf k_c$ as a
 prefactor multiplying $\hat\delta_{2N}(\mathbf k')$:
-\begin{center}
+\begin{table}[h]
+\centering
 \begin{tabular}{lll}
 \hline
 construction & principal ($\mathbf n=\mathbf 0$) & alias ($\mathbf n\ne\mathbf 0$) \\
@@ -937,14 +967,24 @@ construction & principal ($\mathbf n=\mathbf 0$) & alias ($\mathbf n\ne\mathbf 0
    & $i k_{c,x}\,W(\mathbf k')/(k')^{2}$ \\
 \hline
 \end{tabular}
-\end{center}
+\caption{Three coarse-grid constructions of $\Psi_x^{(1)}$, written as
+prefactors of $\hat\delta_{2N}(\mathbf k')$ for the principal coarse
+mode ($\mathbf n=\mathbf 0$, i.e.\ $\mathbf k'=\mathbf k_c$) and for
+its aliases ($\mathbf n\ne\mathbf 0$, $\mathbf k'=\mathbf k_c+2\pi\mathbf
+n/\Delta x_c$). All three agree on the principal mode; the alias
+prefactors differ.}
+\label{tab:constructions}
+\end{table}
 The principal ($\mathbf n=\mathbf 0$) prefactor is identical for all
 three constructions, so they agree on the resolved coarse modes. The
-alias prefactors differ. Construction~(2) replaces the fine-mode
-factor $1/(k')^{2}$ by $1/k_c^{\,2}$, which amplifies aliased high-$k$
-power. Construction~(3) keeps the $1/(k')^{2}$ suppression and matches
-the amplitude of construction~(1) more closely than construction~(2)
-does.
+alias prefactors differ. Construction~(2) replaces the full
+fine-mode kernel $i\mathbf k'/(k')^{2}$ (magnitude $1/k'$) by the
+coarse-mode kernel $i\mathbf k_c/k_c^{\,2}$ (magnitude $1/k_c$), which
+amplifies aliased high-$k$ power as discussed in \S\ref{sec:psi}.
+Construction~(3) keeps the $1/(k')^{2}$ suppression of the inverse
+Laplacian (only the gradient numerator changes from $ik'_x$ to
+$ik_{c,x}$), so its alias amplitude tracks construction~(1) more
+closely than construction~(2) does.
 
 Amplitude alone, however, is not the correct criterion. The lo-res
 1LPT displacement should be the one that solves Poisson on the coarse
@@ -1021,13 +1061,16 @@ function, $\xi(r)$ --- are biased at the level of Fig.~\ref{fig:phi-spectral}
 ($\sim 5\%$ near the Nyquist for $n=\toyn$), with the largest effects
 on the smallest resolved haloes. The BAO scale and other large-scale
 signatures live at low $k$, where principal modes dominate and
-$\delta_{\rm eff}\approx\delta_N$, so they are unaffected. The errors
+$\hat\delta_{\rm eff}(\mathbf k_c)\approx\hat\delta_N(\mathbf k_c)$
+mode-by-mode (the two agree exactly on the principal $\mathbf n=0$
+term and differ only by the alias contributions, which are negligible
+at low $k_c$), so they are unaffected. The errors
 are typically cosmetic for cosmology but visible at the sub-percent
-precision targeted by modern emulators. \emph{Zoom-in runs:} the
+precision targeted by modern emulators. \emph{Zoom-in runs:} \textbf{the
 inconsistency lives in the lo-res region surrounding the zoom and
 introduces a step in $\nabla\Phi$ at the coarse-fine interface,
 because particles inside the zoom are displaced by $\delta_{2N}$ and
-those outside by $\delta_{\rm eff}$. The discontinuity heats gas near
+those outside by $\delta_{\rm eff}$.} The discontinuity heats gas near
 the boundary (in hydro), tidally torques nearby haloes, and distorts
 the inner density profiles of haloes within a few coarse cells of the
 interface; substructure abundance in the affected zone is also wrong.
@@ -1040,7 +1083,7 @@ production codes (\texttt{MUSIC2}, \texttt{monofonIC}) avoid this
 mode entirely by using the white-noise $k$-truncation strategy
 (approach B in \S\ref{sec:zoom}).
 
-\section{Comparison with a CDM-like spectrum}\label{sec:cdm}
+\section{Comparison with a CDM spectrum}\label{sec:cdm}
 
 The toy $P(k)\propto k^n$ used above (with $n=\toyn$ in our figures) is
 chosen as the 2D analog of the high-$k$ behavior of the physical
@@ -1263,18 +1306,18 @@ suppressed by $W = \cos(k_a\Delta x_f/2)$ along each axis, dropping
 to $\cos(\pi/4)\approx 0.71$ at the coarse Nyquist along an axis and
 to $\cos^2(\pi/4)=1/2$ at the 2D corner. The alias terms
 ($\mathbf n\ne\mathbf 0$) add fine-grid power at $|\mathbf k'| >
-k_{\mathrm{Ny},N}$, weighted by $W(\mathbf k')$. For a red spectrum
+k_{\mathrm{Ny},N}$, weighted by $W(\mathbf k')$. \textbf{For a red spectrum
 ($n=\toyn$) those aliased contributions are small because both $W$
 and $\delta_{2N}$ are small at high $k'$; the mismatch with the
-hi-res zoom interior is then dominated by the principal-mode deficit.
+hi-res zoom interior is then dominated by the principal-mode deficit.}
 For bluer spectra (or white noise) the aliased power is comparable to
 the principal and the boundary mismatch acquires both
 amplitude-suppression and alias-folded contributions. In either case,
 inside the zoom region the field carries all fine modes; outside it
-carries only the alias-summed coarse-grid version. The near-Nyquist
+carries only the alias-summed coarse-grid version. \textbf{The near-Nyquist
 amplitude mismatch (modes that both grids resolve, but the lo-res copy
 is suppressed by $W$) is a \emph{boundary discontinuity in $\delta$}
-at the zoom edge.
+at the zoom edge.}
 
 The lo-res displacement $\boldsymbol{\Psi}_{\rm lo}$ is internally
 Poisson-consistent with the lo-res $\delta_{\rm lo}$ (we solved Poisson
@@ -1321,19 +1364,29 @@ mode by $1/(k')^2$ but the coarse Laplacian only put back $k_c^{\,2}$
 $\delta_{\rm eff}$ is the bin-averaged density with its aliases
 weakened.
 
-So at the boundary the cell-window deficit is similar to that of A1.
+\textbf{So at the boundary the cell-window deficit is similar to that of A1.
 The more important problem is that $\boldsymbol{\Psi}_{\rm lo}$ and
 $\delta_{\rm lo}$ refer to different underlying fields: inside the
 zoom, particles are displaced according to $\delta_{2N}$; outside,
 they are displaced according to $\delta_{\rm eff}$. The two regions
-therefore correspond to different density distributions.
+therefore correspond to different density distributions.}
 
 \paragraph{Why B is consistent (flat noise spectrum).}
 For approach B, the lo-res field is
 $\delta_{\rm lo}(\mathbf k_c) = T(\mathbf k_c)\,\hat\mu(\mathbf k_c)$
 for $|k_a|\le\pi/\Delta x_c$ and zero otherwise. There is no cell-window
 suppression and no aliasing, because $\mu$ is band-limited
-\emph{before} the convolution with $T(k)$.
+\emph{before} the convolution with $T(k)$. ``Band-limited'' here means
+$\hat\mu_{\rm trunc}(\mathbf k)$ is set to zero outside the coarse
+Brillouin zone --- i.e.\ for any axis with $|k_a| > \pi/\Delta x_c$ ---
+before $T(k)$ is applied. Multiplying by $T(k)$ does not introduce new
+modes, so $T(\mathbf k)\hat\mu_{\rm trunc}(\mathbf k)$ is also zero
+outside the coarse Brillouin zone. With no out-of-zone modes to fold
+back, sub-sampling to the coarse grid produces no alias sum --- in
+contrast to A1/A2, where $\delta_{2N}$ (or $\phi_{2N}$) carries
+fine-grid power up to the fine Brillouin zone
+($|k_a|\le\pi/\Delta x_f$) and the block-average $\R$ folds the modes
+between the two zones into the coarse modes.
 
 This works because white noise has a flat power spectrum,
 $P_\mu(\mathbf k)=$ constant. In the alias-sum formula
@@ -1386,7 +1439,7 @@ Approach B is the only construction that both reproduces the ideal
 band-limited version of $\delta_{2N}$ on the coarse grid and remains
 Poisson-consistent.
 
-\begin{figure}[!t]
+\begin{figure}[!ht]
 \centering
 \includegraphics[width=\textwidth]{zoom_ic_comparison.pdf}
 \caption{Three constructions for the lo-res region of a zoom-in IC,
