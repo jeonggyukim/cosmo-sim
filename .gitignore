@@ -20,7 +20,9 @@ compute_xi_cic
 
 # Claude Code auto-memory (machine-local)
 memory/
-.claude/
+# Claude Code: ignore local settings/state, but track shared reference docs
+.claude/*
+!.claude/CLAUDE_*.md
 
 # Figures (generated; only the three box/tophat/pgrid PDFs copied to notes/ root are versioned)
 plots/
@@ -48,6 +50,7 @@ notes/figures/*.png
 # Python
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Exploratory script outputs (regenerable)
 scripts/restriction_*.png
