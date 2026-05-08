@@ -62,9 +62,12 @@ ax[1,0].set_title('error: (1) - (2)'); plt.colorbar(im, ax=ax[1,0], fraction=0.0
 im = ax[1,1].imshow(psix_ref - psix_rp, cmap='RdBu_r', vmin=-emax, vmax=emax, origin='lower')
 ax[1,1].set_title('error: (1) - (3)'); plt.colorbar(im, ax=ax[1,1], fraction=0.045)
 
-dmax = max(abs(delta_N).max(), abs(delta_eff).max())
-im = ax[1,2].imshow(delta_eff - delta_N, cmap='RdBu_r', vmin=-dmax, vmax=dmax, origin='lower')
-ax[1,2].set_title(r'$\nabla^2(\mathcal{R}\,\phi^{(1)}_{2N}) - \delta_N$' + '\n(Poisson inconsistency)')
+sigma_d = delta_N.std()
+resid = (delta_eff - delta_N) / sigma_d
+dmax = max(abs(resid).max(), 1e-30)
+im = ax[1,2].imshow(resid, cmap='RdBu_r', vmin=-dmax, vmax=dmax, origin='lower')
+ax[1,2].set_title(r'$[\nabla^2(\mathcal{R}\,\phi^{(1)}_{2N}) - \delta_N]/\sigma_{\delta_N}$'
+                  + '\n(Poisson inconsistency)')
 plt.colorbar(im, ax=ax[1,2], fraction=0.045)
 
 fig.suptitle(rf'Power-law input $P(k)\propto k^{{n}}$ with $n={n_pk:g}$')
