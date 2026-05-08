@@ -56,6 +56,44 @@ SEED=""       # random seed override for the IC level; empty = use template defa
 MUSIC2_DIR=""     # optional: path to MUSIC2 source (default: ~/Dropbox/Projects/MUSIC2 or cloned)
 CORRFUNC_DIR=""   # optional: path to built Corrfunc (default: ~/Corrfunc or cloned)
 
+print_help() {
+    cat <<EOF
+Usage: $0 [options]
+
+Full IC + diagnostics pipeline: build MUSIC2 + compute_xi/compute_xi_cic,
+generate the MUSIC2 config from a template, run MUSIC2 to produce SWIFT-format
+ICs, run CLASS to get the linear P(k), measure xi(r) (Corrfunc + CIC) and P(k),
+and plot diagnostics. Each step is skipped if its output already exists.
+
+Options:
+  --ngrid N                 Particles per side (default: ${NGRID}).  Total particle
+                            count is N^3.  MUSIC2 levmax = log2(N).
+  --lbox L                  Box size in comoving Mpc/h (default: ${LBOX}).  Mean
+                            inter-particle spacing is L/N.
+  --zstart Z                Starting redshift (default: ${ZSTART}).  Lower z gives
+                            more 2LPT corrections; higher z gives more shot-noise
+                            problems.  Sets z_pk for the CLASS run too.
+  --nthreads T              OpenMP threads for MUSIC2/Corrfunc (default: all
+                            logical CPUs detected on this machine; current ${NTHREADS}).
+  --fix-amplitude yes|no    Whether to fix the |delta(k)| amplitude per mode
+                            (CV-style ICs) or draw it from a Rayleigh distribution
+                            (default: ${FIX_AMP}).
+  --seed INT                Random seed for the IC level's white noise.  Empty
+                            uses the template's seed (default: empty).  Useful
+                            for paired suite runs.
+  --music2-dir PATH         Path to a MUSIC2 source checkout (default: \$MUSIC2_SOURCE_DIR
+                            if set, else ../MUSIC2, else clone from GitHub).
+  --corrfunc-dir PATH       Path to a built Corrfunc tree (default: ../Corrfunc,
+                            else clone from GitHub).
+  -h, --help                Show this help and exit.
+
+Examples:
+  $0                                                         # all defaults
+  $0 --ngrid 256 --lbox 512 --zstart 200                     # smaller box
+  $0 --ngrid 256 --lbox 256 --zstart 99 --fix-amplitude no   # Gaussian-draw ICs
+EOF
+}
+
 while [[ $# -gt 0 ]]; do
     case $1 in
         --ngrid)         NGRID="$2";        shift 2 ;;
@@ -66,11 +104,9 @@ while [[ $# -gt 0 ]]; do
         --seed)          SEED="$2";         shift 2 ;;
         --music2-dir)    MUSIC2_DIR="$2";   shift 2 ;;
         --corrfunc-dir)  CORRFUNC_DIR="$2"; shift 2 ;;
-        *) echo "Unknown argument: $1"
-           echo "Usage: $0 [--ngrid N] [--lbox L] [--zstart Z] [--nthreads T]"
-           echo "          [--fix-amplitude yes|no] [--seed INT]"
-           echo "          [--music2-dir /path/to/MUSIC2]"
-           echo "          [--corrfunc-dir /path/to/Corrfunc]"
+        -h|--help)       print_help; exit 0 ;;
+        *) echo "Unknown argument: $1" >&2
+           print_help >&2
            exit 1 ;;
     esac
 done
