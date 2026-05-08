@@ -560,6 +560,29 @@ scatter on top of the green band is the alias contamination, which
 grows toward the coarse Nyquist where high-$k$ fine-grid power
 ($|\mathbf k|>\pi/\Delta x_c$) is folded back in by subsampling.
 
+Before turning to the spectrum dependence, it is useful to separate
+the two ingredients of restriction. \emph{Pure subsampling} (no
+block-averaging) folds high-$k$ power onto each coarse mode but
+preserves total variance: writing the alias sum without $W$,
+$P_{\rm sub}(\mathbf k_c) = \sum_{\mathbf n}P_{2N}(\mathbf k_c+\pi
+\mathbf n/\Delta x_f)$, the integral over the coarse Brillouin zone
+exactly tiles the fine zone,
+\[
+  \int_{\rm coarse\,BZ}\!P_{\rm sub}(\mathbf k_c)\,d^d k_c
+  \;=\; \int_{\rm fine\,BZ}\!P_{2N}(\mathbf k)\,d^d k,
+\]
+because every fine mode falls into exactly one coarse mode under the
+periodic identification. So pure subsampling \emph{redistributes}
+power (preserves total variance) without changing it. \emph{Block
+averaging}, by contrast, multiplies each fine-mode power by
+$W^2(\mathbf k)\le 1$, so it can only \emph{remove} variance. The
+full restriction $\R$ (block-average then subsample) combines both
+effects: the total variance of $\delta_N$ is
+$\sum_{\mathbf n}W^2 P_{2N}$ summed over the coarse Brillouin zone,
+which is bounded above by the fine variance and equals it iff
+$\sum_{\mathbf n}W^2(\mathbf k_c+\pi\mathbf n/\Delta x_f)=1$ for all
+$\mathbf k_c$ --- the Parseval identity derived below.
+
 The amount of aliasing depends on the input power spectrum slope $n$
 (with $P(k)\propto k^n$). The alias-sum formula~(\ref{eq:Pk-alias}) gives
 $P_N(\mathbf k_c) = \sum_{\mathbf n}W^2(\mathbf k_c+\pi\mathbf
