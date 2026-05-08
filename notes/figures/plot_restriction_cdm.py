@@ -1,9 +1,14 @@
-"""Figure: same restriction comparisons but with a CDM-like P(k) from CLASS (z=200).
+"""Figure: 3D CDM restriction comparison of constructions (1), (2), (3).
 
-Shows that with a realistic CDM transfer function (P(k) ~ k^-3 ln^2 k at high k),
-the restriction effects on delta itself are visible only near the coarse Nyquist,
-and the 1LPT displacement and 2LPT source are essentially indistinguishable
-between the fine-then-restrict and restrict-then-solve paths.
+Constructions follow the §5 table:
+  (1) fine Psi/S2 then restrict      -- reference
+  (2) restrict delta then solve      -- amplifies aliases via 1/k_c instead of 1/k'
+  (3) restrict phi then -grad phi    -- keeps 1/(k')^2 suppression but Poisson-inconsistent
+
+Layout: 2 rows (Psi_x^(1) on top, S^(2) on bottom). Each row has, left to right:
+the reference field (1) on a z-slice, the residual (1)-(2) z-slice, the residual
+(1)-(3) z-slice, and a histogram of the per-cell relative errors of (2) and (3)
+versus (1) (computed over the full 3D volume, not the slice).
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,106 +19,122 @@ from icpipe import LinearTheory
 CLASS_PK = Path(__file__).resolve().parents[2] / 'data' / 'class_pk_z200_pk.dat'
 
 rng = np.random.default_rng(42)
-N, N2, L = 64, 128, 500.0   # L in Mpc/h, large enough that small-k modes have CDM peak
-n_toy = -2.0   # slope of the toy P(k) ~ k^n_toy used in earlier figures
-
+N, N2, L = 64, 128, 500.0
 th = LinearTheory.from_class(CLASS_PK, z=200)
-ktab, Ptab = th.k_table, th.Pk_table
 Pk_of_k = th.Pk
 
-# --- generate fine field ---
 kx = np.fft.fftfreq(N2, d=L/N2) * 2*np.pi
-KX, KY = np.meshgrid(kx, kx, indexing='ij')
-Kmag = np.sqrt(KX**2 + KY**2)
+KX, KY, KZ = np.meshgrid(kx, kx, kx, indexing='ij')
+Kmag = np.sqrt(KX**2 + KY**2 + KZ**2)
 Pk = Pk_of_k(Kmag)
 
-white = rng.standard_normal((N2, N2))
-dk = np.fft.fftn(white) * np.sqrt(Pk); dk[0,0] = 0.0
+white = rng.standard_normal((N2, N2, N2))
+dk = np.fft.fftn(white) * np.sqrt(Pk); dk[0,0,0] = 0.0
 delta_2N = np.fft.ifftn(dk).real
 delta_2N -= delta_2N.mean()
-delta_N  = delta_2N.reshape(N, 2, N, 2).mean(axis=(1, 3))
 
-# --- coarse k grid ---
 kc = np.fft.fftfreq(N, d=L/N) * 2*np.pi
-KXc, KYc = np.meshgrid(kc, kc, indexing='ij')
+KXc, KYc, KZc = np.meshgrid(kc, kc, kc, indexing='ij')
 
-def restrict(f): return f.reshape(N, 2, N, 2).mean(axis=(1, 3))
+def restrict(f):
+    return f.reshape(N,2,N,2,N,2).mean(axis=(1,3,5))
 
-def psi1(delta, kxg, kyg):
-    K2 = kxg**2 + kyg**2
+delta_N = restrict(delta_2N)
+
+def solve_phi(delta, kxg, kyg, kzg):
+    K2 = kxg**2 + kyg**2 + kzg**2
     inv = np.where(K2 > 0, 1.0/K2, 0.0)
-    dh = np.fft.fftn(delta)
-    return (np.fft.ifftn(1j*kxg*inv*dh).real,
-            np.fft.ifftn(1j*kyg*inv*dh).real)
+    return np.fft.ifftn(-np.fft.fftn(delta) * inv).real
 
-def deformation(delta, kxg, kyg):
-    K2 = kxg**2 + kyg**2
-    inv = np.where(K2 > 0, 1.0/K2, 0.0)
-    dh = np.fft.fftn(delta)
-    dxx = np.fft.ifftn(-kxg*kxg*inv*dh).real
-    dxy = np.fft.ifftn(-kxg*kyg*inv*dh).real
-    dyy = np.fft.ifftn(-kyg*kyg*inv*dh).real
-    return dxx, dxy, dyy
+def psi_x_from_phi(phi, kxg):
+    return np.fft.ifftn(-1j*kxg * np.fft.fftn(phi)).real
 
-# fine-then-restrict
-psix_f, _ = psi1(delta_2N, KX, KY)
-psix_ref  = restrict(psix_f)
-dxx_f, dxy_f, dyy_f = deformation(delta_2N, KX, KY)
-S2_f   = dxx_f * dyy_f - dxy_f**2
-S2_ref = restrict(S2_f)
+def deformation_for_psi(phi, kxg, kyg, kzg):
+    """d_i Psi_j = -d_i d_j phi -> (+k_i k_j) phi_hat."""
+    phih = np.fft.fftn(phi)
+    return tuple(np.fft.ifftn(ka*kb * phih).real
+                 for (ka, kb) in [(kxg,kxg),(kyg,kyg),(kzg,kzg),
+                                  (kxg,kyg),(kxg,kzg),(kyg,kzg)])
 
-# restrict-then-solve
-psix_N, _ = psi1(delta_N, KXc, KYc)
-dxx_N, dxy_N, dyy_N = deformation(delta_N, KXc, KYc)
-S2_N = dxx_N * dyy_N - dxy_N**2
+def S2_3d(p):
+    pxx, pyy, pzz, pxy, pxz, pyz = p
+    return (pxx*pyy - pxy**2) + (pxx*pzz - pxz**2) + (pyy*pzz - pyz**2)
 
-# input P(k) plot
-fig, ax = plt.subplots(2, 3, figsize=(13, 8))
+# (1) fine phi, then restrict the LPT objects
+phi_2N = solve_phi(delta_2N, KX, KY, KZ)
+psix_f = psi_x_from_phi(phi_2N, KX)
+defo_f = deformation_for_psi(phi_2N, KX, KY, KZ)
+S2_f   = S2_3d(defo_f)
+psix_1 = restrict(psix_f)
+S2_1   = restrict(S2_f)
+del psix_f, defo_f, S2_f
 
-# (top-left) input P(k) vs k^-1 toy
-kshow = np.logspace(np.log10(ktab.min()), np.log10(ktab.max()), 400)
-Pshow = Pk_of_k(kshow)
-ax[0,0].loglog(kshow, Pshow, 'k-', label='CLASS $P(k)$, $z=200$')
-norm = Pshow[200] * kshow[200]**(-n_toy)
-ax[0,0].loglog(kshow, norm * kshow**n_toy, 'r--',
-               label=rf'toy $\propto k^{{{n_toy:g}}}$')
-ax[0,0].axvline(np.pi*N/L,  color='C0', ls=':', label=r'$k_{Ny,N}$')
-ax[0,0].axvline(np.pi*N2/L, color='C1', ls=':', label=r'$k_{Ny,2N}$')
-ax[0,0].set_xlabel('k [h/Mpc]'); ax[0,0].set_ylabel('P(k)')
-ax[0,0].legend(fontsize=8); ax[0,0].set_title('input spectrum')
+# (2) restrict delta, then solve on coarse grid
+phi_N_rd = solve_phi(delta_N, KXc, KYc, KZc)
+psix_2   = psi_x_from_phi(phi_N_rd, KXc)
+defo_2   = deformation_for_psi(phi_N_rd, KXc, KYc, KZc)
+S2_2     = S2_3d(defo_2)
+del defo_2
 
-# (top-mid, top-right) delta_2N and delta_N
-vmax = max(abs(delta_2N).max(), abs(delta_N).max())
-im = ax[0,1].imshow(delta_2N, cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
-ax[0,1].set_title(r'$\delta_{2N}$'); plt.colorbar(im, ax=ax[0,1], fraction=0.045)
-im = ax[0,2].imshow(delta_N,  cmap='RdBu_r', vmin=-vmax, vmax=vmax, origin='lower')
-ax[0,2].set_title(r'$\delta_N$'); plt.colorbar(im, ax=ax[0,2], fraction=0.045)
+# (3) restrict phi, then take coarse-grid gradients
+phi_N_rp = restrict(phi_2N)
+psix_3   = psi_x_from_phi(phi_N_rp, KXc)
+defo_3   = deformation_for_psi(phi_N_rp, KXc, KYc, KZc)
+S2_3     = S2_3d(defo_3)
+del defo_3, phi_2N
 
-# bottom row: differences for delta, Psi_x, S^(2)
-diff_d = restrict(delta_2N) - delta_N  # zero by construction
-diff_psi = psix_ref - psix_N
-diff_s2  = S2_ref - S2_N
+sigma_psi = psix_1.std()
+sigma_s2  = S2_1.std()
+slc = N // 2
 
-vmax = max(abs(restrict(delta_2N)).max(), 1e-30)
-im = ax[1,0].imshow(restrict(delta_2N) - delta_N, cmap='RdBu_r', vmin=-vmax/10, vmax=vmax/10, origin='lower')
-ax[1,0].set_title(r'$R\delta_{2N} - \delta_N$ (=0, sanity)')
-plt.colorbar(im, ax=ax[1,0], fraction=0.045)
+fig, ax = plt.subplots(2, 4, figsize=(17, 8))
 
-vmax = max(abs(psix_ref).max(), 1e-30)
-im = ax[1,1].imshow(diff_psi, cmap='RdBu_r', vmin=-vmax/20, vmax=vmax/20, origin='lower')
-ax[1,1].set_title(r'$\Psi_x$ error (paths diff)')
-plt.colorbar(im, ax=ax[1,1], fraction=0.045)
+def show_map(a, img, title):
+    v = max(abs(img).max(), 1e-30)
+    im = a.imshow(img, cmap='RdBu_r', vmin=-v, vmax=v, origin='lower')
+    a.set_title(title, fontsize=10)
+    plt.colorbar(im, ax=a, fraction=0.045)
 
-vmax = max(abs(S2_ref).max(), 1e-30)
-im = ax[1,2].imshow(diff_s2, cmap='RdBu_r', vmin=-vmax/5, vmax=vmax/5, origin='lower')
-ax[1,2].set_title(r'$S^{(2)}$ error (paths diff)')
-plt.colorbar(im, ax=ax[1,2], fraction=0.045)
+def hist_panel(a, e12, e13, sigma_label, field_label):
+    rms_12 = np.sqrt((e12**2).mean()) / sigma_label
+    rms_13 = np.sqrt((e13**2).mean()) / sigma_label
+    bins = 80
+    a.hist(e12.ravel()/sigma_label, bins=bins, histtype='step', linewidth=1.4,
+           color='C0', label=f'(1)$-$(2): RMS = {rms_12:.1%}')
+    a.hist(e13.ravel()/sigma_label, bins=bins, histtype='step', linewidth=1.4,
+           color='C1', label=f'(1)$-$(3): RMS = {rms_13:.1%}')
+    a.set_xlabel(f'residual / $\\sigma_{{{field_label}}}$')
+    a.set_ylabel('number of coarse-grid cells')
+    a.legend(fontsize=8)
+    a.set_title('per-cell relative error', fontsize=10)
+
+# top row: Psi_x
+show_map(ax[0,0], psix_1[:,:,slc]/sigma_psi,
+         r'(1) reference $\mathcal{R}\,\Psi_x^{(1)}/\sigma$')
+show_map(ax[0,1], (psix_1-psix_2)[:,:,slc]/sigma_psi,
+         r'(1)$-$(2): residual$/\sigma_{\Psi_x^{(1)}}$')
+show_map(ax[0,2], (psix_1-psix_3)[:,:,slc]/sigma_psi,
+         r'(1)$-$(3): residual$/\sigma_{\Psi_x^{(1)}}$')
+hist_panel(ax[0,3], psix_1-psix_2, psix_1-psix_3, sigma_psi, r'\Psi_x^{(1)}')
+
+# bottom row: S^(2)
+show_map(ax[1,0], S2_1[:,:,slc]/sigma_s2,
+         r'(1) reference $\mathcal{R}\,S^{(2)}/\sigma$')
+show_map(ax[1,1], (S2_1-S2_2)[:,:,slc]/sigma_s2,
+         r'(1)$-$(2): residual$/\sigma_{S^{(2)}}$')
+show_map(ax[1,2], (S2_1-S2_3)[:,:,slc]/sigma_s2,
+         r'(1)$-$(3): residual$/\sigma_{S^{(2)}}$')
+hist_panel(ax[1,3], S2_1-S2_2, S2_1-S2_3, sigma_s2, r'S^{(2)}')
 
 plt.tight_layout()
 plt.savefig('restriction_cdm.pdf')
-print("wrote restriction_cdm.pdf")
+print('wrote restriction_cdm.pdf')
 
-def relerr(a, b):
-    return np.sqrt(((a-b)**2).mean()) / np.sqrt((a**2).mean())
-print(f"rel.RMS Psi_x error = {relerr(psix_ref, psix_N):.3e}")
-print(f"rel.RMS S^(2) error = {relerr(S2_ref, S2_N):.3e}")
+def relrms(a, b, ref):
+    return np.sqrt(((a-b)**2).mean()) / np.sqrt((ref**2).mean())
+
+print(f'3D CDM, N2={N2}, L={L} Mpc/h')
+print(f'  Psi_x:  rel.RMS (1)-(2) = {relrms(psix_1, psix_2, psix_1):.3e}')
+print(f'          rel.RMS (1)-(3) = {relrms(psix_1, psix_3, psix_1):.3e}')
+print(f'  S^(2):  rel.RMS (1)-(2) = {relrms(S2_1,   S2_2,   S2_1  ):.3e}')
+print(f'          rel.RMS (1)-(3) = {relrms(S2_1,   S2_3,   S2_1  ):.3e}')

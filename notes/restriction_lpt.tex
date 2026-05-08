@@ -1078,45 +1078,144 @@ Figure~\ref{fig:cdm} repeats the comparisons using a $\Lambda$CDM
 matter power spectrum at $z=200$, generated with \texttt{CLASS} (a
 public Boltzmann code that integrates the linear cosmological
 perturbation equations through the radiation, matter, and dark-energy
-eras), on a 2D grid with $L=500\,h^{-1}$~Mpc, $2N=128$, $N=64$. (The
-length unit $h^{-1}\,\mathrm{Mpc}$ is the standard cosmology
-convention: $h$ is the dimensionless Hubble parameter, $H_0 = 100h\,
-\mathrm{km}\,\mathrm{s}^{-1}\,\mathrm{Mpc}^{-1}$. See
-\notecosmoic for cosmology background.)
+eras), in a true 3D box with $L=500\,h^{-1}$~Mpc, $2N=128$, $N=64$,
+and $2\times 2\times 2$ block-averaging restriction.
 
-The top-left panel shows the input: the true CDM spectrum (black) versus
-the toy $k^n$ used in the previous figures (red dashed), with the
-coarse and fine Nyquist wavenumbers marked. The CDM spectrum has the
-matter-radiation-equality turnover at low $k$ that the toy lacks, but
-the high-$k$ slopes are similar. The top-right
-two panels show $\delta_{2N}$ and $\delta_N$; the bottom row shows the
-residuals for the mass-conservation sanity check ($\R\,\delta_{2N}-\delta_N=0$),
-the 1LPT displacement $\Psi_x^{(1)}$, and the 2LPT source $S^{(2)}$,
-each on a colour scale set to a fraction of the field's own dynamic range.
+For each of $\Psi_x^{(1)}$ (top row) and $S^{(2)}$ (bottom row), the
+figure compares the three coarse-grid constructions of \S\ref{sec:phi}:
+construction (1) (fine $\Psi$/$S^{(2)}$ then restrict; the reference),
+construction (2) (restrict $\delta$ then solve), and construction (3)
+(restrict $\phi^{(1)}$ then differentiate). The leftmost panel shows a
+$z$-slice of the reference (1), normalised by its own RMS; the middle
+two panels show the residual $z$-slices $(1)-(2)$ and $(1)-(3)$ on the
+same normalisation; the rightmost panel histograms the per-cell
+relative error of (2) and (3) versus (1) over the full 3D volume.
 
-The qualitative conclusions are unchanged: $\Psi^{(1)}$ is essentially
-unaffected, $S^{(2)}$ shows visible residuals, and the Poisson
-inconsistency of \S\ref{sec:phi} does not depend on the choice of input
-spectrum. The relative errors are smaller for the CDM spectrum than
-for the $n=\toyn$ toy because the CDM spectrum has less power near the
-coarse Nyquist scale, where the cell window and aliasing have the
-largest effect.
+The numbers confirm the alias-prefactor ordering of
+Table~\ref{tab:constructions}. For $\Psi_x^{(1)}$, the relative RMS is
+$\sim 17\%$ for $(1)-(2)$ and $\sim 12\%$ for $(1)-(3)$: construction
+(3) is visibly closer to (1) than (2) is, because (3) keeps the
+$1/(k')^2$ suppression of the inverse Laplacian and only changes the
+gradient numerator, while (2) changes the full kernel from $1/k'$ to
+$1/k_c$ and amplifies aliases by the largest factor. For $S^{(2)}$,
+the relative RMS is $\sim 48\%$ for both $(1)-(2)$ and $(1)-(3)$, with
+per-cell deviations exceeding $\sigma_{S^{(2)}}$ in either: the
+squaring of deformation-tensor errors at second order, combined with
+the lack of $1/|\mathbf k|$ damping in the kernel $-k_ik_j/k^2$, makes
+$S^{(2)}$ the LPT object most sensitive to restriction. Two effects also amplify the residuals relative to what the toy
+showed. First, in 3D each coarse mode has
+seven alias partners (one per non-principal octant of the fine zone)
+rather than three in 2D, so the alias sum has more terms.
+
+Second, the denominator $\sigma_{\Psi^{(1)}}$ that we normalise the
+residual by is itself much smaller for CDM than for the toy. The
+variance per logarithmic $k$ bin of $\Psi^{(1)}$ is, up to a constant,
+\[
+  \frac{d\sigma^2_{\Psi^{(1)}}}{d\ln k} \;\propto\;
+  \begin{cases}
+    P(k)            & \text{(2D)},\\[2pt]
+    k\,P(k)         & \text{(3D)},
+  \end{cases}
+\]
+so the field's variance is concentrated wherever this combination
+peaks. For the 2D toy $P(k)\propto k^{-2}$, $d\sigma^2/d\ln k\propto
+k^{-2}$ keeps growing toward small $k$, and $\sigma^2_{\Psi^{(1)}}$ is
+dominated by a few of the lowest box modes (those near $k_{\min}=2\pi/L$).
+That single huge IR contribution puffs up the denominator while the
+residual --- which lives at the high-$k$ end near the coarse Nyquist
+--- is unchanged, so the relative error looks small. For 3D CDM, on
+the other hand, $kP(k)$ peaks at $k_{\rm eq}\sim 0.01\,h\,\text{Mpc}^{-1}$
+and falls on either side; the variance is contributed by a broad
+range of intermediate scales, no single low-$k$ mode dominates, and
+the denominator is finite and modest. The residual at $k_{\mathrm{Ny},c}$
+is then a larger fraction of it.
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=\textwidth]{restriction_cdm.pdf}
-\caption{Restriction with a realistic CDM-like spectrum (CLASS, $z=200$,
-$L=500\,h^{-1}$~Mpc, $2N=128$, $N=64$). Top-left: input $P(k)$ (black)
-compared with the toy $P(k)\propto k^{\toyn}$ used in Figs.~\ref{fig:psi}
-and \ref{fig:deformation} (red dashed); the coarse and fine Nyquist
-wavenumbers are marked by vertical dotted lines. Top-middle and
-top-right: $\delta_{2N}$ and $\delta_N$. Bottom row, left to right:
-the mass-conservation check $\R\,\delta_{2N}-\delta_N$ (zero by
-construction); the difference in $\Psi_x^{(1)}$ between the two
-coarse-grid constructions; and the corresponding difference in
-$S^{(2)}$.}
+\caption{Restriction with a realistic CDM spectrum in genuine 3D
+(CLASS, $z=200$, $L=500\,h^{-1}$~Mpc, $2N=128$, $N=64$, $2\times
+2\times 2$ block-averaging restriction). The three coarse-grid
+constructions, defined in Table~\ref{tab:constructions} of
+\S\ref{sec:phi}, are: \emph{(1) fine $\Psi$, then restrict}
+($\R\Psi^{(1)}[\delta_{2N}]$ --- the reference); \emph{(2) restrict
+$\delta$, then solve} ($\Psi^{(1)}[\R\delta_{2N}]$); and \emph{(3)
+restrict $\phi^{(1)}$, then $-\nabla\phi^{(1)}$}
+($-\nabla(\R\phi^{(1)}_{2N})$). Top row: $\Psi_x^{(1)}$.  Bottom row:
+2LPT source $S^{(2)}$. Columns: (i)~reference $z=L/2$ midplane slice
+from construction (1), normalised by the field's own RMS; (ii)~residual
+slice $(1)-(2)$ on the same midplane; (iii)~residual slice $(1)-(3)$,
+both on the same normalisation; (iv)~histogram of the per-cell
+relative error of (2) and (3) versus (1) over the \emph{full 3D
+volume} (not just the displayed slice), with RMS values printed in
+the legend.  For $\Psi^{(1)}$, construction (3) is visibly closer to
+(1) than (2) because (3) preserves the $1/(k')^2$ alias suppression
+of the inverse Laplacian. For $S^{(2)}$ both alternatives are far
+from (1).}
 \label{fig:cdm}
 \end{figure}
+
+A caveat on the reference. Construction (1) is the \emph{best} of the
+three coarse-grid constructions, not the truth. The truth is the
+unrestricted fine-grid LPT solution $\Psi^{\rm fine}_{2N}$. All three
+constructions agree on the principal coarse mode ($\mathbf n=\mathbf 0$
+in Table~\ref{tab:constructions}), so they share the same
+window-suppression error $(W(\mathbf k_c)-1)\hat\delta_{2N}(\mathbf k_c)\,
+i\mathbf k_c/k_c^2$ on each resolved mode. Where they differ is in the
+alias prefactor for $\mathbf n\ne\mathbf 0$, so the residuals $(1)-(2)$
+and $(1)-(3)$ in Fig.~\ref{fig:cdm} isolate the \emph{alias-prefactor
+difference} between constructions: the principal-mode window cost
+cancels in the subtraction, and what remains is
+$\sum_{\mathbf n\ne\mathbf 0}[\text{prefactor}_{(1)} - \text{prefactor}_{(k)}]\,\hat\delta_{2N}(\mathbf k')$.
+This isolates the part of \S\ref{sec:phi}'s analysis (the alias-amplification
+of (2), the Poisson inconsistency of (3)) but \emph{does not} measure
+how far each construction is from the fine truth. Each carries the
+same baseline window+alias error of \S\ref{sec:fourier}, which (1) -- (2)
+and (1) -- (3) cannot show.
+
+To make this absolute scale visible, Fig.~\ref{fig:cdm-truth} plots
+the per-mode residual against the fine-grid truth itself,
+\[
+  \Delta^{(k)}(\mathbf k_c) \;=\;
+   \hat{\mathcal F}^{(k)}_N(\mathbf k_c) - \hat{\mathcal F}^{\rm fine}_{2N}(\mathbf k_c),
+\]
+where $\mathcal F$ stands for $\Psi_x^{(1)}$ or $S^{(2)}$ and the
+fine amplitude is sampled at the same wavevector. Radially binned in
+$k_c$, the residual grows from a few percent at low $k_c$ to of order
+unity at the coarse Nyquist, for both fields and all three
+constructions. \textbf{The dominant absolute error is the window
+suppression $W^2$ plus aliasing carried by all three constructions,
+not the extra contributions that distinguish (1)/(2)/(3).} The
+(1)/(2)/(3) ordering is still visible --- (1) has the smallest
+residual at low $k_c$ for $S^{(2)}$, where it sits well below (2) and
+(3) --- but the spread between constructions is small relative to the
+common floor.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\textwidth]{restriction_cdm_truth.pdf}
+\caption{Per-mode fractional residual against the fine-grid truth,
+binned radially in $k_c$, for $\Psi_x^{(1)}$ (left) and $S^{(2)}$
+(right). The plotted quantity is
+$\sqrt{\langle|\hat{\mathcal F}^{(k)}_N(\mathbf k_c)
+-\hat{\mathcal F}^{\rm fine}_{2N}(\mathbf k_c)|^2\rangle/
+\langle|\hat{\mathcal F}^{\rm fine}_{2N}(\mathbf k_c)|^2\rangle}$
+in each $k_c$ bin, with the same setup as Fig.~\ref{fig:cdm}. The
+dotted vertical line marks the coarse Nyquist $k_{\mathrm{Ny},c}$.
+All three constructions track each other closely for $\Psi^{(1)}$;
+for $S^{(2)}$ construction (1) is best at low $k_c$, but all three
+converge near $k_{\mathrm{Ny},c}$ where the common window+alias error
+dominates.}
+\label{fig:cdm-truth}
+\end{figure}
+
+\textbf{The takeaway is the §\ref{sec:psi}--\S\ref{sec:phi}
+recommendation, sharpened: in realistic 3D $\Lambda$CDM the residuals
+are not small for any of the three coarse-grid constructions
+($\sim 10$--$20\%$ for $\Psi^{(1)}$, $\sim 50\%$ for $S^{(2)}$). The
+order (1) better than (3) better than (2) is the same as predicted by
+the alias prefactor analysis, but no construction is good enough to
+substitute for working with the unrestricted fine field.}
 
 \section{Application: zoom-in IC generation}\label{sec:zoom}
 
