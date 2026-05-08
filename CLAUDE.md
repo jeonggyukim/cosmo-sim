@@ -143,7 +143,7 @@ conda run -n cosmo python scripts/make_rbins.py --hdf5 data/ics_swift_n256_z2_L1
 
 At z ≳ 10 the cosmological signal in pair-counting ξ(r) is ~10⁻⁶ — undetectable.
 The CIC grid estimator can measure ξ(r) and ψ(r) at any z because it exploits
-sub-Poissonian lattice shot noise (σ_δ ≈ D(z)·σ₀ ≪ 1). See `.claude/CLAUDE_CORRFUNC.md` § "When ξ(r) is the wrong tool".
+sub-Poissonian lattice shot noise (σ_δ ≈ D(z)·σ₀ ≪ 1). See `docs-claude/CLAUDE_CORRFUNC.md` § "When ξ(r) is the wrong tool".
 
 **Rbins**: SWIFT stores coordinates in **Mpc** (not Mpc/h); rbins must be in Mpc to match.
 Always generate rbins for each IC run with `make_rbins.py` — do not reuse a file from a different
@@ -163,7 +163,7 @@ Three LaTeX write-ups live in `notes/`:
 
 Planning docs (markdown, kept next to the notes):
 
-- `notes/drafts/baryon_ic_plan.md` — roadmap for extending the pipeline from CDM-only to baryon+CDM ICs (theory write-up for `cosmo_ic.tex` §9, `--baryons` switch in `make_music_conf.py`, per-species P(k) diagnostics, two-species coherence test).
+- `docs-claude/baryon_ic_plan.md` — roadmap for extending the pipeline from CDM-only to baryon+CDM ICs (theory write-up for `cosmo_ic.tex` §9, `--baryons` switch in `make_music_conf.py`, per-species P(k) diagnostics, two-species coherence test).
 
 ```bash
 cd notes
@@ -178,7 +178,7 @@ Figures are generated from `plot_box_window.py`, `plot_tophat_window.py`, and `p
 
 ## MUSIC2
 
-See [`.claude/CLAUDE_MUSIC2.md`](.claude/CLAUDE_MUSIC2.md) for full details on the MUSIC2 code structure, build
+See [`docs-claude/CLAUDE_MUSIC2.md`](docs-claude/CLAUDE_MUSIC2.md) for full details on the MUSIC2 code structure, build
 instructions, IC generation pipeline, transfer function internals, and file formats.
 
 ### Quick usage
