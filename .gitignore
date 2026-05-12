@@ -50,6 +50,10 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# Jupyter scratch notebooks (regenerable, never versioned)
+notebooks/scratch-pad.ipynb
+notebooks/.ipynb_checkpoints/
+
 # Exploratory script outputs (regenerable)
 scripts/restriction_*.png
 
