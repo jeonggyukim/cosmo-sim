@@ -53,6 +53,7 @@ ZSTART=200
 NTHREADS=$(sysctl -n hw.logicalcpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 FIX_AMP=yes   # fix_mode_amplitude: yes = fixed amplitudes (CV); no = Gaussian draw
 SEED=""       # random seed override for the IC level; empty = use template default
+STOP_AFTER_MUSIC=no  # if yes, exit after Step 4 (skip CLASS, ξ, P(k), plots)
 MUSIC2_DIR=""     # optional: path to MUSIC2 source (default: ~/Dropbox/Projects/MUSIC2 or cloned)
 CORRFUNC_DIR=""   # optional: path to built Corrfunc (default: ~/Corrfunc or cloned)
 
@@ -85,6 +86,10 @@ Options:
                             if set, else ../MUSIC2, else clone from GitHub).
   --corrfunc-dir PATH       Path to a built Corrfunc tree (default: ../Corrfunc,
                             else clone from GitHub).
+  --stop-after-music        Exit after Step 4 (MUSIC2 IC generation), skipping
+                            CLASS P(k), Corrfunc ξ(r), CIC P(k), and plots.
+                            Useful for memory benchmarking or when the IC HDF5
+                            is the only output needed.
   -h, --help                Show this help and exit.
 
 Examples:
@@ -104,6 +109,7 @@ while [[ $# -gt 0 ]]; do
         --seed)          SEED="$2";         shift 2 ;;
         --music2-dir)    MUSIC2_DIR="$2";   shift 2 ;;
         --corrfunc-dir)  CORRFUNC_DIR="$2"; shift 2 ;;
+        --stop-after-music) STOP_AFTER_MUSIC=yes; shift 1 ;;
         -h|--help)       print_help; exit 0 ;;
         *) echo "Unknown argument: $1" >&2
            print_help >&2
@@ -200,14 +206,43 @@ fi
 # ---------------------------------------------------------------------------
 if [ ! -f "$IC_FILE" ]; then
     log "Running MUSIC2..."
-    "$MUSIC_BIN" "$CONF_FILE"
+    # Wrap in /usr/bin/time to measure peak memory usage.
+    # macOS uses -l (bytes); Linux uses -v (kilobytes).
+    TIME_LOG="data/music_time_${STEM}.log"
+    if [ "$(uname -s)" = "Darwin" ]; then
+        TIME_FLAG="-l"; MEM_LABEL="maximum resident set size"; MEM_DIVISOR=1048576  # B -> MiB
+    else
+        TIME_FLAG="-v"; MEM_LABEL="Maximum resident set size"; MEM_DIVISOR=1024     # kB -> MiB
+    fi
+    /usr/bin/time $TIME_FLAG "$MUSIC_BIN" "$CONF_FILE" 2> "$TIME_LOG"
+    MUSIC_RC=$?
+    if [ $MUSIC_RC -ne 0 ]; then
+        echo "Error: MUSIC2 exited with code $MUSIC_RC. See $TIME_LOG for details." >&2
+        cat "$TIME_LOG" >&2
+        exit $MUSIC_RC
+    fi
+    # Extract peak memory in MiB.  GNU time line: "Maximum resident set size (kbytes): 12345"
+    # macOS time line:        "12345  maximum resident set size"
+    PEAK_MEM_MIB=$(awk -v label="$MEM_LABEL" -v div="$MEM_DIVISOR" '
+        $0 ~ label {
+            for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/) { v = $i; break }
+            printf "%.1f", v / div; exit
+        }' "$TIME_LOG")
     mv input_class_parameters.ini "$CLASS_INI"
     # MUSIC2 always writes wnoise_NNNN.bin to CWD (path is hardcoded); move to data/
     for f in wnoise_*.bin; do [ -f "$f" ] && mv "$f" "data/$f" && echo "    Saved: data/$f"; done
     echo "    Saved: $IC_FILE"
     echo "    Saved: $CLASS_INI"
+    echo "    Saved: $TIME_LOG (full /usr/bin/time output)"
+    [ -n "$PEAK_MEM_MIB" ] && echo "    Peak memory: ${PEAK_MEM_MIB} MiB"
 else
     log "IC file already exists — skipping ($IC_FILE)"
+fi
+
+# Optional early exit: stop after MUSIC2, skip CLASS / Corrfunc / P(k) / plots.
+if [ "$STOP_AFTER_MUSIC" = "yes" ]; then
+    log "--stop-after-music set: exiting before Step 5 (CLASS P(k))."
+    exit 0
 fi
 
 # ---------------------------------------------------------------------------
