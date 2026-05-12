@@ -1,4 +1,4 @@
-NOTES  = ic_sampling cosmo_ic fft restriction_lpt
+NOTES  = ic_sampling cosmo_ic fft restriction_lpt music2_internals
 PYTHON = conda run -n cosmo python
 
 # Absolute path to this Makefile's directory — pdflatex is always run from here
@@ -7,9 +7,24 @@ NOTESDIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 UNAME := $(shell uname)
 ifeq ($(UNAME), Linux)
-    OPEN = evince
+    # $(1) = absolute PDF path
+    define OPEN_PDF
+	evince $(1) &
+    endef
 else ifeq ($(UNAME), Darwin)
-    OPEN = open
+    # Reload the PDF in Preview without stealing focus or spawning a new window.
+    # If a document with the same path is already open, close+reopen it in place;
+    # otherwise just open it. `activate` is omitted so Preview stays in the back.
+    define OPEN_PDF
+	osascript -e 'tell application "Preview"' \
+	          -e 'set thePath to POSIX file "$(1)"' \
+	          -e 'set theDocs to (every document whose path is POSIX path of thePath)' \
+	          -e 'repeat with d in theDocs' \
+	          -e 'close d saving no' \
+	          -e 'end repeat' \
+	          -e 'open thePath' \
+	          -e 'end tell' >/dev/null
+    endef
 endif
 
 TIDY = rm -f *.aux *.log *.blg *.out *.toc
@@ -23,7 +38,9 @@ FIGURES = figures/box_window.pdf figures/tophat_window.pdf figures/pgrid_compari
           figures/restriction_cdm.pdf figures/restriction_cdm_truth.pdf \
           figures/window_compare.pdf \
           figures/alias_diagram.pdf figures/zoom_ic_comparison.pdf \
-          figures/zoom_ic_pk_full.pdf
+          figures/zoom_ic_pk_full.pdf \
+          figures/grf_exponential.pdf \
+          figures/complex_modes.pdf
 
 all : figures notes
 
@@ -107,6 +124,12 @@ figures/zoom_ic_comparison.pdf : figures/plot_zoom_ic_comparison.py
 figures/zoom_ic_pk_full.pdf : figures/plot_zoom_ic_pk_full.py
 	cd figures && $(PYTHON) plot_zoom_ic_pk_full.py
 
+figures/grf_exponential.pdf : figures/plot_grf_exponential.py
+	cd figures && $(PYTHON) plot_grf_exponential.py
+
+figures/complex_modes.pdf : figures/plot_complex_modes.py
+	cd figures && $(PYTHON) plot_complex_modes.py
+
 # --- LaTeX ---
 notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
 
@@ -115,7 +138,7 @@ notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
 	cd $(NOTESDIR) && bibtex $(basename $(notdir $<)) || true
 	cd $(NOTESDIR) && pdflatex -draftmode -synctex=1 $(notdir $<)
 	cd $(NOTESDIR) && pdflatex $(notdir $<)
-	$(OPEN) $(NOTESDIR)$(notdir $@) &
+	$(call OPEN_PDF,$(NOTESDIR)$(notdir $@))
 	cd $(NOTESDIR) && $(TIDY)
 
 clean :

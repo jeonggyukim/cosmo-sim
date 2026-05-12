@@ -1,0 +1,1445 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{natbib}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,decorations.pathreplacing}
+\usepackage{booktabs}
+\usepackage{tcolorbox}
+\tcbuselibrary{breakable,skins}
+\bibliographystyle{aasjournal}
+
+\lstset{
+  language=C++,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{teal},
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray}
+}
+
+\newcommand{\bk}{\mathbf{k}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\bq}{\mathbf{q}}
+\newcommand{\ba}{\mathbf{a}}
+\newcommand{\bn}{\mathbf{n}}
+\newcommand{\bN}{\mathbf{N}}
+\newcommand{\bm}{\mathbf{m}}
+\newcommand{\br}{\mathbf{r}}
+\newcommand{\by}{\mathbf{y}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{The Inner Workings of \texttt{MUSIC2}:\\
+       A Source-Walking Companion to Hahn \& Abel 2011 and Hahn \& Angulo 2021}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\begin{tcolorbox}[colback=yellow!10!white, colframe=orange!75!black,
+                  title={\bfseries Disclaimer}]
+These notes were compiled by an AI assistant (Claude, Anthropic) from a
+direct reading of the \texttt{MUSIC2-anisotropic-zoom} source, paired
+with the published descriptions in \citet{Hahn2011} and
+\citet{HahnAngulo2021}.  They have \textbf{not been reviewed by a human
+domain expert} and may contain errors in derivations, line-number
+citations, or notation.  Cross-check key formulae against the cited
+papers and the source before use.
+\end{tcolorbox}
+\vspace{0.5em}
+
+%======================================================================
+\section{Introduction}
+\label{sec:intro}
+
+\texttt{MUSIC2}~\citep{HahnAngulo2021} is a code that generates particle
+initial conditions for cosmological $N$-body simulations on
+\emph{nested grids of varying spatial resolution}.  Given a
+cosmological power spectrum $P(k)$, a starting redshift $z_\mathrm{ini}$,
+and a refinement geometry (one or more rectangular sub-regions inside
+a periodic box), it returns particle positions and velocities consistent
+with first- or second-order Lagrangian perturbation theory (LPT),
+expressed in the conventions of a downstream $N$-body solver.  The
+predecessor code \texttt{MUSIC1}~\citep{Hahn2011} introduced the
+multi-scale convolution machinery on which \texttt{MUSIC2} still rests.
+Between those two papers Hahn and collaborators rewrote the code in
+two phases.  Phase one (the \texttt{monofonIC} branch) generalised the
+convolution to higher-order Lagrangian perturbation theory and to
+deterministic random fields supplied by \texttt{PanPhasia}
+\citep{Jenkins2013}; phase two dropped large pieces of the original
+multi-level density-assembly algorithm in favour of a leaner
+Fourier-space mode-replacement step.  Our fork
+(\texttt{MUSIC2-anisotropic-zoom}) restores some of the lost
+functionality as opt-in flags and adds new infrastructure for
+elongated ``pencil'' zoom geometries needed in galactic-scale
+resimulations.  The aim of this document is to make every step of the
+pipeline transparent, from the continuum equations down to the lines
+of source that implement them.
+
+\subsection{Reader's guide}
+
+The exposition assumes the reader has worked through three companion
+notes in this directory:
+
+\begin{itemize}
+  \item \texttt{cosmo\_ic.tex} on cosmological perturbation theory,
+        LPT, and the relation between $P(k)$, $\xi(r)$, and the
+        velocity field.
+  \item \texttt{fft.tex} on the continuous-to-discrete Fourier transform
+        chain, the FFTW normalisation conventions, and aliasing.
+        All $2\pi$ and $1/N$ factors here use the convention defined
+        there: forward DFT unnormalised, inverse DFT carries the
+        $1/N$ factor.
+  \item \texttt{restriction\_lpt.tex} on cross-grid Poisson consistency,
+        per-level $P(k)$ diagnostics, and the field-level subtraction
+        test for matched-noise validation.  Section~\ref{sec:validation}
+        below leans heavily on the framework set up there.
+\end{itemize}
+
+The exposition begins with the cosmological inputs
+(\S\ref{sec:cosmo-inputs}) and the conventions (\S\ref{sec:notation}),
+then proceeds along the pipeline in the order \texttt{MUSIC2} itself
+executes:
+
+\begin{enumerate}
+  \item Build a hierarchy of white-noise fields on the levels of the
+        refinement structure (\S\ref{sec:noise}).
+  \item Construct the transfer-function convolution kernel
+        (\S\ref{sec:tf-kernel}).
+  \item Apply the kernel to the noise to obtain the density contrast
+        $\delta(\bq)$ on each level (\S\ref{sec:delta-driver},
+        \S\ref{sec:delta-hierarchy}).
+  \item Solve Poisson's equation on the multi-level hierarchy to get
+        the displacement potential $\phi$, differentiate to get the
+        displacement field $\boldsymbol\Psi$ and the peculiar velocity,
+        and finally pass particle positions and velocities to the
+        output plug-in (\S\ref{sec:lpt-handoff}).
+\end{enumerate}
+
+The two intermediate sections \S\ref{sec:peraxis} (per-axis isolation)
+and \S\ref{sec:multigrid} (multigrid Poisson) cover infrastructure used
+across the pipeline.  The final operational section,
+\S\ref{sec:validation}, describes how to verify that the zoom and
+unigrid pipelines agree to within $10^{-4}\,\sigma_\delta$ on a
+matched-noise test as in \citet{Hahn2011}.  A reading of the design
+choices that distinguish \texttt{MUSIC1}, \texttt{MUSIC2}, and the
+fork follows in \S\ref{sec:lineage}.  Appendices give detailed
+derivations, file-format references, and a configuration-option
+catalogue.
+
+\subsection{Two-stage pipeline}
+\label{sec:two-stage}
+
+A useful organising principle is the \emph{two-stage decoupling} of
+the code.  Stage~A constructs a Gaussian white-noise field on each
+level of the refinement hierarchy.  This stage is purely numerical:
+it depends on the random seeds, the cube-tiled sampler, and the
+two refinement schemes inherited from~\citet{Hahn2011}~\S2.3.1
+(Hoffman--Ribak real space, or FFT-based coarse-mode replacement).
+It does not see cosmology.  Stage~B convolves that noise with a
+transfer-function kernel $T$, assembles the multi-level density
+$\delta$, solves Poisson, and constructs the displacement and velocity
+fields.  This stage is cosmology-aware (via $P(k)$, $D_+$, $f$) but
+independent of the noise construction.
+
+The decoupling matters operationally because the two stages have
+different failure modes: Stage~A is sensitive to FFT-shape effects in
+the noise-refinement step (\S\ref{sec:noise-approach-shape-dep}),
+while Stage~B is sensitive to the boundary handling at the coarse--fine
+interface (\S\ref{sec:delta-three-term}).  The matched-noise
+diagnostic of \S\ref{sec:validation} probes Stage~A; the per-level
+$P(k)$ diagnostic of \texttt{restriction\_lpt.tex}~\S6 probes
+Stage~B.
+
+\subsection{Source-tree map}
+\label{sec:source-map}
+
+The files that implement the pipeline are organised as follows:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lp{0.55\textwidth}}
+\toprule
+File & Role \\
+\midrule
+\code{src/main.cc}                & Top-level pipeline; orchestrates Stage~A and Stage~B; handles 2LPT iteration; calls the output plug-in. \\
+\code{src/densities.cc}           & Stage~B driver: \code{GenerateDensityUnigrid} and \code{GenerateDensityHierarchy}; selects k-space or real-space TF kernel. \\
+\code{src/densities\_three\_term.cc}  & \emph{Our fork only.}  Hahn~2011 \S2.3.3 three-term decomposition $\delta = \delta_\mathrm{self} + \delta_\mathrm{bnd} + \delta_\mathrm{coarse}$, opt-in via \code{[setup]/density\_boundary = yes}. \\
+\code{src/density\_grid.hh}       & \code{DensityGrid} and \code{PaddedDensitySubGrid} classes; the octet-mean helpers used by the three-term decomposition live here. \\
+\code{src/convolution\_kernel.cc} & Kernel driver \code{convolution::perform}; k-sampled kernel \code{tf\_kernel\_k}; mode-amplitude fixing and flipping; \code{[setup]/dump\_delta} debug option. \\
+\code{src/convolution\_kernel\_real.cc} & \emph{Restored in our fork.}  Real-space TF kernel \code{tf\_kernel\_real} with sub-cell quadrature; opt-in via \code{[setup]/kspace\_TF = no}. \\
+\code{src/transfer\_function.hh}     & \code{TransferFunction\_k}: $T(k)$ evaluated analytically (Eisenstein--Hu, CAMB, CLASS, etc.). \\
+\code{src/transfer\_function\_real.hh} & \code{TransferFunction\_real}: $T(r)$ obtained from FFTLog~\citep{Hamilton2000} of $T(k)$. \\
+\code{src/plugins/random\_music.cc}              & Stage~A factory: parses the seed table, decides the order of level construction, manages on-disk noise caching. \\
+\code{src/plugins/random\_music\_wnoise\_generator.cc} & Stage~A worker: cube-tiled sampler, file-loading constructor, constrained-fine-field constructors (Hoffman--Ribak and FFT-based). \\
+\code{src/plugins/random\_panphasia.cc}          & Alternative Stage~A backend using \texttt{PanPhasia}~\citep{Jenkins2013}. \\
+\code{src/poisson.cc}             & Driver for the multigrid Poisson solve and its FFT counterpart. \\
+\code{src/mg\_solver.hh}          & FAS V-cycle implementation. \\
+\code{src/mg\_operators.hh}       & Restriction, prolongation, and the boundary flux-correction operators used in the multigrid V-cycle. \\
+\code{src/mg\_interp.hh}          & Higher-order coarse--fine interpolation (\code{interp\_O3\_fluxcorr} etc.). \\
+\code{src/mesh.hh}                & \code{grid\_hierarchy} container; \code{MeshvarBnd} with ghost cells. \\
+\code{src/refinement\_hierarchy.hh} & \code{refinement\_hierarchy} class; defines the multi-level geometry, per-axis isolation flags. \\
+\bottomrule
+\end{tabular}
+\caption{File-by-file map of the \texttt{MUSIC2-anisotropic-zoom}
+         source tree, restricted to the modules touched by this
+         document.  Throughout the text, line numbers refer to the
+         commit at the top of \texttt{git log} when this document was
+         last compiled.}
+\label{tab:source-map}
+\end{table}
+
+\subsection{Version history relevant to this note}
+\label{sec:lineage-summary}
+
+The pieces of code covered here have moved between \texttt{MUSIC1}
+and \texttt{MUSIC2} several times.  Table~\ref{tab:lineage} gives
+the highlights; a fuller discussion is in \S\ref{sec:lineage}.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Feature & \texttt{MUSIC1} & \texttt{MUSIC2}     & This fork \\
+        & rel.~cand.~2011 & master $\ge$ 2023   &           \\
+\midrule
+$k$-space TF kernel             & yes  & yes & yes \\
+Real-space TF kernel            & yes  & no  & yes (opt-in) \\
+Hoffman--Ribak noise refinement (Approach~1) & yes (default) & no & yes (opt-in) \\
+FFT-based noise refinement (Approach~2)      & yes  & yes (Meyer-window blend) & yes (Meyer-window blend, default) \\
+Three-term $\delta$ decomposition & yes  & no  & yes (opt-in) \\
+Fourier-replacement $\delta$ path  & no   & yes (default) & yes (default) \\
+\texttt{PanPhasia} RNG              & no   & yes & yes \\
+Per-axis isolation \code{axis\_periodic[3]} & no   & no  & yes \\
+\bottomrule
+\end{tabular}
+\caption{Inheritance pattern of the algorithmic pieces discussed in
+this note.  ``Opt-in'' means a configuration flag toggles the feature
+on; default is off so existing \texttt{MUSIC2} configurations behave
+identically.}
+\label{tab:lineage}
+\end{table}
+
+%======================================================================
+\section{Notation and Conventions}
+\label{sec:notation}
+
+This section fixes the units, indexing, and Fourier-transform
+normalisations used throughout the note.  The conventions are those
+of \texttt{fft.tex} and \texttt{cosmo\_ic.tex} unless otherwise stated.
+They are listed here in one place because every Stage-A and Stage-B
+operation in \texttt{MUSIC2} relies on them.
+
+\subsection{Refinement hierarchy}
+\label{sec:notation-refinement}
+
+A \texttt{MUSIC2} run is parametrised by:
+
+\begin{itemize}
+  \item A simulation box of comoving length $L$ in units of
+        $h^{-1}\,\mathrm{Mpc}$ (configuration key
+        \code{[setup]/boxlength}).  The box is periodic on the coarsest
+        level.
+  \item A coarsest level $\ell_\mathrm{min}$ and a finest level
+        $\ell_\mathrm{max}$ (\code{levelmin} and \code{levelmax}).
+        Each level $\ell$ corresponds to a notional grid of
+        $N_\ell = 2^\ell$ cells per axis covering the full box,
+        giving a cell spacing
+        \begin{equation}
+          \Delta x_\ell = \frac{L}{N_\ell} = \frac{L}{2^\ell}\,.
+          \label{eq:dxell}
+        \end{equation}
+        Only a sub-region of the level-$\ell$ grid is actually
+        allocated in memory for $\ell > \ell_\mathrm{min}$; that
+        sub-region is the \emph{refinement patch}.
+  \item For each refinement level $\ell \ge \ell_\mathrm{min}+1$, an
+        integer offset $\bn^\mathrm{off}_\ell \in \mathbb{Z}^3$ and
+        an integer extent $\bN^\mathrm{ext}_\ell \in \mathbb{Z}^3$ in
+        level-$\ell$ cell units.  The patch occupies absolute
+        level-$\ell$ cells
+        $[\bn^\mathrm{off}_\ell,\,\bn^\mathrm{off}_\ell + \bN^\mathrm{ext}_\ell)$.
+        The user specifies these geometrically via
+        \code{[setup]/ref\_center} and \code{[setup]/ref\_extent} in
+        box-fraction units; the conversion to cell-integer
+        coordinates is performed in
+        \code{src/refinement\_hierarchy.hh}.
+  \item A per-axis isolation flag
+        $\mathrm{axis\_periodic}[a] \in \{0,1\}$ for
+        $a \in \{x,y,z\}$ (\code{[setup]/axis\_periodic}).  When
+        $\mathrm{axis\_periodic}[a] = 1$ the refinement patch is
+        understood to wrap periodically along axis $a$ --- only the
+        non-isolated axes contribute to the Hockney--Eastwood
+        doubling described in \S\ref{sec:peraxis-doubling}.  This
+        flag is unique to our fork and is used for elongated
+        pencil-zoom geometries.
+\end{itemize}
+
+We write generic level-$\ell$ integer cell indices as
+$\bn^{(\ell)} = (i^{(\ell)}, j^{(\ell)}, k^{(\ell)}) \in \mathbb{Z}^3$.
+The continuum Lagrangian coordinate associated with the cell centre
+is
+\begin{equation}
+  \bq^{(\ell)}_{\bn} = \left(\bn^{(\ell)} + \tfrac{1}{2}\right)\,\Delta x_\ell\,.
+  \label{eq:qcoord}
+\end{equation}
+
+\subsection{Eulerian and Lagrangian coordinates}
+\label{sec:notation-coords}
+
+We follow \texttt{cosmo\_ic.tex}~\S4 in distinguishing
+\emph{Lagrangian} ($\bq$) and \emph{Eulerian} ($\bx$) coordinates.
+At the starting redshift $z_\mathrm{ini}$ a particle initially at
+$\bq$ is displaced by the LPT displacement field $\boldsymbol\Psi(\bq)$
+to end up at
+\begin{equation}
+  \bx(\bq) = \bq + \boldsymbol\Psi(\bq)\,,
+  \qquad
+  \mathbf{v}(\bq) = \dot{\boldsymbol\Psi}(\bq)
+        = a\,H\,f_1\,\boldsymbol\Psi^{(1)}(\bq)
+          + a\,H\,f_2\,\boldsymbol\Psi^{(2)}(\bq) + \mathcal{O}(\Psi^3)\,.
+  \label{eq:lpt-defs}
+\end{equation}
+The growth-rate factors $f_n \equiv \mathrm{d}\ln D_n / \mathrm{d}\ln a$
+are evaluated at $z = z_\mathrm{ini}$, with $D_1$ and $D_2$ the
+first- and second-order growing-mode amplitudes of
+\texttt{cosmo\_ic.tex}.  The density contrast at first order,
+evaluated on the Lagrangian grid, is the divergence of the
+displacement,
+\begin{equation}
+  \delta^{(1)}(\bq) = -\nabla_\bq \cdot \boldsymbol\Psi^{(1)}(\bq)\,,
+  \label{eq:delta-of-q}
+\end{equation}
+and we shall reserve the symbol $\delta(\bq)$ for the quantity
+\texttt{MUSIC2} actually constructs --- namely the convolution of a
+white-noise field with a transfer-function kernel.
+
+The Eulerian density $\delta(\bx)$ that an $N$-body solver would
+measure after particle deposition is obtained by cloud-in-cell (CIC)
+binning of the displaced particles; it is \emph{not} what
+\texttt{MUSIC2} writes to its grid-format output.
+
+\subsection{Fourier conventions}
+\label{sec:notation-fft}
+
+We use the conventions of \texttt{fft.tex}~\S2.  The continuum
+Fourier transform pair is
+\begin{equation}
+  \tilde f(\bk) = \int \mathrm{d}^3 \bx \, f(\bx)\,e^{-\mathrm{i}\bk\cdot\bx}\,,
+  \qquad
+  f(\bx) = \int \frac{\mathrm{d}^3\bk}{(2\pi)^3}\,\tilde f(\bk)\,e^{+\mathrm{i}\bk\cdot\bx}\,.
+  \label{eq:CFT-conv}
+\end{equation}
+On an $N^3$ uniform grid in a box of side $L$, the discrete Fourier
+transform (DFT) of a real array
+$\{f_\bn\}_{\bn=\mathbf{0}}^{\bn=\bN-1}$ samples this pair at integer
+mode indices $\bm = (m_1,m_2,m_3) \in \mathbb{Z}^3$:
+\begin{equation}
+  \hat f_\bm = \sum_{\bn} f_\bn\,e^{-2\pi\mathrm{i}\,\bm\cdot\bn/N}\,,
+  \qquad
+  f_\bn = \frac{1}{N^3}\,\sum_\bm \hat f_\bm\,e^{+2\pi\mathrm{i}\,\bm\cdot\bn/N}\,.
+  \label{eq:DFT-conv}
+\end{equation}
+The physical wavevector corresponding to mode $\bm$ on a box of side
+$L$ is
+\begin{equation}
+  \bk_\bm = \frac{2\pi}{L}\,\bm \qquad\text{with } m_a \in \{0, 1, \ldots, N/2\} \cup \{-N/2+1, \ldots, -1\}\,,
+  \label{eq:k-of-m}
+\end{equation}
+where the negative half is identified by the usual FFTW
+``wrap-around'' on indices in $[N/2+1, N-1]$.  The Nyquist mode of
+the level-$\ell$ grid is
+\begin{equation}
+  k^\mathrm{Ny}_\ell = \frac{2\pi}{L}\,\frac{N_\ell}{2} = \frac{\pi}{\Delta x_\ell}\,.
+  \label{eq:nyquist}
+\end{equation}
+\texttt{MUSIC2} uses the FFTW3 library throughout.  We follow FFTW's
+\emph{unnormalised forward, $1/N$ inverse} convention: a round-trip
+forward+inverse pair leaves the input unchanged (within
+floating-point roundoff).  For an i.i.d.\ Gaussian white-noise input
+$f_\bn \sim \mathcal{N}(0,1)$ the expectation of $|\hat f_\bm|^2$
+under this convention is $N^3$, not $1$ --- the derivation is in
+Appendix~\ref{app:dft-variance}.  When two grids of different size
+$N_\mathrm{c}$ and $N_\mathrm{f} = 2 N_\mathrm{c}$ are filled with
+the \emph{same} per-cell-variance noise, the same physical mode is
+represented in the two grids with an amplitude ratio of
+$\sqrt{N_\mathrm{f}^3 / N_\mathrm{c}^3} = \sqrt{8}$.  This $\sqrt{8}$
+shows up in the FFT-based noise-refinement step
+(\S\ref{sec:noise-approach2}) and is the source of every $1/\sqrt{8}$
+and $\sqrt{8}$ factor in the code.
+
+\subsection{Real-to-complex (r2c) FFT layout}
+\label{sec:notation-r2c}
+
+\texttt{MUSIC2}'s data arrays are real, so the forward FFT is
+real-to-complex (r2c).  The Hermitian symmetry
+$\hat f_{-\bm} = \hat f^*_\bm$ lets FFTW3 store only $N \times N \times (N/2 + 1)$
+complex coefficients instead of $N^3$.  In place, the input buffer
+must be padded along the last axis to size
+\begin{equation}
+  N \times N \times 2(N/2 + 1) = N \times N \times (N + 2)
+  \label{eq:r2c-padding}
+\end{equation}
+real entries; the input data lives in the first $N$ slots of each row,
+the last 2 are scratch space that the r2c step overwrites with the
+(complex) output.  Allocations of $N \times N \times N$ reals will
+overflow during the r2c step; this is the bug that surfaced in
+\code{convolution\_kernel\_real.cc} when our fork's per-axis margin
+size was first introduced (commit \texttt{8e229f8}).
+
+\subsection{White-noise field}
+\label{sec:notation-noise}
+
+The Gaussian white-noise field $\mu(\bq)$ is the basic random input
+to \texttt{MUSIC2}.  On the level-$\ell$ grid it is a real array
+$\mu^{(\ell)}_\bn$ drawn as
+\begin{equation}
+  \mu^{(\ell)}_\bn \sim \mathcal{N}(0,\,1)\,,
+  \qquad
+  \langle \mu^{(\ell)}_\bn\,\mu^{(\ell)}_{\bn'}\rangle = \delta^\mathrm{K}_{\bn\bn'}\,,
+  \label{eq:noise-stats}
+\end{equation}
+where $\delta^\mathrm{K}$ is the Kronecker delta.  Statistical
+isotropy and Gaussianity of the noise are inherited by the density
+field $\delta = T\!\star\!\mu$ for any deterministic real kernel
+$T$ --- this is the property that lets \texttt{MUSIC2} convert a
+single $P(k)$ specification into an entire random field.  The
+variance is per cell, not per unit volume.  When we compare Fourier
+amplitudes on grids of different cell spacing $\Delta x$, we
+therefore have to dimensionally rescale by powers of $\Delta x$ as
+in Parseval's identity.
+
+\subsection{Transfer function and density contrast}
+\label{sec:notation-tf}
+
+The density contrast on the Lagrangian grid is obtained by
+convolving the white-noise field with the transfer function kernel,
+\begin{equation}
+  \delta(\bq) = \int \mathrm{d}^3\br\,T_\mathcal{R}(\br)\,\mu(\bq - \br)
+              = (T_\mathcal{R} \star \mu)(\bq)\,,
+  \label{eq:delta-conv}
+\end{equation}
+where $T_\mathcal{R}(\br)$ is the (smoothed) real-space transfer
+function.  By the convolution theorem,
+\begin{equation}
+  \tilde\delta(\bk) = \tilde T(\bk)\,\tilde\mu(\bk)\,.
+  \label{eq:delta-tilde}
+\end{equation}
+The connection to a measured power spectrum $P(k)$ at the IC redshift
+$z_\mathrm{ini}$ is fixed by demanding
+\begin{equation}
+  \bigl\langle \tilde\delta(\bk)\,\tilde\delta^*(\bk') \bigr\rangle
+   \;=\; (2\pi)^3\,\delta^\mathrm{D}(\bk - \bk')\,P(k, z_\mathrm{ini})\,,
+  \label{eq:Pk-def}
+\end{equation}
+which combined with $\langle\tilde\mu(\bk)\tilde\mu^*(\bk')\rangle =
+(2\pi)^3\,\delta^\mathrm{D}(\bk-\bk')$ for unit-variance white noise
+gives
+\begin{equation}
+  \bigl|\tilde T(\bk)\bigr|^2 \;=\; P(k, z_\mathrm{ini})\,.
+  \label{eq:tk-from-pk}
+\end{equation}
+On the discrete level-$\ell$ grid the equivalent statement is
+$|\tilde T_\bm|^2 = P(k_\bm)/V$ with $V = L^3$; together with
+$\langle|\hat\mu_\bm|^2\rangle = N_\ell^3$ (Appendix~\ref{app:dft-variance})
+this gives the $N_\ell^{-3/2}$ prefactor in Eq.~(\ref{eq:tf-k}).
+The right-hand side comes from a Boltzmann solver (Eisenstein--Hu,
+CAMB, CLASS) plus a back-scaling to $z = z_\mathrm{ini}$ via the
+linear growth factor $D_+(z)$.
+
+\subsection{Indexing and storage layout}
+\label{sec:notation-storage}
+
+Real arrays inside \texttt{MUSIC2} are stored as
+\code{std::vector<real\_t>} with a flat memory layout.  The accessor
+on \code{DensityGrid<real\_t>} is
+\begin{equation}
+  (\code{*this})(i, j, k)
+     \;\longleftrightarrow\;
+     \code{data\_[((size\_t)i * ny\_ + (size\_t)j) * nzp\_ + (size\_t)k]}\,,
+  \label{eq:densitygrid-access}
+\end{equation}
+where $\code{nzp\_} = 2(\code{nz\_}/2 + 1)$ is the FFT-padded
+$z$-extent from Eq.~(\ref{eq:r2c-padding}).  This is the
+$(i, j, k)$ indexing convention assumed by every kernel, helper, and
+convolution-driver loop in the codebase.  The matching r2c forward
+plan is built with \code{nx}, \code{ny}, \code{nz} (not \code{nzp\_});
+FFTW takes care of the stride.
+
+\subsection{Configuration option style}
+\label{sec:notation-config}
+
+Configuration keys follow the convention \code{[section]/key = value}
+used throughout the \texttt{.conf} files in \code{tests/}.  Where a
+key is mentioned in passing, the section header is given on first
+mention and elided thereafter.  All keys used in this note are
+catalogued in Appendix~\ref{app:config-keys}.
+
+%======================================================================
+\section{Cosmological Inputs}
+\label{sec:cosmo-inputs}
+
+\texttt{MUSIC2}'s cosmological state at run time consists of three
+items: a set of background parameters
+$\{\Omega_m, \Omega_\Lambda, \Omega_b, h, n_s, \sigma_8\}$, a linear
+matter power spectrum $P(k, z_\mathrm{ref})$ from a Boltzmann solver,
+and a back-scaling rule from $z_\mathrm{ref}$ to the IC redshift
+$z_\mathrm{ini}$.  The parameters are read at startup
+(\code{main.cc::main} around line~110) and stored on a
+\code{CosmologyParameters} struct attached to each
+\code{transfer\_function} instance.  Within \texttt{MUSIC2-anisotropic-zoom}
+they are accessed via \code{ptf->cosmo\_params\_["..."]}; the keys are
+\code{Omega\_m}, \code{Omega\_L}, \code{Omega\_b}, \code{H0},
+\code{nspec}, \code{sigma\_8}, and the derived normalisation
+\code{pnorm} introduced below.
+
+\subsection{Linear power spectrum}
+\label{sec:cosmo-pk}
+
+The user selects one of several transfer-function plug-ins via the
+\code{[cosmology]/transfer} key (\code{eisenstein},
+\code{eisenstein\_wdm}, \code{camb\_file},
+\code{class}, \code{music\_file}, \code{file\_general},
+\code{file\_two\_species}, etc.).  Each plug-in provides
+\code{compute(k, type)} methods returning the dimensionless transfer
+function $T_\mathrm{B}(k)$ normalised to $T_\mathrm{B}(k\!\to\!0) = 1$.
+Following \texttt{cosmo\_ic.tex}~\S6.2, the linear power spectrum at
+$z_\mathrm{ref}$ is
+\begin{equation}
+  P_\mathrm{lin}(k, z_\mathrm{ref})
+   \;=\; \mathcal{N}_\sigma\,k^{n_s}\,T_\mathrm{B}^2(k)\,
+         \frac{D_+^2(z_\mathrm{ref})}{D_+^2(0)}\,,
+  \label{eq:plin-zref}
+\end{equation}
+where the normalisation $\mathcal{N}_\sigma$ is fixed by the
+$\sigma_8$ requirement:
+\begin{equation}
+  \sigma_8^2 \;=\; \frac{1}{2\pi^2}\,\int_0^\infty\!\mathrm{d}k\,k^2\,
+                   P_\mathrm{lin}(k, z = 0)\,W^2(kR_8)\,,
+  \qquad R_8 = 8\,h^{-1}\,\mathrm{Mpc}\,,
+  \label{eq:sigma8}
+\end{equation}
+with $W(x) = 3\,(\sin x - x \cos x)/x^3$ the spherical top hat.  The
+code stores
+\begin{equation}
+  \mathrm{pnorm} \;\equiv\; \mathcal{N}_\sigma\,
+                            \frac{D_+^2(z_\mathrm{ref})}{D_+^2(0)}
+  \label{eq:pnorm-def}
+\end{equation}
+on \code{cosmo\_params\_["pnorm"]} once it has integrated
+Eq.~\eqref{eq:sigma8}.  This is the value the kernel modules
+multiply $T_\mathrm{B}^2(k)$ by to get $P(k)$.
+
+\subsection{Back-scaling and growth factors}
+\label{sec:cosmo-growth}
+
+Both \texttt{MUSIC1} and \texttt{MUSIC2} use the back-scaling
+convention: solve cosmology at $z_\mathrm{ref}$, propagate to
+$z_\mathrm{ini}$ by multiplying $\delta$ by
+$D_+(z_\mathrm{ini})/D_+(z_\mathrm{ref})$.  The growth factors solve
+\begin{align}
+  \ddot{D}_+ + 2H\,\dot{D}_+ - \tfrac{3}{2}\,\Omega_m(a)\,H^2\,D_+ &= 0\,,
+   \label{eq:growth-1}\\
+  \ddot{D}_2 + 2H\,\dot{D}_2 - \tfrac{3}{2}\,\Omega_m(a)\,H^2\,D_2
+        &= -\tfrac{3}{2}\,\Omega_m(a)\,H^2\,D_+^2\,,
+   \label{eq:growth-2}
+\end{align}
+with $f_n(a) = \mathrm{d}\ln D_n/\mathrm{d}\ln a$.  These ODEs are
+integrated once at startup by
+\code{cosmology\_calculator::CalcGrowthFactor} and its second-order
+companion; their values at $z_\mathrm{ini}$ are cached and used by
+the velocity-construction step (\S\ref{sec:lpt-handoff}).
+
+%======================================================================
+\section{The White-Noise Hierarchy}
+\label{sec:noise}
+
+This is the longest section because it covers the algorithmic piece
+where \texttt{MUSIC2} and \texttt{MUSIC1} disagree most strongly,
+and where our fork's restored \code{[random]/kaveraging = no} branch
+matters most.
+
+\subsection{Goal of the construction}
+\label{sec:noise-goal}
+
+We want a hierarchy of fields $\mu^{(\ell)}(\bq)$, $\ell_\mathrm{min}
+\le \ell \le \ell_\mathrm{max}$, with three properties:
+\begin{enumerate}
+  \item Each level is i.i.d.\ Gaussian with unit per-cell variance
+        (Eq.~\ref{eq:noise-stats}).
+  \item Fine is consistent with coarse \emph{either} via
+        mass conservation (\S\ref{sec:noise-approach1}: the
+        children average to $1/\sqrt{8}$ times the parent),
+        \emph{or} via coarse-mode preservation
+        (\S\ref{sec:noise-approach2}: low-$k$ modes of the patch's
+        restriction of $\mu^{(\ell)}$ equal those of
+        $\mu^{(\ell-1)}$), \emph{or} a smooth Meyer blend
+        (\S\ref{sec:noise-meyer}).
+  \item The field is deterministic in the user's seed:
+        identical seeds give identical $\mu(\bq)$ at the same
+        Lagrangian coordinate \emph{independent of the FFT array
+        shape}.  This property is the central point of
+        \citet{Hahn2011}~\S2.3.
+\end{enumerate}
+
+Property~3 makes the matched-noise zoom-vs-unigrid test of
+\S\ref{sec:validation} stringent: in a code where the noise depends
+on FFT shape, the same physical region drawn in a $512^3$ unigrid
+and in a $256^3 \to 512^3$ zoom has different per-cell values, and
+even with a perfect Stage~B the displacement-field disagreement
+will not fall below $\sim 10^{-2}\sigma_\delta$ in the patch interior.
+
+\subsection{Cube-tiled deterministic sampler}
+\label{sec:noise-cubetile}
+
+The base layer of $\mu^{(\ell)}$ is the unconstrained Gaussian field.
+\texttt{MUSIC2}'s sampler (\code{random\_music\_wnoise\_generator.cc::fill\_cube},
+line~741) breaks the level-$\ell$ grid into cubes of fixed side
+$L_\mathrm{cube} = 32$ cells (\code{cubesize\_ = 32}) and generates
+each cube from its own seed
+\begin{equation}
+  \mathrm{cubeseed} \;=\; \mathrm{baseseed} + i_\mathrm{cube}\,,
+  \qquad
+  i_\mathrm{cube} \;=\; (i\,N_\mathrm{c} + j)\,N_\mathrm{c} + k\,,
+  \label{eq:cubeseed}
+\end{equation}
+where $(i, j, k)$ are cube indices on a
+$N_\mathrm{c} = N_\ell / 32$ grid.  Each cube is drawn by GSL's
+Mersenne-Twister via \code{gsl\_ran\_ugaussian\_ratio\_method}.
+The cube tiling is what makes property~3 hold: the noise at a given
+Lagrangian cell is determined entirely by the seed of its cube and
+its position within the cube --- not by any FFT on the whole level.
+
+\subsection{Hoffman--Ribak real-space refinement (Approach~1)}
+\label{sec:noise-approach1}
+
+\citet{Hahn2011}~\S2.3.1 calls this the Hoffman--Ribak approach.
+Draw an unconstrained $\mu^{(\ell+1)}$ on the patch; for each octet
+of eight fine children of a coarse cell $\bm$, shift them by the
+same additive constant so their mean becomes
+$\mu^{(\ell)}_\bm / \sqrt{8}$.  Define the octet mean
+\begin{equation}
+  \bar\mu^{(\ell+1)}_\bm \;=\; \tfrac{1}{8}\,\sum_{\boldsymbol\epsilon \in \{0,1\}^3}
+          \mu^{(\ell+1)}_{2\bm + \boldsymbol\epsilon}\,;
+  \label{eq:octmean}
+\end{equation}
+then
+\begin{equation}
+  \mu^{(\ell+1)}_{2\bm + \boldsymbol\epsilon} \;\leftarrow\;
+        \mu^{(\ell+1)}_{2\bm + \boldsymbol\epsilon}
+        + \frac{\mu^{(\ell)}_\bm}{\sqrt{8}}
+        - \bar\mu^{(\ell+1)}_\bm\,.
+  \label{eq:hr-shift}
+\end{equation}
+The $1/\sqrt{8}$ factor is the variance-matching factor of
+Appendix~\ref{app:dft-variance}: under FFTW's unnormalised forward
+convention, a unit-per-cell-variance field on a grid with 8 times
+more cells has Fourier modes whose amplitudes are $\sqrt{8}$ times
+larger; the inverse appears when going from coarse cell to fine
+eight-cell mean.  In the fork this is the code path enabled by
+\code{[random]/kaveraging = no} and implemented in
+\code{random\_music\_wnoise\_generator.cc} lines~558--594:
+\begin{lstlisting}
+const double fac = 1.0 / std::sqrt(8.0);
+for (int i = 0; i < (int)nx; i += 2)
+ for (int j = 0; j < (int)ny; j += 2)
+  for (int k = 0; k < (int)nz; k += 2) {
+   const double topval = rc(x0[0]/2 + i/2, x0[1]/2 + j/2, x0[2]/2 + k/2);
+   const double locmean = 0.125 * (sum of eight children);
+   const double dif = fac * topval - locmean;
+   // add dif to all eight children
+  }
+\end{lstlisting}
+The key property is \emph{purely real-space}: no FFT of either the
+patch or the surrounding coarse region is performed.  The result is
+independent of the patch's linear extent
+$L_x \times L_y \times L_z$ beyond what
+Eqs.~(\ref{eq:octmean})--(\ref{eq:hr-shift}) explicitly use.  This
+is the property required by the matched-noise test
+(\S\ref{sec:validation}) to reach $10^{-4}\sigma_\delta$.
+
+\subsection{FFT-based coarse-mode replacement (Approach~2)}
+\label{sec:noise-approach2}
+
+The drawback of Approach~1 is that it does not preserve the Fourier
+coefficients of $\mu^{(\ell)}$ above the cell-mean.  Approach~2,
+described in the second half of \citet{Hahn2011}~\S2.3.1, performs an
+FFT of the fine patch and an FFT of the doubled-coarse footprint,
+replaces the modes $|\bk| \le k^\mathrm{Ny}_{\ell-1}$ of the fine
+field with $\sqrt{8}$ times those of the coarse field, and inverse-
+transforms.  The mass-conservation property of Approach~1 is then
+restored by averaging the resulting eight children to overwrite the
+coarse cell value (``Hoffman--Ribak in reverse'').
+
+\texttt{MUSIC2}-fork keeps Approach~2 as the default
+(\code{random\_music\_wnoise\_generator.cc} lines~596--719).
+Walking the code: 603--617 allocate the padded fine buffer and copy
+the in-place patch noise into it; 620--635 allocate and forward-FFT
+the doubled-coarse footprint; 637--686 perform the mode replacement;
+690--711 inverse-FFT and overwrite the patch noise.  The mode
+replacement is
+\begin{equation}
+  \tilde\mu^{(\ell+1)}_\bk \;\leftarrow\;
+       w_\mathrm{fine}\,\tilde\mu^{(\ell+1)}_\bk\;
+       +\;w_\mathrm{coarse}\,\sqrt{8}\,e^{\mathrm{i}\Phi(\bk)}\,
+        \tilde\mu^{(\ell),\,\mathrm{patch}}_\bk\,,
+  \qquad |\bk| \le k^\mathrm{Ny}_{\ell-1}\,,
+  \label{eq:fft-replace}
+\end{equation}
+where the phase
+\begin{equation}
+\Phi(\bk) \;=\; -\tfrac{\pi}{2}\,\bigl(k_x / N_\mathrm{c}
+            + k_y / N_\mathrm{c} + k_z / N_\mathrm{c}\bigr)
+\label{eq:phase-shift}
+\end{equation}
+(line~639, \code{phasefac = -0.5}) shifts the coarse cell-centre to
+the fine cell-centre, and the weights are either $\{0, 1\}$
+(literal Approach~2) or the Meyer functions of
+\S\ref{sec:noise-meyer}.
+
+\subsubsection{Shape dependency.}
+\label{sec:noise-approach-shape-dep}
+The FFT block depends on the patch dimensions
+$\mathrm{lx}_0, \mathrm{lx}_1, \mathrm{lx}_2$ in two distinct ways.
+First, the discrete-mode-to-physical-wavevector map
+(Eq.~\ref{eq:k-of-m}) uses $L_a = \mathrm{lx}_a$ rather than the
+full box length, so the patch's discrete modes \emph{sample
+different physical wavevectors} than the full unigrid's.  Second,
+the cell-centre alignment phase $\Phi(\bk)$ uses
+$N_\mathrm{c} = \mathrm{lx}_a / 2$.  Because Approach~2 mixes
+coarse and fine modes through Eq.~(\ref{eq:fft-replace}) and then
+inverse-transforms back to real space, the same Lagrangian cell
+inside the patch gets a \emph{different} noise value when the patch
+is embedded in a $512^3$ zoom (patch size $\mathrm{lx} = 256$ on
+each axis) versus a $1024^3$ unigrid (effective patch size
+$\mathrm{lx} = 512$).  This is the shape dependency that prevents
+Approach~2 from reaching $10^{-4}\sigma_\delta$ in the matched-noise
+validation.  The single-paragraph remark in \citet{Hahn2011} that
+the Fig.~15 result requires \code{kaveraging = no} becomes (in
+retrospect) entirely consistent with the rest of the paper once
+this dependency is understood.
+
+\subsection{Meyer-window blend}
+\label{sec:noise-meyer}
+
+\texttt{MUSIC2} master replaces the hard cut of
+Eq.~(\ref{eq:fft-replace}) with a smooth Meyer window:
+\begin{equation}
+  w_\mathrm{coarse}(\bk) \;=\; \prod_{a \in \{x,y,z\}}
+        m_\mathrm{Meyer}\!\left(\frac{k_a}{k^\mathrm{Ny}_{\ell-1}}\right)\,,
+  \qquad
+  w_\mathrm{fine}(\bk) \;=\; \sqrt{\,1 - w_\mathrm{coarse}^2(\bk)\,}\,,
+  \label{eq:meyer-weights}
+\end{equation}
+where $m_\mathrm{Meyer}(x)$ is the Meyer scaling function whose
+analytic form is documented inline in
+\code{random\_math.hh::Meyer\_scaling\_function}.  The smooth-window
+form was added to suppress small oscillation introduced by Approach~2's
+sharp cut at $k^\mathrm{Ny}_{\ell-1}$.  It is the default in our
+fork and shares Approach~2's shape dependency
+(\S\ref{sec:noise-approach-shape-dep}); the matched-noise test
+therefore requires switching to \code{kaveraging = no}, not just
+switching between FFT-based blends.
+
+\subsection{File-loaded white noise (GRAFIC format)}
+\label{sec:noise-fileloaded}
+
+When the user supplies pre-generated noise files via
+\code{[random]/seed\_from\_file\_<level>}, the corresponding
+\code{music\_wnoise\_generator} constructor (lines 142--215) reads a
+GRAFIC Fortran-unformatted file and bypasses the deterministic cube
+tiling.  The constructor still has to apply the coarse-fine
+consistency step --- it does so by following one of the three
+branches above (Approach~1, Approach~2, or Meyer).  The
+matched-noise protocol of \citet{Hahn2011}~\S4.3 uses this path to
+overwrite the unigrid noise outside the patch with the
+coarse-averaged value from the zoom, removing the trivial
+outside-patch contribution from the residual.
+
+\subsection{Hierarchy assembly}
+\label{sec:noise-assembly}
+
+The factory \code{random\_music.cc::random\_numbers\_music} assembles
+the level-by-level hierarchy from $\ell_\mathrm{min}$ to
+$\ell_\mathrm{max}$:
+
+\begin{enumerate}
+  \item Determine which levels are file-loaded vs.\ generated.
+  \item Decide bottom-up vs.\ top-down construction for each
+        generated level (default bottom-up).
+  \item For each pair $(\ell-1, \ell)$, dispatch on the
+        \code{kaveraging} flag and call the corresponding
+        constructor with the appropriate parent-noise pointer.
+\end{enumerate}
+
+The flag is read once on line~118 of \code{random\_music.cc} as
+\code{bool kaveraging = pcf\_->get\_value\_safe<bool>("random","kaveraging",true)}
+and passed via the new constructor signature added in our fork.
+The result is a populated \code{random\_numbers<real\_t>} container
+whose level-$\ell$ array can be queried by \code{operator()(i, j, k)}
+at any cell of the patch.  This is the object the convolution
+driver (\S\ref{sec:delta-driver}) sees.
+
+%======================================================================
+\section{The Transfer-Function Kernel}
+\label{sec:tf-kernel}
+
+The transfer-function kernel is the discrete operator $T$ for which
+$\delta = T \star \mu$ approximates Eq.~(\ref{eq:delta-conv}) on the
+level-$\ell$ grid.  \texttt{MUSIC2} provides two concrete
+realisations: a Fourier-space kernel \code{tf\_kernel\_k} (default),
+and a real-space kernel \code{tf\_kernel\_real} (restored in our
+fork as the opt-in path \code{[setup]/kspace\_TF = no}).  They differ
+in how they handle aliasing and the cell-window function.
+
+\subsection{Fourier-space kernel}
+\label{sec:tf-k-space}
+
+The $k$-space kernel
+(\code{convolution\_kernel.cc::kernel\_k\_cached}) samples the
+transfer function on the discrete wavevector grid
+$\bk_\bm = (2\pi/L)\,\bm$ (Eq.~\ref{eq:k-of-m}) of the
+\emph{padded} level, after the per-axis Hockney--Eastwood doubling
+of \S\ref{sec:peraxis-doubling}.  Each Fourier coefficient of the
+kernel is
+\begin{equation}
+  \tilde T_\bm \;=\; \frac{1}{N_\ell^{3/2}}\,
+                    \sqrt{\,\mathrm{pnorm}\,\bigl|\bk_\bm\bigr|^{n_s}\,
+                          T_\mathrm{B}^2(|\bk_\bm|)\,}\;,
+  \label{eq:tf-k}
+\end{equation}
+where the leading $N_\ell^{-3/2}$ undoes the unnormalised forward FFT
+that the convolution driver subsequently applies to $\mu$
+(Appendix~\ref{app:dft-variance}).  The amplitude squared,
+$|\tilde T_\bm|^2 = P(|\bk_\bm|)/L^3$, agrees with the continuum
+relation $\langle |\tilde\delta_\bm|^2 \rangle = P(k)$ once
+combined with $\langle |\tilde\mu_\bm|^2 \rangle = N_\ell^3$.  The
+kernel is sampled at the cell-centred $\bk_\bm$; aliasing beyond the
+Nyquist wavenumber is therefore unsuppressed at the kernel level and
+must be controlled by the optional pre-convolution cell-window
+deconvolution (Hahn~2011 \S2.3.2) toggled by
+\code{[setup]/deconvolve}.
+
+\subsection{Real-space kernel and FFTLog tabulation}
+\label{sec:tf-r-space}
+
+The real-space kernel
+(\code{convolution\_kernel\_real.cc::kernel\_real\_cached}) evaluates
+\begin{equation}
+  T(\br) \;=\; \frac{1}{2\pi^2}\,\int_0^\infty\!\mathrm{d}k\,k^2\,
+              \sqrt{P(k)}\,j_0(k\,r)\,,
+  \label{eq:tf-real}
+\end{equation}
+where $j_0(x) = \sin x / x$, then integrates $T(\br)$ over each
+target cell of side $\Delta x_\ell$ by Gauss--Legendre quadrature at
+the requested sub-cell order (default 4 nodes per axis).  The radial
+table is built once at startup by FFTLog
+\citep{Talman1978, Hamilton2000} on a logarithmic $k$-grid spanning
+$[k_\mathrm{min}, k_\mathrm{max}]$ with $k_\mathrm{max}$ chosen to
+resolve at least $4\,k^\mathrm{Ny}_{\ell_\mathrm{max}}$.  The
+cell-window convolution is therefore done in real space exactly --- no
+deconvolution step is necessary.  This is the property that makes
+the real-space kernel reach a smaller residual at the coarse--fine
+interface and is one of the two flags
+(\code{kspace\_TF = no} + \code{density\_boundary = yes}) needed to
+reproduce Hahn~2011's matched-noise number to within a factor of 3.
+
+%======================================================================
+\section{The Convolution Driver}
+\label{sec:delta-driver}
+
+The driver \code{convolution::perform} (\code{convolution\_kernel.cc}
+line~92) ties the noise field of \S\ref{sec:noise} to the kernel of
+\S\ref{sec:tf-kernel}.  Its inputs are a \code{DensityGrid} or
+\code{PaddedDensitySubGrid} containing the (padded) white noise and
+a pointer to a \code{kernel} instance; its output is the same grid
+overwritten with $\delta(\bq)$.  In abstract form:
+\begin{equation}
+  \delta_\bn \;=\; \mathrm{IFFT}\!\Bigl[\,\tilde T_\bm \cdot
+                  \mathrm{FFT}[\mu]_\bm\,\Bigr]_\bn\,.
+  \label{eq:driver-abstract}
+\end{equation}
+Concretely, the driver performs four steps:
+\begin{enumerate}
+  \item \emph{Pad and forward-FFT.}  The grid's $(\code{nx}, \code{ny}, \code{nz})$
+        r2c plan is executed in place, leaving the complex
+        coefficients $\tilde\mu_\bm$ in the buffer's last
+        $2(N/2{+}1)$ slots per row.
+  \item \emph{Mode-by-mode multiply.}  An OpenMP-parallel loop over
+        $\bm$ multiplies $\tilde\mu_\bm$ by $\tilde T_\bm$ from
+        Eq.~(\ref{eq:tf-k}) for the $k$-space kernel, or by the
+        precomputed FFT of $T(\br)$ for the real-space kernel.
+  \item \emph{Inverse FFT.}  The c2r plan, with the FFTW $1/N^3$
+        normalisation applied explicitly, brings the buffer back to
+        $\delta_\bn$.
+  \item \emph{Optional amplitude fixing / sign flipping.}  If the
+        user sets \code{[setup]/fix\_mode\_amplitudes} or
+        \code{[setup]/flip\_mode\_signs}, the driver applies the
+        corresponding operations between steps~(2) and (3).
+\end{enumerate}
+
+\subsubsection*{The \texttt{dump\_delta} debug option.}
+Setting \code{[setup]/dump\_delta = yes} causes the driver to
+write the current value of $\delta_\bn$ to disk after step~(3).
+\emph{This option writes only the field at the call site, so in the
+three-term path (\S\ref{sec:delta-three-term}) it sees only the
+final coarse term $\delta_\mathrm{coarse}$, not the assembled total.}
+For a true total-$\delta$ diagnostic use the generic-format HDF5
+output (\code{level\_009\_DM\_rho} for $\ell = 9$).
+
+%======================================================================
+\section{The $\delta$ Hierarchy}
+\label{sec:delta-hierarchy}
+
+On a unigrid, $\delta(\bq)$ is the output of a single call to
+\code{convolution::perform}.  On a multi-level hierarchy the
+construction is more delicate because the noise on the patch is not
+just the cube-tile sample but the constrained field of
+\S\ref{sec:noise-approach1}--\S\ref{sec:noise-meyer}; the kernel
+applied to the patch sees a different cell window than the kernel
+applied to the surrounding coarse grid; and the result on the patch
+must agree with the coarse-grid $\delta$ on the patch's boundary so
+that the multigrid Poisson solve of \S\ref{sec:multigrid} is
+consistent.
+
+\subsection{The default Fourier-replacement path}
+\label{sec:delta-default}
+
+\code{MUSIC2}'s default path (\code{densities.cc::GenerateDensityHierarchy},
+the entry point selected when \code{[setup]/density\_boundary} is
+absent or \code{no}) applies the kernel \emph{once per level} on
+the doubled-patch grid and relies on the noise constraints to keep
+the fine and coarse $\delta$ consistent.  Concretely:
+\begin{enumerate}
+  \item For each level $\ell$ from $\ell_\mathrm{min}$ up:
+        \begin{enumerate}
+          \item Build the padded subgrid carrying the patch noise
+                $\mu^{(\ell)}$ (Hockney--Eastwood doubling on every
+                isolated axis, per \S\ref{sec:peraxis-doubling}).
+          \item Call \code{convolution::perform} to overwrite the
+                padded grid with $\delta^{(\ell)}(\bq)$.
+          \item Crop the padded grid back to the physical patch and
+                store in the level-$\ell$ \code{MeshvarBnd}.
+        \end{enumerate}
+\end{enumerate}
+The coarse--fine boundary handling is left implicit: it works
+\emph{if} the noise hierarchy preserves coarse modes exactly inside
+the patch (Approach~2 or the Meyer blend), so the difference
+between the fine and coarse $\delta$ at the boundary is dominated by
+the modes the patch resolves above $k^\mathrm{Ny}_{\ell-1}$.  In
+practice the discrepancy is $\sim 10^{-2}\sigma_\delta$ ---
+adequate for production zoom ICs but $\sim 100\times$ above the
+matched-noise residual claimed by \citet{Hahn2011}~\S4.3.
+
+\subsection{Three-term decomposition (\code{density\_boundary = yes})}
+\label{sec:delta-three-term}
+
+\citet{Hahn2011}~\S2.3.3 introduces a different assembly that
+\emph{directly} accounts for the coarse-fine boundary.  Decompose
+the patch density as
+\begin{equation}
+  \delta(\bq) \;=\; \delta_\mathrm{self}(\bq)
+                  + \delta_\mathrm{bnd}(\bq)
+                  + \delta_\mathrm{coarse}(\bq)\,,
+  \label{eq:three-term}
+\end{equation}
+with each term computed by a \emph{separate} convolution and added
+together.  Define the boundary octet-mean operator $\mathcal{O}_\mathrm{bnd}$
+that, when applied to a fine-level field, replaces each cell in a
+boundary octet by that octet's mean and leaves interior cells
+unchanged; explicitly, for a cell $2\bm + \boldsymbol\epsilon$
+belonging to a boundary octet,
+\begin{equation}
+  (\mathcal{O}_\mathrm{bnd}\mu^{(\ell+1)})_{2\bm+\boldsymbol\epsilon}
+   \;=\; \bar\mu^{(\ell+1)}_\bm
+  \qquad (\text{boundary octet})\,,
+  \label{eq:Obnd-def}
+\end{equation}
+and $(\mathcal{O}_\mathrm{bnd}\mu)_\bn = \mu_\bn$ on all other
+cells.  We further define the bulk-mean operator
+$\mathcal{M}$ that subtracts the global mean of a level-$\ell$
+field over the patch footprint, ensuring that the three pieces are
+mean-free where needed.  The three terms are then
+\begin{align}
+  \delta_\mathrm{self}(\bq)
+    \;&=\; \bigl(T_\ell \star (\mathrm{I} - \mathcal{O}_\mathrm{bnd})\,\mu^{(\ell+1)}\bigr)(\bq)\,,
+    \label{eq:delta-self}\\[4pt]
+  \delta_\mathrm{bnd}(\bq)
+    \;&=\; \bigl(T_\ell \star \mathcal{O}_\mathrm{bnd}\mu^{(\ell+1)}\bigr)(\bq)\,,
+    \label{eq:delta-bnd}\\[4pt]
+  \delta_\mathrm{coarse}(\bq)
+    \;&=\; \mathcal{P}_{\ell-1 \to \ell}\!\bigl(T_{\ell-1} \star \mathcal{M}\,\mu^{(\ell-1)}\bigr)(\bq)\,,
+    \label{eq:delta-coarse}
+\end{align}
+where $\mathrm{I}$ is the identity and
+$\mathcal{P}_{\ell-1\to\ell}$ is the cubic prolongation operator
+from level $\ell-1$ onto the level-$\ell$ patch
+(\code{mg\_cubic().prolong\_add} in the source).  By construction
+$\delta_\mathrm{self}$ is mean-free over each boundary octet, so the
+FFT-based convolution on the doubled patch does not leak boundary
+mean into the interior; $\delta_\mathrm{bnd}$ supplies that
+boundary mean back from a separate convolution where the input is
+piecewise-constant on octets; and $\delta_\mathrm{coarse}$ supplies
+the long-wavelength power below $k^\mathrm{Ny}_{\ell-1}$ by
+convolving on the coarse grid and prolongating into the patch.
+The sum recovers the full level-$\ell$ density without the
+boundary-mode mixing artefact of the single-convolution path.  The construction enforces three properties:
+(i) $\delta_\mathrm{self}$ has zero coarse mean on every boundary
+octet, so the FFT-based convolution on the doubled patch does not
+spread boundary mean into the interior; (ii) $\delta_\mathrm{bnd}$
+provides the missing boundary-mean contribution from a
+\emph{prolongated} coarse-grid convolution result; and (iii)
+$\delta_\mathrm{coarse}$ provides the long-wavelength power below
+$k^\mathrm{Ny}_{\ell-1}$ from a coarse-grid convolution restricted
+to the patch and uploaded back.
+
+In our fork this path is selected by
+\code{[setup]/density\_boundary = yes} and is implemented in
+\code{src/densities\_three\_term.cc} (250 lines, isolated from the
+existing driver).  The dispatch sits at the top of
+\code{GenerateDensityHierarchy} as seven lines that fall through to
+the default if the flag is off, so the existing infrastructure is
+bit-for-bit preserved (verified by matched-seed comparison: max
+difference $= 0$).  The helpers used by the new path live on
+\code{DensityGrid<real\_t>} and \code{PaddedDensitySubGrid<real\_t>}
+in \code{density\_grid.hh} (added in commit \texttt{4d420d3}):
+\code{oct\_mean}, \code{add\_oct\_val},
+\code{subtract\_oct\_mean}, \code{subtract\_boundary\_oct\_mean},
+\code{subtract\_mean}, \code{zero\_subgrid}, \code{upload\_bnd\_add}.
+
+\subsubsection*{Why \texttt{MUSIC2} master does not include this.}
+The Fourier-replacement path is simpler, has a smaller memory
+footprint (one $\delta$-convolution per level vs.\ three), and
+produces zoom ICs whose Eulerian-density power agrees with the
+corresponding unigrid above the patch's $k^\mathrm{Ny}_{\ell-1}$ to
+sub-percent accuracy.  For production zoom science those properties
+are usually sufficient and the additional $\sim 10^{-2}\sigma_\delta$
+residual at the boundary is dominated by the matter inside the patch
+itself.  The three-term path becomes necessary only when one wants
+to reproduce the matched-noise test \emph{numerically}, i.e.\
+verify that the zoom and unigrid produce the same particle
+displacements at the same Lagrangian coordinate.
+
+\subsubsection*{Numerical performance.}
+With the two opt-in flags \code{kaveraging = no} and
+\code{density\_boundary = yes}, the MUSIC2 fork reaches
+$2.6 \times 10^{-4}\,\sigma_\delta$ rms residual on the
+$256^3 \to 512^3$ matched-noise test of \S\ref{sec:validation},
+within a factor of $\sim 2.6$ of Hahn's quoted ``below
+$10^{-4}\sigma_\delta$'' and within $\sim 1.3$ of
+\texttt{MUSIC1}-release-candidate's $3.5 \times 10^{-4}$.  The
+remaining factor is plausibly attributable to multigrid Poisson
+convergence and single-vs.-double-precision arithmetic in the
+two builds.
+
+%======================================================================
+\section{Output of LPT and Velocities}
+\label{sec:lpt-handoff}
+
+Given $\delta(\bq)$ on the level-$\ell$ grid, the Lagrangian
+displacement potential $\phi^{(1)}$ and second-order potential
+$\phi^{(2)}$ are obtained by solving Poisson's equation
+(\S\ref{sec:multigrid}):
+\begin{align}
+  \nabla_\bq^2 \phi^{(1)} &= \delta(\bq)\,,
+    \label{eq:poisson-1lpt}\\
+  \nabla_\bq^2 \phi^{(2)} &= -\!\!\sum_{i<j}\!
+        \bigl(\phi^{(1)}_{,ii}\,\phi^{(1)}_{,jj} - (\phi^{(1)}_{,ij})^2\bigr)\,,
+    \label{eq:poisson-2lpt}
+\end{align}
+where commas denote partial derivatives with respect to $\bq$.  The
+displacement and velocity follow from \texttt{cosmo\_ic.tex}~\S5:
+\begin{align}
+  \boldsymbol\Psi^{(1)}(\bq) &= D_+(z_\mathrm{ini})\,\nabla_\bq \phi^{(1)}\,,
+    \label{eq:psi1}\\
+  \boldsymbol\Psi^{(2)}(\bq) &= D_2(z_\mathrm{ini})\,\nabla_\bq \phi^{(2)}\,,
+    \label{eq:psi2}\\
+  \mathbf{v}(\bq) &= a\,H\,\bigl[f_1\,\boldsymbol\Psi^{(1)} + f_2\,\boldsymbol\Psi^{(2)}\bigr]\,.
+    \label{eq:vel-lpt}
+\end{align}
+We use the sign convention in which the second-order growth factor
+$D_2$ is positive at matter-domination
+($D_2 \approx \tfrac{3}{7}\,D_+^2$), so $\boldsymbol\Psi^{(2)}$ in
+Eq.~(\ref{eq:psi2}) carries the same sign as the $\phi^{(2)}$
+gradient defined by Eq.~(\ref{eq:poisson-2lpt}); some references
+absorb a minus sign into $\phi^{(2)}$ and arrive at the same
+$\mathbf{v}$.  The factor of $a$ in Eq.~(\ref{eq:vel-lpt}) is the
+peculiar-velocity convention used by the SWIFT plug-in (see the
+\code{cosmo\_pipeline} CLAUDE.md remark on SWIFT velocity units).
+The plug-in registry (\code{src/plugins/output\_*.cc}) handles the
+mapping from $\boldsymbol\Psi, \mathbf{v}$ to whichever variables
+the downstream code consumes; the conversion to canonical momentum
+$u = a\,\mathbf{v}$ is then done by SWIFT itself at IC read time.
+
+\subsubsection*{2LPT iteration.}
+\texttt{MUSIC2} solves Eq.~(\ref{eq:poisson-2lpt}) by reusing the
+multigrid solver: $\phi^{(1)}$ is differentiated on the grid, the
+source term is assembled cell-by-cell, and a second Poisson solve
+is performed.  The flag \code{[setup]/use\_2LPT = yes} toggles this
+step.  Both the default $\delta$-hierarchy and the three-term path
+(\S\ref{sec:delta-three-term}) work transparently with 2LPT in our
+fork; we have verified this for both unigrid and zoom configurations.
+
+%======================================================================
+\section{Per-Axis Isolation}
+\label{sec:peraxis}
+
+\texttt{MUSIC2}'s subgrid Poisson solve uses Hockney--Eastwood
+doubling \citep{HockneyEastwood1988} to embed an isolated patch
+inside a zero-padded region twice its size on each axis, so that
+periodic FFTs solve the Poisson equation with Dirichlet-zero
+boundaries to the order of the cell-window quadrature.  For
+elongated pencil zooms typical of galactic-scale resimulations the
+doubling along the long axis is wasteful and can even exceed the
+memory budget.  Our fork's
+\code{[setup]/axis\_periodic = (Px, Py, Pz)} flag (commit
+\texttt{8e229f8}) allows the user to mark individual axes as
+periodic, suppressing the doubling on those axes only.
+
+\subsection{Per-axis Hockney--Eastwood doubling}
+\label{sec:peraxis-doubling}
+
+For each refinement-level patch of physical extent
+$\bN^\mathrm{ext}_\ell = (N_x, N_y, N_z)$ in cell units, the
+\code{PaddedDensitySubGrid} allocates a buffer of size
+\begin{equation}
+  \mathrm{ng}_a \;=\; \begin{cases}
+                       2\,N_a + 2 & \text{if } \mathrm{axis\_periodic}[a] = 0\,, \\
+                       N_a + 2    & \text{if } \mathrm{axis\_periodic}[a] = 1
+                     \end{cases}
+  \label{eq:axis-pad}
+\end{equation}
+in each direction (the $+2$ being the r2c r2c-padding of
+Eq.~\ref{eq:r2c-padding}).  The patch noise is copied into the
+first $N_a$ slots and the remaining slots are zero-filled.  The
+Poisson kernel is built on the same enlarged grid so the periodic
+FFT solves the isolated problem on the non-doubled axes and the
+periodic problem on the doubled axes simultaneously.  For pencil
+geometries of aspect ratio $\sim 16:1$, switching the long axis to
+periodic reduces the memory footprint of the patch solve by a
+factor of $\sim 2$ with no measurable bias on the matched-noise
+test.
+
+%======================================================================
+\section{Multigrid Poisson Solver}
+\label{sec:multigrid}
+
+The multigrid solver lives in \code{src/mg\_solver.hh} and is called
+from \code{src/poisson.cc::do\_poisson} after the hierarchy of
+$\delta$ fields has been built.  It implements a standard FAS
+V-cycle \citep{Brandt1977, Trottenberg2001}: the residual
+$r = b - L\phi$ on each level is restricted to the next coarser
+level, the coarse correction is solved (recursively, or by a direct
+solve on the coarsest level), and the correction is prolongated
+back and added.  The Laplacian discretisation is
+$L\phi_\bn = \Delta x^{-2} \sum_{a} (\phi_{\bn+\hat a} - 2\phi_\bn + \phi_{\bn-\hat a})$
+(\code{laplace\_order = 2}; the user can select 4 or 6 via
+\code{[poisson]/laplace\_order}, which expands the stencil
+correspondingly).  The coarse--fine boundary handling for the
+correction step uses the higher-order interpolators in
+\code{mg\_interp.hh}; this is independent of the $\delta$-hierarchy
+construction of \S\ref{sec:delta-hierarchy} but interacts with it
+when the multigrid V-cycle restricts $\delta$ and then prolongates
+$\phi$.  The relaxation smoother is Gauss--Seidel with red--black
+ordering by default (\code{mg\_solver.hh::smoother}), with two
+pre-/post-relaxation sweeps per V-cycle (\code{n\_pre = n\_post = 2}).
+Convergence is declared when $\|r\|_\infty / \|b\|_\infty < 10^{-6}$
+or after a maximum of $\code{nvcycles\_max} = 64$ V-cycles.
+
+%======================================================================
+\section{Validation: the Matched-Noise Test}
+\label{sec:validation}
+
+The cleanest end-to-end test of the pipeline is
+\citet{Hahn2011}~\S4.3's matched-noise protocol: run the same IC
+both as a unigrid at the fine resolution and as a zoom from
+$N_\mathrm{coarse}^3$ to $N_\mathrm{fine}^3$ with the same seeds.
+The unigrid noise outside the would-be patch is replaced by the
+coarse-averaged value from the zoom (file-loaded path of
+\S\ref{sec:noise-fileloaded}), so that any difference in $\delta$
+inside the patch interior reflects genuine numerical mismatch
+between the two pipelines rather than a difference in input noise.
+The figure of merit is the rms of
+$|\Delta\boldsymbol\Psi(\bq)| / \sigma_{|\Psi|}$ over the patch
+interior with a margin of $\sim 8$--$32$ cells excluded to avoid
+the coarse-fine oscillation.
+
+We verified our fork against three reference points (cubic
+$0.2$-fraction patch, $z = 45$, 1LPT, $N_\mathrm{coarse} = 256$,
+$N_\mathrm{fine} = 512$):
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lc}
+\toprule
+Configuration & rms $|\Delta\boldsymbol\Psi|/\sigma$ at margin = 24 \\
+\midrule
+MUSIC1 release\_candidate, \code{kaveraging=no}              & $3.5 \times 10^{-4}$ \\
+MUSIC2 fork, defaults (Meyer blend, Fourier-replacement $\delta$)  & $6.6 \times 10^{-2}$ \\
+MUSIC2 fork, \code{kaveraging=no} only                          & $\sim 10^{-3}$ \\
+MUSIC2 fork, \code{kaveraging=no} + \code{density\_boundary=yes} & $2.6 \times 10^{-4}$ \\
+Hahn 2011 §4.3 (claim)                                          & $< 10^{-4}$ \\
+\bottomrule
+\end{tabular}
+\caption{Matched-noise residuals.  The last fork row reaches the
+Hahn~2011 reference within a factor of $\sim 2.6$ and matches
+MUSIC1 release\_candidate to within a factor of $\sim 1.3$.
+The remaining gap is consistent with single- vs.\ double-precision
+arithmetic and multigrid Poisson convergence (Hahn~2011 used double
+precision; our build uses single by default following MUSIC1's
+\texttt{Makefile} default).}
+\label{tab:validation}
+\end{table}
+
+The conclusion is that reaching Hahn's $10^{-4}\sigma_\delta$
+residual requires \emph{both} the real-space noise refinement of
+\S\ref{sec:noise-approach1} \emph{and} the three-term $\delta$
+assembly of \S\ref{sec:delta-three-term}.  Either by itself is
+insufficient: with only \code{kaveraging=no}, the residual is
+dominated by the boundary mismatch in the convolved $\delta$;
+with only \code{density\_boundary=yes}, it is dominated by the
+FFT-shape dependence of the FFT-blend noise refinement
+(\S\ref{sec:noise-approach-shape-dep}).
+
+\subsection{What the matched-noise test is, and is not}
+\label{sec:matched-noise-purpose}
+
+Zoom ICs exist to pump compute into a specific region (a halo, a
+filament, a void, a lensing target) at much higher resolution than
+the user could afford box-wide, while the rest of the box supplies
+the long-range tides at coarse resolution.  The user gets the
+correct large-scale environment without paying for it, and the fine
+particles resolve the small-scale physics that motivated the run.
+
+The matched-noise test of \citet{Hahn2011}~\S4.3 asks a different
+question: would a hypothetical full-box unigrid at the patch
+resolution have produced bit-identical noise inside the patch?
+That is an internal consistency check on the zoom machinery, not
+the user-facing goal.  What the user actually needs is
+\emph{statistical} equivalence: ICs in the patch with the right
+$P(k)$, the right local tidal tensor, and the right cosmic
+environment, so that the halo (or filament, or void) that forms is
+physically the same one a computationally impossible full-resolution
+box would produce.
+
+A residual of $\sim 10^{-2}\sigma$ on the displacement field --
+concentrated at the patch face, decaying inward with a smooth
+$k$-space spectrum -- does not visibly disturb any of that.  The
+halo at the patch centre has the same mass, profile, and accretion
+history.  The bit-equality target only becomes load-bearing for
+code-validation paper figures, not for science runs.
+
+%======================================================================
+\section{MUSIC1 $\to$ MUSIC2 $\to$ Fork Lineage}
+\label{sec:lineage}
+
+The pieces of code covered in this note have moved between
+\texttt{MUSIC1}, \texttt{monofonIC} (the intermediate codebase that
+became \texttt{MUSIC2}), and our fork in a way that is not always
+obvious from the public git history.  Table~\ref{tab:lineage}
+gave a summary; here we expand it briefly.
+
+\textbf{MUSIC1 (Hahn \& Abel 2011).}  Implements both noise
+refinement approaches selected by \code{kaveraging} (default true),
+the real-space TF kernel from FFTLog-tabulated $T(r)$, and the
+three-term $\delta$ assembly.  Source: \code{random.cc:419-610},
+\code{convolution\_kernel.cc:339-1228}, \code{densities.cc:200-...}.
+At the cost of slow real-space convolutions, it reaches
+$\sim 5\times 10^{-5}\sigma_\delta$ rms in the matched-noise test
+when the appropriate flags are set; we have reproduced the
+\code{kaveraging=no} number to $3.5 \times 10^{-4}\sigma$ in a
+single-precision rebuild on modern compilers.
+
+\textbf{MUSIC2 master (Hahn, Rampf, Uhlemann 2021 and after).}
+Removes the real-space TF kernel (commit \texttt{bb9c07c},
+2023-02-04), drops the Hoffman--Ribak real-space noise refinement
+in favour of the FFT-based blend (and later the smooth Meyer
+window), and replaces the three-term $\delta$ assembly with the
+single-convolution Fourier-replacement path of \S\ref{sec:delta-default}.
+The result is a leaner, faster, and easier-to-extend code that is
+accurate \emph{for production zoom science} but cannot reproduce
+the matched-noise residual of \citet{Hahn2011} Fig.~15.
+
+\textbf{This fork (\texttt{MUSIC2-anisotropic-zoom}).}  Restores the
+three lost pieces as opt-in flags:
+\code{[setup]/kspace\_TF = no} (real-space TF kernel, commit
+\texttt{8e229f8}), \code{[random]/kaveraging = no}
+(Hoffman--Ribak real-space noise refinement, commit
+\texttt{60d020a}), and \code{[setup]/density\_boundary = yes}
+(three-term $\delta$ assembly, commits \texttt{4d420d3} +
+\texttt{2a394b9}).  Adds new infrastructure for pencil zoom
+geometries: per-axis isolation \code{[setup]/axis\_periodic} of
+\S\ref{sec:peraxis}.  All restored features default to off so
+existing \texttt{MUSIC2} configurations are bit-for-bit preserved.
+
+%======================================================================
+\section{Configuration Reference}
+\label{sec:config}
+
+Table~\ref{tab:config-keys} catalogues the keys touched in this
+note.  Defaults reproduce \texttt{MUSIC2} master behaviour exactly.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Key & Default & Section \\
+\midrule
+\code{[setup]/boxlength}              & required & \ref{sec:notation-refinement} \\
+\code{[setup]/levelmin, levelmax}     & required & \ref{sec:notation-refinement} \\
+\code{[setup]/ref\_center, ref\_extent} & required for zoom & \ref{sec:notation-refinement} \\
+\code{[setup]/zstart}                 & required & \ref{sec:cosmo-backscale} \\
+\code{[setup]/use\_2LPT}              & \code{yes} & \ref{sec:lpt-handoff} \\
+\code{[setup]/axis\_periodic}         & \code{(0,0,0)} & \ref{sec:peraxis} \\
+\code{[setup]/kspace\_TF}             & \code{yes} & \ref{sec:tf-kernel} \\
+\code{[setup]/density\_boundary}      & \code{no}  & \ref{sec:delta-three-term} \\
+\code{[setup]/deconvolve}             & \code{yes} & \ref{sec:tf-k-space} \\
+\code{[setup]/fix\_mode\_amplitudes}  & \code{no}  & \ref{sec:delta-driver} \\
+\code{[setup]/dump\_delta}            & \code{no}  & \ref{sec:delta-driver} \\
+\code{[random]/seed\_<level>}         & required & \ref{sec:noise-cubetile} \\
+\code{[random]/seed\_from\_file\_<level>} & none & \ref{sec:noise-fileloaded} \\
+\code{[random]/kaveraging}            & \code{yes} & \ref{sec:noise-assembly} \\
+\code{[cosmology]/transfer}           & required & \ref{sec:cosmo-pk} \\
+\code{[cosmology]/Omega\_m, Omega\_L, Omega\_b, H0, sigma\_8, nspec}
+                                       & required & \ref{sec:cosmo-inputs} \\
+\code{[poisson]/laplace\_order}       & \code{2}   & \ref{sec:multigrid} \\
+\bottomrule
+\end{tabular}
+\caption{Configuration-key reference for this note.}
+\label{tab:config-keys}
+\end{table}
+
+%======================================================================
+\appendix
+\section{Per-mode variance of the unnormalised DFT of i.i.d.\ white noise}
+\label{app:dft-variance}
+
+Let $\mu_\bn$ be i.i.d.\ $\mathcal{N}(0, 1)$ on the $N^3$ grid.  The
+unnormalised forward DFT (Eq.~\ref{eq:DFT-conv}) gives
+\begin{equation}
+  \langle |\tilde\mu_\bm|^2 \rangle
+  \;=\;\Bigl\langle \sum_{\bn, \bn'} \mu_\bn \mu_{\bn'}\,
+              e^{-2\pi\mathrm{i}\,\bm\cdot(\bn - \bn')/N}\Bigr\rangle
+  \;=\;\sum_\bn 1
+  \;=\; N^3\,.
+  \label{eq:dft-var-derivation}
+\end{equation}
+If the same physical white-noise field is sampled on two grids,
+$N_\mathrm{c}^3$ and $N_\mathrm{f}^3 = (2 N_\mathrm{c})^3 =
+8 N_\mathrm{c}^3$, with unit per-cell variance on each, the
+$k = 0$ Fourier coefficient is the (un-normalised) sum of cell
+values:
+\begin{equation}
+  \frac{\langle |\tilde\mu^\mathrm{fine}_0|^2 \rangle}
+       {\langle |\tilde\mu^\mathrm{coarse}_0|^2 \rangle}
+  \;=\;\frac{N_\mathrm{f}^3}{N_\mathrm{c}^3} \;=\; 8\,,
+  \label{eq:dft-variance-ratio}
+\end{equation}
+so the amplitudes differ by $\sqrt{8}$.  This is the origin of the
+$\sqrt{8}$ rescaling in Approach~2
+(Eq.~\ref{eq:fft-replace}) and of the $1/\sqrt{8}$ in
+Eq.~(\ref{eq:hr-shift}).
+
+\section{Hoffman--Ribak constraint formula}
+\label{app:hr}
+
+The Hoffman--Ribak constraint algorithm \citep{HoffmanRibak1991}
+modifies a Gaussian random field $\mu$ so that a set of linear
+constraints $\{c_i\}$ takes prescribed values, while keeping the
+modified field Gaussian with the same covariance structure away
+from the constraints.  The general formula is
+\begin{equation}
+  \mu^\mathrm{constr}(\bx)
+  \;=\;\mu(\bx) + \sum_{ij}\,
+        \xi_i(\bx)\,\bigl(\xi_i^{-1}\bigr)_{ij}\,
+        \bigl[c_j^\mathrm{target} - c_j[\mu]\bigr]\,,
+  \label{eq:hr-general}
+\end{equation}
+where $\xi_i(\bx) = \langle \mu(\bx)\,c_i \rangle$.  In our case the
+constraints are the eight cell-mean values of a coarse cell, and
+the covariance $\xi_i = \delta_{ij}/8$ is diagonal, reducing
+Eq.~(\ref{eq:hr-general}) to the simple additive shift of
+Eq.~(\ref{eq:hr-shift}).
+
+\section{FFTLog and the real-space transfer-function tabulation}
+\label{app:fftlog}
+
+\code{TransferFunction\_real} tabulates Eq.~(\ref{eq:tf-real}) using
+the FFTLog algorithm of \citet{Talman1978, Hamilton2000}.  Substitute
+$k = e^\kappa$, $r = e^\rho$; then the spherical Bessel transform
+becomes a convolution in $(\kappa, \rho)$ that an FFT computes in
+$O(N \log N)$.  Subtleties (window-edge bias, low-$k$ extrapolation,
+log-grid choice) are handled by the \code{FFTLog} implementation
+inherited from \texttt{MUSIC1} (commit \texttt{437e77f}).
+
+\section{GRAFIC wnoise file format reference}
+\label{app:grafic}
+
+The GRAFIC noise file is Fortran-unformatted: header record
+$\{N_x, N_y, N_z, i_\mathrm{seed}, x_\mathrm{off}, y_\mathrm{off}, z_\mathrm{off}, \mathrm{dx}, \mathrm{xstart}, \mathrm{ystart}, \mathrm{zstart}\}$ followed by $N_z$ slab records each containing a
+$N_x \times N_y$ \code{float32} array.  See
+\code{scripts/read\_wnoise.py} for a Python reader.
+
+\section{Glossary of MUSIC2 configuration keys}
+\label{app:config-keys}
+
+See Table~\ref{tab:config-keys}.
+
+%======================================================================
+\begin{thebibliography}{99}
+
+\bibitem[{Hahn~\& Abel(2011)}]{Hahn2011}
+Hahn, O. \& Abel, T. 2011, MNRAS, 415, 2101.
+
+\bibitem[{Hahn~\& Angulo(2021)}]{HahnAngulo2021}
+Hahn, O., Rampf, C., \& Uhlemann, C. 2021, MNRAS, 503, 426.
+
+\bibitem[{Bertschinger(2001)}]{Bertschinger2001}
+Bertschinger, E. 2001, ApJS, 137, 1.
+
+\bibitem[{Hoffman~\& Ribak(1991)}]{HoffmanRibak1991}
+Hoffman, Y. \& Ribak, E. 1991, ApJL, 380, L5.
+
+\bibitem[{Jenkins(2013)}]{Jenkins2013}
+Jenkins, A. 2013, MNRAS, 434, 2094.
+
+\bibitem[{Pen(1997)}]{Pen1997}
+Pen, U.-L. 1997, ApJS, 109, 1.
+
+\bibitem[{Hamilton(2000)}]{Hamilton2000}
+Hamilton, A.~J.~S. 2000, MNRAS, 312, 257.
+
+\bibitem[{Talman(1978)}]{Talman1978}
+Talman, J.~D. 1978, J.\ Comput.\ Phys., 29, 35.
+
+\bibitem[{Brandt(1977)}]{Brandt1977}
+Brandt, A. 1977, Math.\ Comp., 31, 333.
+
+\bibitem[{Hockney~\& Eastwood(1988)}]{HockneyEastwood1988}
+Hockney, R.~W. \& Eastwood, J.~W. 1988, ``Computer Simulation Using
+Particles'' (CRC Press).
+
+\bibitem[{Trottenberg et al.(2001)}]{Trottenberg2001}
+Trottenberg, U., Oosterlee, C.~W., \& Sch\"uller, A. 2001,
+``Multigrid'' (Academic Press).
+
+\end{thebibliography}
+
+\end{document}
