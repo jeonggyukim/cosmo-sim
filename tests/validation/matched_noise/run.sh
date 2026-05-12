@@ -25,6 +25,7 @@ TAG=matched_noise
 OUT=""   # auto-derived from parameters if empty: see below
 MUSIC_BIN="$HOME/Dropbox/Projects/MUSIC2-anisotropic-zoom/build/MUSIC"
 SKIP_MUSIC=0
+WITH_SWIFT=0   # also emit SWIFT-format particles (Eulerian diagnostics); off by default
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -44,6 +45,7 @@ while [[ $# -gt 0 ]]; do
     --out)         OUT=$2;         shift 2;;
     --music)       MUSIC_BIN=$2;   shift 2;;
     --skip-music)  SKIP_MUSIC=1;   shift 1;;
+    --with-swift)  WITH_SWIFT=1;   shift 1;;
     -h|--help)     sed -n '2,11p' "$0"; exit 0;;
     *) echo "unknown arg: $1" >&2; exit 1;;
   esac
@@ -82,20 +84,17 @@ for d in "${TAG}_zoom_${LPT_TAG}" "${TAG}_unigrid_${LPT_TAG}"; do
   mkdir -p "$RUN_DIR/$d"
 done
 
-# Plot reads the generic-format dump (level-9 grid).  Run swift first to
-# write the wnoise binaries and SWIFT particles (cheap), then re-run in
-# generic format in the same dir reusing the wnoise cache.
+# For each (kind = zoom | unigrid), invoke MUSIC2 in format=generic to produce
+# the Lagrangian δ(q), Ψ_x,y,z grids that plot_residuals.py reads.  With
+# --with-swift, also invoke MUSIC2 in format=swift (writes Eulerian SWIFT
+# particles) in the same dir; the second run reuses the wnoise_NNNN.bin from
+# the first so the noise realisation is identical across formats.  The swift
+# output is not used by plot_residuals.py — only enable it if you need
+# particle-form data for an Eulerian diagnostic.
 run_pair() {
   local kind=$1 tpl=$2
   local dir="$RUN_DIR/${TAG}_${kind}_${LPT_TAG}"
   local stem="${TAG}_${kind}_${LPT_TAG}"
-  render "$tpl" swift   "${stem}.hdf5"   "$dir/run.conf"
-  if [[ "$SKIP_MUSIC" -eq 1 && -f "$dir/${stem}.hdf5" ]]; then
-    echo "[skip-music] $kind swift"
-  else
-    echo "=== $kind swift ==="
-    ( cd "$dir" && "$MUSIC_BIN" run.conf > music_swift.log 2>&1 )
-  fi
   render "$tpl" generic "${stem}_g.hdf5" "$dir/run_g.conf"
   if [[ "$SKIP_MUSIC" -eq 1 && -f "$dir/${stem}_g.hdf5" ]]; then
     echo "[skip-music] $kind generic"
@@ -103,14 +102,25 @@ run_pair() {
     echo "=== $kind generic ==="
     ( cd "$dir" && "$MUSIC_BIN" run_g.conf > music_generic.log 2>&1 )
   fi
+  if [[ "$WITH_SWIFT" -eq 1 ]]; then
+    render "$tpl" swift "${stem}.hdf5" "$dir/run.conf"
+    if [[ "$SKIP_MUSIC" -eq 1 && -f "$dir/${stem}.hdf5" ]]; then
+      echo "[skip-music] $kind swift"
+    else
+      echo "=== $kind swift ==="
+      ( cd "$dir" && "$MUSIC_BIN" run.conf > music_swift.log 2>&1 )
+    fi
+  fi
 }
 
 run_pair zoom    "$SCRIPT_DIR/zoom.conf.template"
 run_pair unigrid "$SCRIPT_DIR/unigrid.conf.template"
 
 mkdir -p "$(dirname "$OUT")"
-# Plot script hardcodes RUN_DIR=~/Documents/music_validation, PS/PL/N for
-# level 9.  Path inputs come from env vars (OUT, TAG, LPT_TAG).
+# plot_residuals.py reads RUN_DIR=~/Documents/music_validation directly;
+# everything run-specific (geometry, paths, margin) comes through env vars.
+# Geometry (PL_xyz, PS_xyz) is parsed from MUSIC2's music_generic.log inside
+# the script, so non-cubic patches and other LEVELMAX values work too.
 OUT="$OUT" TAG="$TAG" LPT_TAG="$LPT_TAG" \
   LEVELMAX="$LEVELMAX" REF_EXTENT="$REF_EXTENT" \
   conda run -n cosmo python "$SCRIPT_DIR/plot_residuals.py"
