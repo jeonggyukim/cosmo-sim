@@ -112,4 +112,5 @@ mkdir -p "$(dirname "$OUT")"
 # Plot script hardcodes RUN_DIR=~/Documents/music_validation, PS/PL/N for
 # level 9.  Path inputs come from env vars (OUT, TAG, LPT_TAG).
 OUT="$OUT" TAG="$TAG" LPT_TAG="$LPT_TAG" \
+  LEVELMAX="$LEVELMAX" REF_EXTENT="$REF_EXTENT" \
   conda run -n cosmo python "$SCRIPT_DIR/plot_residuals.py"
