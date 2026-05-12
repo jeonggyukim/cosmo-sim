@@ -1,0 +1,43 @@
+[setup]
+density_boundary = yes
+kspace_TF       = no
+dump_delta      = yes
+boxlength       = {BOXLENGTH}
+zstart          = {ZSTART}
+levelmin        = {LEVELMAX}
+levelmin_TF     = {LEVELMAX}
+levelmax        = {LEVELMAX}
+padding         = {PADDING}
+overlap         = 4
+ref_center      = 0.5, 0.5, 0.5
+ref_extent      = 1.0, 1.0, 1.0
+align_top       = no
+no_shift        = yes
+convolution_margin = -1
+baryons         = no
+use_2LPT        = {USE_2LPT}
+ZeroRadiation   = true
+[cosmology]
+Omega_m         = 0.276
+Omega_L         = 0.724
+Omega_b         = 0.045
+H0              = 70.3
+sigma_8         = 0.811
+n_s             = 0.961
+transfer        = eisenstein
+[random]
+generator       = MUSIC
+kaveraging      = no
+seed[{LEVELMIN}]         = {SEED_COARSE}
+seed[{LEVELMAX}]         = {SEED_FINE}
+[output]
+format          = {FORMAT}
+filename        = {FILENAME}
+[poisson]
+fft_fine        = yes
+accuracy        = {ACCURACY}
+pre_smooth      = {SMOOTH}
+post_smooth     = {SMOOTH}
+smoother        = gs
+laplace_order   = 6
+grad_order      = 6

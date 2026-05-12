@@ -214,6 +214,51 @@ Uses `uname -s` to detect macOS vs cluster:
 
 Skips compilation if `music_build/MUSIC` already exists.
 
+### Matched-noise validation (MUSIC2-anisotropic-zoom fork)
+
+For Hahn 2011 §4.3 matched-noise zoom-vs-unigrid validation in the
+`MUSIC2-anisotropic-zoom` fork, the working combination is:
+
+- `[random]/kaveraging = no` — makes MUSIC's level-N white noise coord-deterministic (per-cell RNG keyed on `(seed[N], i, j, k)`), no Meyer-window FFT splice across array shapes.
+- `[setup]/density_boundary = yes` — Hahn 2011 §2.3.3 three-term density assembly at the coarse-fine boundary.
+
+With both options set and the same `seed[levelmax]` integer in the zoom and the
+single-level (`levelmin=levelmax`) unigrid conf, the patch-interior δ(q) rms
+residual is 2.6×10⁻⁴σ at margin = 24 (commit `b90cfad` in
+`MUSIC2-anisotropic-zoom`).  Do NOT try to pass the zoom's `wnoise_NNNN.bin` as
+`seed[N] = <path>` — MUSIC2's wnoise reader expects strict GRAFIC
+Fortran-unformatted records, not the plain dump format MUSIC2 writes by default
+(it will throw "corrupt random number file").
+
+Reproducible pipeline: `tests/validation/matched_noise/run.sh` — produces
+`~/Documents/music_validation/figures/matched_noise_<lpt>_l<lmin>-<lmax>_re<re>_b<box>_z<z>_s<sc>-<sf>.png`.
+Flags: `--use-2lpt | --use-1lpt`, `--seed-coarse N --seed-fine N`,
+`--boxlength MPC --zstart Z --levelmin L --levelmax L --ref-extent F`,
+`--padding N --accuracy F --smooth N`.  Recommended-quality knobs:
+`padding=16`, `accuracy=1e-9`, `smooth=5` — drops the m=16 interior Ψ
+residual by ~30% at the cost of a moderately larger doubled-patch FFT.
+
+**What the matched-noise test is — and is not.**  Zoom ICs exist to pump
+compute into a specific region (halo, filament, void, lensing target) at much
+higher resolution than the user could afford box-wide, while the rest of the
+box supplies the long-range tides at coarse resolution.  The user gets the
+correct large-scale environment for free, and the fine particles resolve the
+small-scale physics that motivated the run.
+
+The matched-noise test asks "would a hypothetical full-box unigrid at the
+patch resolution have produced bit-identical noise here?"  That is an
+internal consistency check on the zoom machinery — not the user-facing goal.
+What the user actually needs is **statistical equivalence**: ICs in the patch
+with the right P(k), the right local tidal tensor, and the right cosmic
+environment, so the halo that forms is physically the same one a
+(computationally impossible) full-resolution box would produce.
+
+A residual of ~10⁻²σ on the displacement field — concentrated at the patch
+face, decaying inward with a smooth k-space spectrum — does not visibly
+disturb any of that.  The halo at the patch centre has the same mass,
+profile, and accretion history.  The bit-equality target only becomes
+load-bearing for code-validation paper figures, not for science runs.
+
 ### Corrfunc
 
 `compute_xi` links against Corrfunc. Resolution order:
