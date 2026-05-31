@@ -1388,15 +1388,44 @@ fine-grid power up to the fine Brillouin zone
 ($|k_a|\le\pi/\Delta x_f$) and the block-average $\R$ folds the modes
 between the two zones into the coarse modes.
 
-This works because white noise has a flat power spectrum,
-$P_\mu(\mathbf k)=$ constant. In the alias-sum formula
-(\ref{eq:Pk-alias}) applied to $\mu$, all aliased contributions have
-the same amplitude per mode as the principal contribution, so removing
-them (rather than letting them fold back in) does not bias the
-statistics. The truncated white noise is still white, on a coarser
-grid. Convolving with $T(k)$ then produces a coarse-grid density field
-that matches a fully resolved hi-res field for all
-$|\mathbf k|\le k_{\rm Ny,N}$.
+This works because white noise has a flat power spectrum:
+$P_\mu(\mathbf k)=P_0$, independent of $\mathbf k$. Substituting
+$P_{2N}=P_0$ into the alias-sum formula~(\ref{eq:Pk-alias}) applied
+to $\mu$ gives
+\begin{equation}\label{eq:Pk-alias-white}
+  P_N^\mu(\mathbf k_c) \;=\; P_0\sum_{\mathbf n\in\{0,1\}^d}
+        \bigl|W(\mathbf k_c+\pi\mathbf n/\Delta x_f)\bigr|^2.
+\end{equation}
+The kernel $W$ in eq.~(\ref{eq:Pk-alias}) stands for whichever
+restriction is in use; write $W_{\rm B}$ for the kernel of approach~B
+and $W_{\rm A1}$ for the block-average kernel of approach~A1. In
+approach~B the restriction is sharp truncation: a fine mode is kept
+unchanged if it sits inside the coarse Brillouin zone (every axis
+$|k_a|\le\pi/\Delta x_c$) and is discarded otherwise, so
+\begin{equation*}
+  W_{\rm B}(\mathbf k) \;=\; \begin{cases}
+    1 & \text{if } |k_a|\le\pi/\Delta x_c \text{ on every axis,}\\
+    0 & \text{otherwise.}
+  \end{cases}
+\end{equation*}
+The A1 kernel derived in eq.~(\ref{eq:Wcell}),
+$W_{\rm A1}(\mathbf k)=\prod_a\cos(k_a\Delta x_f/2)$, is by contrast
+nonzero everywhere up to the fine Brillouin zone --- which is what
+lets the $\mathbf n\ne\mathbf 0$ alias terms contribute. For
+$W_{\rm B}$ each $\mathbf n\ne\mathbf 0$ shift moves at least one
+component of $\mathbf k_c+\pi\mathbf n/\Delta x_f$ outside the coarse
+zone, so only the $\mathbf n=\mathbf 0$ term in
+eq.~(\ref{eq:Pk-alias-white}) survives:
+\begin{equation}\label{eq:Pk-alias-white-truncated}
+  P_N^{\mu_{\rm trunc}}(\mathbf k_c) \;=\; P_0 .
+\end{equation}
+The truncated white noise is still white, on a coarser grid. The
+aliased contributions $\mathbf n\ne\mathbf 0$ that A1 would have added
+on top of the principal term carry the same flat amplitude $P_0$, so
+dropping them does not bias the statistics: it removes equal-amplitude
+copies of an isotropic spectrum. Convolving with $T(k)$ then produces
+a coarse-grid density field that matches a fully resolved hi-res field
+for all $|\mathbf k|\le k_{\rm Ny,N}$.
 
 In production codes such as \texttt{MUSIC2} v2, the same property is
 realised by generating white noise independently on each refinement
@@ -1469,10 +1498,22 @@ construction and its ratio to the input theory. A1 and A2 both develop
 a deficit that grows toward the coarse Nyquist
 ($|\mathbf k|/k_{\rm Ny,N}\to 1$); B agrees with the theory across the
 full coarse-grid range. We use the fix-and-pair construction
-\citep{Angulo2016}: each Fourier mode of the white noise is rescaled
-to $|\hat\mu_{\mathbf k}| = \sqrt{N_{\rm tot}}$ before convolution
-with $T(k)$. This removes the per-mode cosmic-variance scatter and
-isolates the systematic effect of restriction.
+\citep{Angulo2016}, a variance-reduction technique for cosmological
+ICs (see \texttt{cosmo\_ic.tex} \S\,Reduced-variance sampling for a
+full derivation). \emph{Fixing}: each Fourier mode of the white noise
+$\hat\mu_{\mathbf k}$ has its (random) amplitude replaced by the
+deterministic value $|\hat\mu_{\mathbf k}| = \sqrt{N_{\rm tot}}$,
+where $N_{\rm tot}$ is the total number of grid points, while the
+phase is left random and uniform on $[0,2\pi)$; so the convolution with
+$T(k)$ produces $|\hat\delta(\mathbf k)|^2 = P(k)\,V$ mode-by-mode
+rather than only in the ensemble mean. \emph{Pairing}: a second
+realisation is generated with all phases shifted by $\pi$ (i.e.\
+$\hat\mu_{\mathbf k}\!\to\!-\hat\mu_{\mathbf k}$), so the leading
+non-Gaussian contributions to two-point statistics cancel when the
+pair is averaged. For the per-mode $P(k)$ check in
+Fig.~\ref{fig:zoom-ic-pk} the fix alone is what matters: it removes
+the per-mode cosmic-variance scatter and isolates the systematic
+effect of restriction.
 
 The bottom row uses the same setup to check the standard particle-based
 IC validation procedure. Particles are placed at the fine-grid
@@ -1540,8 +1581,8 @@ region of a zoom IC. In production, the practical question is: given a
 candidate construction, how do we test that it is correct
 \emph{before} running an expensive $N$-body simulation? This section
 presents two field-level diagnostics that probe the failure modes of
-\S\S\ref{sec:fourier} and \ref{sec:phi}, together with the end-to-end
-re-simulation test used as the final check.
+\S\S\ref{sec:fourier} and \ref{sec:phi}, together with the
+re-simulation test used as the final check on the full pipeline.
 
 A first guess --- estimating the global $P(k)$ of the assembled IC ---
 has structural difficulties, which we discuss before introducing the
@@ -1578,10 +1619,22 @@ $\int W^2 d^d x$:
   \;\approx\; P(\mathbf k)\,V_{\rm eff},
   \qquad V_{\rm eff} \equiv \int W^2(\mathbf x)\,d^d x.
 \end{equation}
-Equation~(\ref{eq:Veff-norm}) is the normalisation behind FKP-style
-$P(k)$ estimators in masked galaxy surveys, and it works for
-measuring an unknown $P(k)$. For \emph{validating} an IC against a
-known target it has two limitations:
+Equation~(\ref{eq:Veff-norm}) is the normalisation behind the
+\citet{FKP1994} $P(k)$ estimator for masked galaxy surveys: there the
+window $W(\mathbf x)$ is the survey selection function
+$\bar n(\mathbf x)\,w(\mathbf x)$, the field of interest is observed
+only inside the survey footprint, and the estimator divides the
+periodogram of the masked field by $V_{\rm eff}=\int W^2\,d^d x$ to
+recover $P(k)$. The bias from the convolution with $|\hat W|^2$ is
+tolerable because $P(k)$ is unknown to begin with and is reported in
+broad $k$-bins; the lowest-$k$ bins are either dropped or compared to
+theory after explicitly convolving the theory $P(k)$ with $|\hat W|^2$. For \emph{validating} an IC
+the target is the input linear $P(k)$ that was fed to MUSIC2 in the
+first place (the CLASS/CAMB transfer function evaluated at
+$z_{\rm start}$): the field $\delta(\mathbf x)$ is supposed to be a
+Gaussian realisation with exactly that power spectrum, and the
+question is whether it is. In this setting eq.~(\ref{eq:Veff-norm})
+has two limitations:
 \begin{enumerate}
 \item Modes with $k\lesssim 2\pi/L_\Omega$ are not resolved by the
       window, and modes within a couple of bins of that limit are
@@ -1628,9 +1681,10 @@ reference at the fine resolution. The procedure:
       used.
 \item Subtract: $\varepsilon(\mathbf x) \equiv
       \delta_{\rm zoom}(\mathbf x) - \delta_{\rm ref}(\mathbf x)$.
-      Compare RMS in the deep interior of $\Omega$ (should be at
-      machine precision) against RMS at the coarse-fine boundary
-      (carries the construction error of the lo-res method).
+      Compare RMS in the deep interior of $\Omega$ (should be at the
+      convolution-kernel truncation floor, typically a few times
+      $10^{-5}\sigma$ to $10^{-4}\sigma$) against RMS at the coarse-fine
+      boundary (carries the construction error of the lo-res method).
 \end{enumerate}
 Step~2 is essential: sharing $\mu_{2N}$ ensures that the unigrid
 reference and the hi-res zoom interior agree mode by mode, not only in
@@ -1672,7 +1726,10 @@ $10^{-4}\,\sigma_v$ in the interior. The older Fourier-based
 entire refinement region with amplitudes two orders of magnitude
 larger (\citealt{Hahn2011}, Fig.~16). The property to verify is
 therefore not the overall RMS alone, but that the RMS is dominated by
-a thin boundary layer while the interior reaches machine precision.
+a thin boundary layer while the interior sits at the convolution-kernel
+truncation floor ($\sim 10^{-5}$--$10^{-4}\,\sigma$ in the references
+above), well below the boundary contribution but well above
+floating-point precision.
 
 \subsection{Diagnostic 2: Poisson-consistency residual}\label{sec:val-poisson}
 
@@ -1729,24 +1786,84 @@ Poisson-residual map reveals its specific defect. B is the only
 construction that passes both diagnostics. Any candidate zoom-IC
 method should be checked against both tests.
 
-\subsection{End-to-end re-simulation}\label{sec:val-resim}
+\subsection{Re-simulation against a reference}\label{sec:val-resim}
 
 The diagnostics above probe the IC at construction time. They cannot
 detect secondary issues that appear only under non-linear evolution:
-for example, spurious force discontinuities at the coarse-fine
+for example, \textbf{spurious force discontinuities at the coarse-fine
 interface that gradually distort the inner density profile of objects
 near the boundary, or correlations between IC errors and the late-time
-abundance of the smallest haloes. The standard end-to-end check for the
-full pipeline is a comparison against a controlled reference
-simulation, following \citet{Hahn2011} \S 4.4:
+abundance of the smallest haloes}. The standard whole-pipeline check
+is a comparison against a controlled reference simulation. The
+procedure and the list of compared quantities below follow
+\citet{Hahn2011} \S 4.4 / Table 4; the algebraic remarks and the
+connection to approach~A1 of \S\ref{sec:zoom} are not in Hahn and are
+ours:
 \begin{enumerate}
 \item Generate a unigrid IC at the fine resolution covering the whole
       box, then build a ``degraded'' reference by averaging the
       unigrid field down to the lo-res resolution outside the zoom
-      region. The degraded IC has the same low-$k$ structure as the
-      multi-scale zoom IC but lacks the multi-scale construction
-      itself; it serves as the ``what would unigrid have given''
-      baseline.
+      region. Concretely, this can be done in two equivalent ways
+      (see the algebra below). Let $\mathbf q_c$ denote the Lagrangian
+      position of a coarse cell (the geometric centre of its $2^d$
+      fine sub-cells), and $\mathbf q_i$ for $i\in\text{block}(\mathbf q_c)$
+      the Lagrangian positions of those fine sub-cells.
+      (i) Block-average the fine displacement field
+      $\boldsymbol\Psi_{2N}(\mathbf q)$ over each $2^d$-cell coarse
+      block to get
+      $\boldsymbol\Psi_N(\mathbf q_c)=\tfrac{1}{2^d}\sum_{i}\boldsymbol\Psi_{2N}(\mathbf q_i)$,
+      then place one particle of mass $2^d m_{\rm fine}$ at
+      $\mathbf q_c+\boldsymbol\Psi_N(\mathbf q_c)$;
+      or (ii) take the $2^d$ fine particles in each block and replace
+      them with a single particle at the centre-of-mass position with
+      the mean velocity and total mass. Apply this only outside
+      $\Omega$; inside $\Omega$ keep the original fine particles. The
+      degraded IC has the same long-wavelength structure as the
+      multi-scale zoom IC but skips the multi-scale construction
+      machinery, and so serves as the ``what would unigrid have
+      given'' baseline.
+
+      \textit{Equivalence of (i) and (ii).} Fine particles in a
+      $2^d$ block live at Eulerian positions
+      $\mathbf x_i = \mathbf q_i + \boldsymbol\Psi(\mathbf q_i)$.
+      Procedure~(ii) gives
+      \begin{equation*}
+        \mathbf x_{\rm COM} \;=\; \tfrac{1}{2^d}\sum_i\mathbf x_i
+        \;=\; \underbrace{\tfrac{1}{2^d}\sum_i\mathbf q_i}_{=\,\mathbf q_c}
+        \;+\; \underbrace{\tfrac{1}{2^d}\sum_i\boldsymbol\Psi(\mathbf q_i)}_{=\,\langle\boldsymbol\Psi\rangle_{\rm block}} ,
+      \end{equation*}
+      where the first sum collapses because the $2^d$ fine Lagrangian
+      positions are arranged symmetrically about the coarse Lagrangian
+      centre $\mathbf q_c$. Procedure~(i) places the new particle at
+      $\mathbf q_c+\boldsymbol\Psi_N(\mathbf q_c)
+      =\mathbf q_c+\langle\boldsymbol\Psi\rangle_{\rm block}$,
+      so $\mathbf x_{\rm COM}=\mathbf x_{\rm field}$ identically. The
+      same argument applies to the velocity, which is a linear
+      functional of the fine $\boldsymbol\Psi$.
+
+      \textit{Relation to approach A1.} The restriction operator used
+      here is exactly approach A1 of \S\ref{sec:zoom}: block-average
+      $\boldsymbol\Psi_{2N}$ over $2^d$ fine cells, with Fourier
+      multiplier $W_{\rm A1}(\mathbf k)=\prod_a\cos(k_a\Delta x_f/2)$.
+      The same $\cos^2$ near-Nyquist suppression and alias-folding are
+      therefore present in the degraded reference. What is \emph{not}
+      present is the additional error that a real production zoom code
+      makes at the coarse-fine boundary: real zoom codes do not have
+      $\boldsymbol\Psi_{2N}$ outside $\Omega$ at all and generate the
+      lo-res field there from a separate coarse white noise $\mu_N$,
+      with the job of approaches A1/A2/B being to stitch the two
+      regions together. In the degraded reference a single $\mu_{2N}$
+      covers the whole box, so the long-wavelength modes inside and
+      outside $\Omega$ come from the same underlying noise field and
+      there is no boundary-stitching to get wrong. The degraded
+      reference therefore inherits the suppression and aliasing of
+      A1's $\cos^2$ Fourier multiplier --- the same $|W_{\rm A1}|^2$
+      factor in eq.~(\ref{eq:Pk-alias}) that the toy demo of
+      \S\ref{sec:zoom} measured against ideal-lowpass~B --- but it
+      does not inherit the boundary-stitching error, and is what defines ``correct'' for the
+      comparison below: the zoom IC under test should reproduce the
+      degraded reference's halo properties to within the cosmic-variance
+      noise that survives non-linear evolution.
 \item Run both ICs (multi-scale and degraded) forward to $z=0$ with
       the same $N$-body code and force softening.
 \item Compare bulk halo properties: virial mass $M_{\rm vir}$,
@@ -2300,6 +2417,6 @@ P(\mathbf k)$ at a single mode is $P(\mathbf k)$ itself (Gaussian
 fields), so binning over $N_{\rm modes}$ in a shell reduces the
 fractional uncertainty to $\sim 1/\sqrt{N_{\rm modes}}$.
 
-\bibliography{cosmo_ic}
+\bibliography{references}
 
 \end{document}
