@@ -454,6 +454,11 @@ gives
   \bigl|\tilde T(\bk)\bigr|^2 \;=\; P(k, z_\mathrm{ini})\,.
   \label{eq:tk-from-pk}
 \end{equation}
+Eqs.~(\ref{eq:delta-tilde})--(\ref{eq:tk-from-pk}) are the spectral
+factorization of a Gaussian random field;
+Appendix~\ref{app:grf} collects the underlying definitions and
+shows why $|\tilde T|^2 = P$ fully specifies the distribution of
+$\delta$.
 On the discrete level-$\ell$ grid the equivalent statement is
 $|\tilde T_\bm|^2 = P(k_\bm)/V$ with $V = L^3$; together with
 $\langle|\hat\mu_\bm|^2\rangle = N_\ell^3$ (Appendix~\ref{app:dft-variance})
@@ -586,9 +591,11 @@ We want a hierarchy of fields $\mu^{(\ell)}(\bq)$, $\ell_\mathrm{min}
         mass conservation (\S\ref{sec:noise-approach1}: the
         children average to $1/\sqrt{8}$ times the parent),
         \emph{or} via coarse-mode preservation
-        (\S\ref{sec:noise-approach2}: low-$k$ modes of the patch's
-        restriction of $\mu^{(\ell)}$ equal those of
-        $\mu^{(\ell-1)}$), \emph{or} a smooth Meyer blend
+        (\S\ref{sec:noise-approach2}: take the real-space
+        restriction of $\mu^{(\ell)}$ to the patch volume, FFT it,
+        and force its low-$k$ modes to equal the corresponding
+        modes of the doubled-coarse footprint of $\mu^{(\ell-1)}$),
+        \emph{or} a smooth Meyer blend
         (\S\ref{sec:noise-meyer}).
   \item The field is deterministic in the user's seed:
         identical seeds give identical $\mu(\bq)$ at the same
@@ -628,11 +635,22 @@ its position within the cube --- not by any FFT on the whole level.
 \subsection{Hoffman--Ribak real-space refinement (Approach~1)}
 \label{sec:noise-approach1}
 
+Approach~1 is the only noise-refinement path implemented in MUSIC1;
+MUSIC2 master replaced it with the FFT-based Approach~2
+(\S\ref{sec:noise-approach2}) and the Meyer-window blend
+(\S\ref{sec:noise-meyer}).  Our fork restores it as the
+\code{[random]/kaveraging = no} branch.
+
 \citet{Hahn2011}~\S2.3.1 calls this the Hoffman--Ribak approach.
 Draw an unconstrained $\mu^{(\ell+1)}$ on the patch; for each octet
 of eight fine children of a coarse cell $\bm$, shift them by the
 same additive constant so their mean becomes
-$\mu^{(\ell)}_\bm / \sqrt{8}$.  Define the octet mean
+$\mu^{(\ell)}_\bm / \sqrt{8}$.  In what follows
+$\boldsymbol\epsilon = (\epsilon_x, \epsilon_y, \epsilon_z)$ with
+each $\epsilon_i \in \{0,1\}$ ranges over the eight corners of a
+unit cube in index space, so $2\bm + \boldsymbol\epsilon$
+enumerates the eight fine children of the coarse cell $\bm$.
+Define the octet mean
 \begin{equation}
   \bar\mu^{(\ell+1)}_\bm \;=\; \tfrac{1}{8}\,\sum_{\boldsymbol\epsilon \in \{0,1\}^3}
           \mu^{(\ell+1)}_{2\bm + \boldsymbol\epsilon}\,;
@@ -746,11 +764,45 @@ Eq.~(\ref{eq:fft-replace}) with a smooth Meyer window:
   w_\mathrm{fine}(\bk) \;=\; \sqrt{\,1 - w_\mathrm{coarse}^2(\bk)\,}\,,
   \label{eq:meyer-weights}
 \end{equation}
-where $m_\mathrm{Meyer}(x)$ is the Meyer scaling function whose
-analytic form is documented inline in
-\code{random\_math.hh::Meyer\_scaling\_function}.  The smooth-window
-form was added to suppress small oscillation introduced by Approach~2's
-sharp cut at $k^\mathrm{Ny}_{\ell-1}$.  It is the default in our
+where $m_\mathrm{Meyer}(u)$ is the Meyer scaling function
+\begin{equation}
+  m_\mathrm{Meyer}(u) \;=\;
+   \begin{cases}
+      1 & u < 1/3 \\[2pt]
+      \cos\!\bigl[\tfrac{\pi}{2}\,\nu(3u - 1)\bigr]
+        & 1/3 \le u < 2/3 \\[2pt]
+      0 & u \ge 2/3
+   \end{cases}\qquad
+   \nu(x) = \min\bigl(\max(x, 0),\,1\bigr)\,,
+   \label{eq:meyer-def}
+\end{equation}
+as implemented in \code{src/math/special.hh::Meyer\_scaling\_function}.
+Fig.~\ref{fig:meyer} plots Eq.~(\ref{eq:meyer-def}) and the
+resulting 3D blend weights of Eq.~(\ref{eq:meyer-weights}) along
+a coordinate axis and along the cube diagonal; because the
+weight is a product of three 1D functions of $k_a/k^\mathrm{Ny}$,
+$w_\mathrm{coarse}$ is anisotropic in $\bk$ and is suppressed
+more strongly along the diagonal than along an axis.
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\linewidth]{figures/meyer.pdf}
+  \caption{\textbf{Left:} the 1D Meyer scaling function
+    $m_\mathrm{Meyer}(u)$, $u = |k|/k_\mathrm{max}$
+    (Eq.~\ref{eq:meyer-def}); compared with the Shannon (hard)
+    cutoff used in commented-out code at
+    \code{random\_music\_wnoise\_generator.cc:676--678}.
+    \textbf{Right:} the 3D coarse and fine blend weights
+    (Eq.~\ref{eq:meyer-weights}) along a coordinate axis
+    ($\bk = (k, 0, 0)$) and along the cube diagonal
+    ($\bk = (k, k, k)/\sqrt 3$).  The product-of-1D structure
+    cuts off the diagonal at $|\bk|/k^\mathrm{Ny}_{\ell-1} = 2/\sqrt 3 \approx 1.15$
+    before the relevant axis even reaches the Nyquist Meyer
+    support, so coarse modes are removed earlier along the
+    diagonal than along an axis.}
+  \label{fig:meyer}
+\end{figure}
+The smooth-window form was added to suppress small oscillation
+introduced by Approach~2's sharp cut at $k^\mathrm{Ny}_{\ell-1}$.  It is the default in our
 fork and shares Approach~2's shape dependency
 (\S\ref{sec:noise-approach-shape-dep}); the matched-noise test
 therefore requires switching to \code{kaveraging = no}, not just
@@ -1328,6 +1380,430 @@ Key & Default & Section \\
 
 %======================================================================
 \appendix
+\section{Gaussian random fields and spectral factorization}
+\label{app:grf}
+
+This appendix collects the standard facts that justify the
+construction $\delta = T \star \mu$ used throughout
+\S\ref{sec:cosmo-inputs}--\S\ref{sec:noise-assembly}: what
+``Gaussian random field'' means, why a single white-noise draw
+suffices, and why $|\tilde T|^2 = P(k)$ then determines the
+\emph{entire} distribution of $\delta$, not just its two-point
+function.
+
+\subsection{Three equivalent definitions}
+\label{sec:grf-def}
+
+A real-valued field $\delta(\bx)$ on $\mathbb{R}^3$ (or on the
+discrete torus $(\mathbb{Z}/N)^3$) is a \emph{Gaussian random
+field} (GRF) if any one of the following equivalent conditions
+holds.
+
+\paragraph{(D1) Finite-dimensional definition.}
+For every finite set of points $\bx_1, \dots, \bx_n$, the random
+vector $\bigl(\delta(\bx_1), \dots, \delta(\bx_n)\bigr)$ is
+multivariate Gaussian; i.e.\ the probability that
+$\delta(\bx_i) \in [u_i, u_i + \mathrm d u_i]$ for every $i$ is
+$p(u_1,\dots,u_n)\,\mathrm d u_1\cdots\mathrm d u_n$ with joint
+density
+\begin{equation}
+  p(u_1,\dots,u_n) \;=\; \frac{1}{\sqrt{(2\pi)^n\det C}}\,
+        \exp\!\Bigl[-\tfrac12 (\mathbf u - \bar{\mathbf u})^\top C^{-1}
+                     (\mathbf u - \bar{\mathbf u})\Bigr]\,,
+  \label{eq:grf-mvn}
+\end{equation}
+where $\mathbf u = (u_1,\dots,u_n)^\top$ is the dummy argument of
+the density, $\bar u_i = \langle\delta(\bx_i)\rangle$ is the mean
+vector, and $C_{ij} = \xi(\bx_i - \bx_j)$ is the covariance matrix.
+
+\paragraph{(D2) Linear-functional definition.}
+For every (sufficiently regular) deterministic test function
+$f(\bx)$, the scalar
+$F[\delta] \equiv \int f(\bx)\,\delta(\bx)\,\mathrm d^3x$ is a
+one-dimensional Gaussian random variable, with mean
+$\int f\,\bar\delta$ and variance
+$\int\!\int f(\bx)\,\xi(\bx-\by)\,f(\by)\,\mathrm d^3x\,\mathrm d^3y$.
+
+(D1) is the special case $f(\bx) = \sum_i c_i\,\delta^\mathrm{D}(\bx - \bx_i)$
+of (D2); the equivalence in the reverse direction follows by
+approximating $f$ by a sum of delta spikes and taking a limit.
+
+\paragraph{(D3) Characteristic-functional definition.}
+The generating functional of correlators is exactly Gaussian in
+the source $J(\bx)$:
+\begin{equation}
+  Z[J] \;\equiv\; \bigl\langle e^{\mathrm i \int J\,\delta}\bigr\rangle
+  \;=\; \exp\!\Bigl[\,\mathrm i\!\int\! J\,\bar\delta
+              \;-\; \tfrac12\!\int\!\!\int\! J(\bx)\,\xi(\bx-\by)\,
+                                            J(\by)\,\mathrm d^3x\,\mathrm d^3y\,\Bigr]\,.
+  \label{eq:grf-charfunc}
+\end{equation}
+Functional derivatives of $\log Z$ with respect to $J$ at $J=0$
+give the cumulants of $\delta$.  Because the exponent is quadratic
+in $J$, only the first two cumulants survive: $\langle\delta\rangle
+= \bar\delta$ and $\langle\delta\delta\rangle_\mathrm{c} = \xi$,
+and \emph{all higher cumulants vanish}.
+
+\subsection{Wick's theorem and "two points are everything"}
+\label{sec:grf-wick}
+
+(D3) has a striking corollary.  Take $\bar\delta = 0$ without
+loss of generality.  Expanding both sides of
+Eq.~(\ref{eq:grf-charfunc}) in powers of $J$ and matching the
+coefficient of $\mathrm i^n J(\bx_1)\cdots J(\bx_n)/n!$ on the two
+sides yields Wick's theorem:
+\begin{equation}
+  \langle\delta(\bx_1)\,\delta(\bx_2)\,\cdots\,\delta(\bx_{2k+1})\rangle
+  \;=\; 0
+  \qquad \text{(odd $n$),}
+  \label{eq:wick-odd}
+\end{equation}
+\begin{equation}
+  \langle\delta(\bx_1)\,\delta(\bx_2)\,\cdots\,\delta(\bx_{2k})\rangle
+  \;=\; \sum_{\text{pairings}\;\pi}\;
+        \prod_{(i,j)\in\pi} \xi(\bx_i - \bx_j)\,,
+  \label{eq:wick-even}
+\end{equation}
+the sum running over all $(2k)!/(2^k\,k!)$ ways of partitioning
+$\{1,\dots,2k\}$ into $k$ unordered pairs.  The four-point case is
+\begin{equation}
+  \langle \delta_1\delta_2\delta_3\delta_4\rangle \;=\;
+     \xi_{12}\xi_{34} + \xi_{13}\xi_{24} + \xi_{14}\xi_{23}\,,
+  \label{eq:wick-4}
+\end{equation}
+and the six-point case is the sum of $5!! = 15$ such pairings.
+
+\textbf{Consequence.}  The entire hierarchy of correlators is an
+explicit polynomial in $\xi$.  Combined with (D3), this means
+\textbf{the full distribution of $\delta$ is fixed by $(\bar\delta,
+\xi)$ alone}.  No higher-point information is independent.  This
+is what we mean when we say "Gaussianity makes the two-point
+function the whole story", and it is the property that allows
+spectral factorization (\S\ref{sec:grf-spec}) to be a
+\emph{complete} construction of $\delta$ rather than just a way
+to match $P(k)$.
+
+\subsection{Finite-dimensional picture: factoring a covariance matrix}
+\label{sec:grf-discrete}
+
+Before going back to fields, look at the discrete analogue, which
+is what is actually computed.  Let $\boldsymbol\delta \in
+\mathbb{R}^N$ be a mean-zero Gaussian vector with covariance
+$C = \langle\boldsymbol\delta\,\boldsymbol\delta^\top\rangle$,
+an $N\times N$ symmetric positive-semidefinite matrix.
+
+Any factorization $C = L L^\top$ produces a sampler:
+\begin{equation}
+  \boldsymbol\mu \sim \mathcal{N}(0, I_N)\,, \qquad
+  \boldsymbol\delta \;=\; L\,\boldsymbol\mu
+  \;\Longrightarrow\;
+  \langle\boldsymbol\delta\,\boldsymbol\delta^\top\rangle
+  \;=\; L\,\langle\boldsymbol\mu\,\boldsymbol\mu^\top\rangle\,L^\top
+  \;=\; L L^\top \;=\; C\,.
+  \label{eq:grf-factor}
+\end{equation}
+Three textbook choices of $L$:
+\begin{enumerate}
+  \item \textbf{Cholesky:} $L$ lower-triangular.  Always exists for
+        positive-definite $C$; cost $\mathcal{O}(N^3)$.
+  \item \textbf{Symmetric square root:} $L = C^{1/2}$ via the
+        eigendecomposition $C = U \Lambda U^\top$ with
+        $C^{1/2} = U \Lambda^{1/2} U^\top$.
+  \item \textbf{Spectral factorization for translation-invariant
+        $C$:} if $C_{ij} = \xi(i - j)$ depends only on the offset
+        (i.e.\ statistical homogeneity), $C$ is a circulant matrix
+        on the torus and is diagonalised by the discrete Fourier
+        transform.  Its eigenvalues are exactly the discrete power
+        spectrum $\{P_\bm\}$.  Then $L$ in the Fourier basis is
+        $L_\bm = \sqrt{P_\bm}\,e^{\mathrm i\phi_\bm}$ --- a
+        diagonal matrix.
+\end{enumerate}
+Option~3 is what the continuum convolution $\delta = T\star\mu$
+becomes on the grid: the Fourier basis diagonalises every
+translation-invariant covariance, so the most expensive operation
+(applying $C^{1/2}$) collapses to mode-by-mode multiplication by
+$\sqrt{P_\bm}$ followed by an inverse FFT.  The cost drops from
+$\mathcal{O}(N^3)$ to $\mathcal{O}(N \log N)$.
+
+\subsection{White noise as the canonical Gaussian field}
+\label{sec:grf-wn}
+
+The continuum object playing the role of
+$\boldsymbol\mu \sim \mathcal{N}(0, I_N)$ above is unit-variance
+white noise $\mu(\bq)$, defined by $\bar\mu = 0$ and
+\begin{equation}
+  \langle \mu(\bq)\,\mu(\bq')\rangle \;=\; \delta^\mathrm{D}(\bq - \bq')\,,
+  \label{eq:wn-real}
+\end{equation}
+i.e.\ the covariance is the identity operator on
+$L^2(\mathbb{R}^3)$.  Equivalently, by (D2), every linear functional
+$\int f\,\mu$ is a scalar Gaussian with variance
+$\int f(\bq)^2\,\mathrm d^3q$ --- the field is fully specified by
+"orthogonal test functions give independent Gaussians".  On a
+grid, $\langle\mu_\bn\mu_{\bn'}\rangle = \delta_{\bn\bn'}$ is the
+familiar i.i.d.\ $\mathcal{N}(0,1)$ per cell.  Fourier-transforming
+Eq.~(\ref{eq:wn-real}),
+\begin{equation}
+  \langle \tilde\mu(\bk)\,\tilde\mu^*(\bk')\rangle \;=\;
+       (2\pi)^3\,\delta^\mathrm{D}(\bk - \bk')\,,
+  \label{eq:wn-fourier}
+\end{equation}
+so $P_\mu(k) = 1$: flat power spectrum, every Fourier mode an
+independent unit-variance Gaussian (real and imaginary parts each
+$\mathcal{N}(0, 1/2)$ on the discrete torus, modulo the Hermitian
+symmetry of a real field).  This is the continuum analogue of
+"diagonal identity in the Fourier basis".
+
+\subsection{Linear filtering preserves Gaussianity}
+\label{sec:grf-linear}
+
+Let $T(\bx)$ be a deterministic real kernel and define
+\begin{equation}
+  \delta(\bx) \;=\; (T \star \mu)(\bx)
+              \;=\; \int T(\bx - \bq)\,\mu(\bq)\,\mathrm d^3q\,.
+  \label{eq:grf-filter}
+\end{equation}
+\textbf{Step 1 --- $\delta$ is Gaussian.}  For any test function
+$f$,
+\begin{equation*}
+  \int f(\bx)\,\delta(\bx)\,\mathrm d^3x
+   \;=\; \int\!\!\int f(\bx)\,T(\bx - \bq)\,\mu(\bq)\,\mathrm d^3x\,\mathrm d^3q
+   \;=\; \int g(\bq)\,\mu(\bq)\,\mathrm d^3q\,,
+\end{equation*}
+where $g(\bq) = \int f(\bx)\,T(\bx-\bq)\,\mathrm d^3x = (f \star T_{-})(\bq)$.
+The right-hand side is a linear functional of $\mu$, which by
+(D2) applied to white noise is a scalar Gaussian.  Hence every
+linear functional of $\delta$ is Gaussian, and by the equivalence
+(D2)$\Leftrightarrow$(D1), $\delta$ is a GRF.
+
+\textbf{Step 2 --- compute the covariance.}  In Fourier space,
+$\tilde\delta(\bk) = \tilde T(\bk)\,\tilde\mu(\bk)$, so
+\begin{equation}
+  \langle\tilde\delta(\bk)\tilde\delta^*(\bk')\rangle
+  \;=\; \tilde T(\bk)\,\tilde T^*(\bk')\,
+        \langle\tilde\mu(\bk)\tilde\mu^*(\bk')\rangle
+  \;=\; |\tilde T(k)|^2\,(2\pi)^3\,\delta^\mathrm{D}(\bk-\bk')\,.
+  \label{eq:grf-covar}
+\end{equation}
+\textbf{Step 3 --- match $P(k)$.}  Demanding
+$\langle\tilde\delta\tilde\delta^*\rangle = (2\pi)^3\,
+\delta^\mathrm{D}(\bk-\bk')\,P(k)$ fixes
+\begin{equation}
+  \boxed{\;\tilde T(\bk) \;=\; \sqrt{P(k)}\;e^{\mathrm i\phi(\bk)}\;}
+  \label{eq:grf-T}
+\end{equation}
+with the phase $\phi(\bk)$ free.  The usual choice is $\phi = 0$
+so that $T(\bx)$ is real and symmetric ($T(-\bx) = T(\bx)$); any
+other choice produces a different real-space realisation with the
+\emph{same} $P(k)$ and therefore the same distribution.  The
+Angulo--Pontzen "paired-and-fixed" construction
+(\code{[setup]/fix\_mode\_amplitude}, \code{flip\_mode\_amplitude})
+exploits exactly this phase freedom to reduce the cosmic-variance
+spread of estimators that depend only on $P(k)$.
+
+\subsection{Why this fully specifies $\delta$}
+\label{sec:grf-spec}
+
+Combine the three pieces:
+\begin{enumerate}
+  \item $\delta = T\star\mu$ is Gaussian (Step~1 of
+        \S\ref{sec:grf-linear}).
+  \item It has two-point function $\xi(r) = \mathcal{F}^{-1}[P]$
+        (Step~2, with $|\tilde T|^2 = P$).
+  \item A Gaussian field is fully determined by
+        $(\bar\delta, \xi)$ (Wick's theorem, \S\ref{sec:grf-wick}).
+\end{enumerate}
+Therefore $\delta = T\star\mu$ has \emph{exactly} the target
+distribution.  Every $n$-point function, every probability density,
+every cross-correlation with a deterministic template --- all
+follow from $P(k)$ via Eqs.~(\ref{eq:wick-odd})--(\ref{eq:wick-4}).
+Cosmological linear ICs can therefore be reduced to "draw a single
+Gaussian seed $\mu$, multiply its Fourier transform by
+$\sqrt{P(k)}$, inverse FFT".
+
+The fork's noise hierarchy of \S\ref{sec:noise-assembly} carries
+this construction down through the refinement levels: each
+level-$\ell$ field $\mu^{(\ell)}$ is itself unit-variance white
+noise, and the cosmology lives entirely in the transfer kernel
+$\tilde T^{(\ell)}_\bm = \sqrt{P(k_\bm)/V}$ applied at convolution
+time (\S\ref{sec:tf-kernel}).
+
+\subsection{Worked example: a 1D Gaussian-correlated field}
+\label{sec:grf-example}
+
+To make the abstract machinery concrete, build a one-dimensional
+Gaussian field with a chosen correlation length $\lambda$.  Take
+the target power spectrum
+\begin{equation}
+  P(k) \;=\; A\,\lambda\,\sqrt{\pi}\;e^{-k^2 \lambda^2 / 4}\,,
+  \label{eq:ex-Pk}
+\end{equation}
+chosen so that its Fourier transform is a Gaussian correlation
+function:
+\begin{equation}
+  \xi(r) \;=\; \int\!\frac{\mathrm d k}{2\pi}\,P(k)\,e^{\mathrm i k r}
+        \;=\; A\,e^{-r^2/\lambda^2}\,.
+  \label{eq:ex-xi}
+\end{equation}
+The amplitude obeys $\xi(0) = A = \langle\delta^2\rangle$ and
+$\lambda$ is the $1/e$ correlation length.
+
+\textbf{Construction.}  Apply Eq.~(\ref{eq:grf-T}) with
+$\phi \equiv 0$:
+\begin{equation}
+  \tilde T(k) \;=\; \sqrt{P(k)} \;=\; (A\,\lambda\,\sqrt\pi)^{1/2}\,
+                                       e^{-k^2 \lambda^2 / 8}\,,
+  \label{eq:ex-T-k}
+\end{equation}
+whose inverse Fourier transform is a real-space Gaussian kernel
+\begin{equation}
+  T(x) \;=\; \Bigl(\frac{A}{\sqrt{\pi/2}\;\lambda}\Bigr)^{1/2}
+              e^{-2 x^2 / \lambda^2}\,,
+  \label{eq:ex-T-x}
+\end{equation}
+i.e.\ $T$ is a Gaussian of width $\lambda/2$ (verify by computing
+$\int T(x-q)\,T(x'-q)\,\mathrm d q$ and recovering
+Eq.~(\ref{eq:ex-xi}) by the standard Gaussian-convolution-of-
+Gaussians).  The realisation is then literally
+\begin{equation}
+  \delta(x) \;=\; (T \star \mu)(x)
+              \;=\; \int T(x - q)\,\mu(q)\,\mathrm d q\,.
+  \label{eq:ex-realise}
+\end{equation}
+
+\textbf{Discrete recipe.}  On a periodic 1D grid of $N$ cells of
+spacing $\Delta q$:
+\begin{enumerate}
+  \item Draw $\mu_n \sim \mathcal{N}(0, 1)$ for $n = 0, \dots, N-1$.
+  \item FFT: $\tilde\mu_m = \sum_n \mu_n\,e^{-2\pi\mathrm i\,m n / N}$.
+  \item Multiply mode-by-mode: $\tilde\delta_m =
+        \sqrt{P(k_m)/(N\,\Delta q)}\;\tilde\mu_m$, with the
+        discrete wavenumber $k_m = 2\pi m / (N\Delta q)$ and the
+        $1/\sqrt{N\Delta q}$ normalisation fixed by
+        Appendix~\ref{app:dft-variance}.
+  \item Inverse FFT: $\delta_n = N^{-1}\sum_m \tilde\delta_m\,
+        e^{+2\pi\mathrm i\,m n / N}$.
+\end{enumerate}
+Three properties drop out automatically and worth verifying by
+hand on a small grid (e.g.\ $N = 8$, $\lambda = 2\Delta q$):
+
+\textbf{(a) Each $\delta_n$ is Gaussian.}  Step~4 makes $\delta_n$
+a fixed linear combination of $\{\mu_{n'}\}$, hence Gaussian
+((D2) for white noise).
+
+\textbf{(b) Variance matches $\xi(0) = A$.}  Sum
+$\langle|\tilde\delta_m|^2\rangle = P(k_m)/(N\Delta q) \cdot
+\langle|\tilde\mu_m|^2\rangle = P(k_m)/\Delta q$ over $m$ and
+divide by $N^2$ from the inverse-FFT convention:
+$\langle\delta_n^2\rangle = (N\Delta q)^{-1}\sum_m P(k_m) \to
+\int\!\mathrm d k\,P(k)/(2\pi) = A$ as $N\Delta q \to \infty$ and
+$\Delta q \to 0$.
+
+\textbf{(c) Two-point function matches $\xi(r)$.}  Same
+calculation with a phase factor:
+$\langle\delta_n\delta_{n+r}\rangle = (N\Delta q)^{-1}\sum_m P(k_m)\,
+e^{\mathrm i k_m r \Delta q} \to A\,e^{-r^2\Delta q^2/\lambda^2}$.
+\textbf{And by Wick (\S\ref{sec:grf-wick}), since (a)+(c) hold,
+the full distribution of $\{\delta_n\}$ matches the target.}
+
+\textbf{Phase freedom in action.}  Replace step~3 by
+$\tilde\delta_m = \sqrt{P(k_m)/(N\Delta q)}\;e^{\mathrm i\theta_m}\,
+\tilde\mu_m$ with $\theta_m$ any deterministic real numbers
+satisfying $\theta_{-m} = -\theta_m$ (so $\delta_n$ stays real).
+Two specific choices:
+\begin{enumerate}
+  \item $\theta_m \equiv 0$: standard Gaussian draw.  Each
+        $|\tilde\delta_m|$ is Rayleigh-distributed with mean
+        $\sqrt{\pi P(k_m)/(4 N\Delta q)}$.
+  \item $|\tilde\mu_m| \to \sqrt{N}$ (mode amplitude fixed, only
+        the phase $\arg\tilde\mu_m$ random): "fixed-amplitude" ICs.
+        Cosmic-variance noise on any quantity that depends only on
+        $P(k)$ drops to zero in this construction (Angulo--Pontzen
+        2016).
+\end{enumerate}
+Both give fields with the \emph{same} $P(k)$ and (in case 2) the
+same full distribution after pairing with the $\delta \to -\delta$
+realisation --- a direct demonstration that the spectral
+factorization fixes the distribution only up to the phase
+$\phi(\bk)$.
+
+\subsection{Where Gaussianity fails}
+
+Primordial non-Gaussianity (e.g.\ local $f_\mathrm{NL}$) breaks
+Eq.~(\ref{eq:grf-charfunc}): higher cumulants no longer vanish, and
+$P(k)$ alone no longer determines the distribution.  A single linear
+filter of one white-noise field cannot produce such a $\delta$.
+Non-Gaussian IC codes augment Eq.~(\ref{eq:grf-filter}) with a
+nonlinear term, e.g.
+\begin{equation}
+  \delta_\mathrm{NG}(\bx) \;=\; (T \star \mu)(\bx)
+        \;+\; f_\mathrm{NL}\,\bigl[(T\star\mu)^2(\bx)
+                                   - \langle (T\star\mu)^2\rangle\bigr]\,,
+  \label{eq:fnl-local}
+\end{equation}
+or use multiple auxiliary white-noise fields.  Throughout this
+document we assume Gaussian ICs, so Eq.~(\ref{eq:grf-filter}) is
+the complete construction.
+
+\subsection{Further reading}
+\label{sec:grf-further}
+
+For a beginning graduate student approaching the material in this
+appendix for the first time, the following references are useful,
+in roughly increasing order of mathematical formality.
+
+\paragraph{Cosmology textbooks.}
+\citet{MoBoschWhite2010} \S4.3--4.4 gives the cleanest pedagogical
+chapter on cosmological GRFs: definitions, peak statistics, Wiener
+filtering, the full Wick expansion.  \citet{Peacock1999} ch.~16
+covers the central-limit-theorem origin of the Gaussian one-point
+PDF and the spectral construction $\delta = T \star \mu$.
+\citet{DodelsonSchmidt2020} ch.~6--7 connects the GRF formalism to
+the inflationary origin of $P(k)$ and the linear-theory transfer
+function in the same notation used here.
+
+\paragraph{The classic cosmology paper.}
+\citet{BBKS1986} (Bardeen--Bond--Kaiser--Szalay) Appendix~A is a
+self-contained physicist primer on multivariate Gaussian PDFs,
+$n$-point functions, and Wick contractions, written for cosmologists.
+The peak-statistics body of the paper is harder going on a first
+pass but rewards re-reading.
+
+\paragraph{Mathematical foundations.}
+\citet{vanKampen2007} ch.~3 is the most accessible physicist
+treatment of Gaussian processes, characteristic functionals, and
+the equivalence of definitions (D1)--(D3); the clearest source for
+why all cumulants beyond the second vanish.
+\citet{AdlerTaylor2007} is the mathematician's reference --- use
+ch.~1--2 as a lookup when proving (D1)$\Leftrightarrow$(D2) via
+Kolmogorov's consistency theorem, not as a first read.
+
+\paragraph{Papers tied directly to IC generation.}
+\citet{Pen1997} is the original FFT recipe for unconstrained
+cosmological GRF synthesis --- exactly the construction in
+\S\ref{sec:grf-spec}.  \citet{Sirko2005} discusses finite-box
+sampling biases and the integral constraint that arises when the
+GRF formalism is applied on a periodic cube.  \citet{Hahn2011}
+\S2 lays out the multi-scale GRF on a refinement hierarchy;
+reading it alongside \S\ref{sec:noise-assembly} makes the
+connection between abstract GRF theory and the actual MUSIC2 code
+paths transparent.  \citet{AnguloPontzen2016} introduces the
+``fixed and paired'' construction that operationalises the phase
+freedom $\phi(\bk)$ of Eq.~(\ref{eq:grf-T}).
+
+\paragraph{Non-Gaussian extensions.}
+\citet{SalopekBond1990} is the origin of the local-$f_\mathrm{NL}$
+construction in Eq.~(\ref{eq:fnl-local}).
+\citet{Scoccimarro2012} gives practical algorithms for generating
+non-Gaussian $N$-body ICs; the natural next step once the Gaussian
+case in this appendix is in hand.
+
+\paragraph{Recommended reading path.}
+\citet{MoBoschWhite2010} \S4.3--4.4 first, then \citet{BBKS1986}
+Appendix~A, then \citet{Pen1997}, then \citet{Hahn2011} \S2
+alongside this appendix.  \citet{vanKampen2007} ch.~3 fills any
+remaining gaps on the stochastic-process side.
+
 \section{Per-mode variance of the unnormalised DFT of i.i.d.\ white noise}
 \label{app:dft-variance}
 
@@ -1439,6 +1915,43 @@ Particles'' (CRC Press).
 \bibitem[{Trottenberg et al.(2001)}]{Trottenberg2001}
 Trottenberg, U., Oosterlee, C.~W., \& Sch\"uller, A. 2001,
 ``Multigrid'' (Academic Press).
+
+\bibitem[{Bardeen et al.(1986)}]{BBKS1986}
+Bardeen, J.~M., Bond, J.~R., Kaiser, N., \& Szalay, A.~S. 1986,
+ApJ, 304, 15.
+
+\bibitem[{Peacock(1999)}]{Peacock1999}
+Peacock, J.~A. 1999, ``Cosmological Physics'' (Cambridge
+University Press).
+
+\bibitem[{Dodelson~\& Schmidt(2020)}]{DodelsonSchmidt2020}
+Dodelson, S.\ \& Schmidt, F. 2020, ``Modern Cosmology'' 2nd ed.\
+(Academic Press).
+
+\bibitem[{Mo et al.(2010)}]{MoBoschWhite2010}
+Mo, H., van den Bosch, F., \& White, S. 2010, ``Galaxy Formation
+and Evolution'' (Cambridge University Press).
+
+\bibitem[{van~Kampen(2007)}]{vanKampen2007}
+van Kampen, N.~G. 2007, ``Stochastic Processes in Physics and
+Chemistry'' 3rd ed.\ (North-Holland).
+
+\bibitem[{Adler~\& Taylor(2007)}]{AdlerTaylor2007}
+Adler, R.~J.\ \& Taylor, J.~E. 2007, ``Random Fields and
+Geometry'' (Springer).
+
+\bibitem[{Sirko(2005)}]{Sirko2005}
+Sirko, E. 2005, ApJ, 634, 728.
+
+\bibitem[{Angulo~\& Pontzen(2016)}]{AnguloPontzen2016}
+Angulo, R.~E.\ \& Pontzen, A. 2016, MNRAS, 462, L1.
+
+\bibitem[{Salopek~\& Bond(1990)}]{SalopekBond1990}
+Salopek, D.~S.\ \& Bond, J.~R. 1990, Phys.\ Rev.\ D, 42, 3936.
+
+\bibitem[{Scoccimarro et al.(2012)}]{Scoccimarro2012}
+Scoccimarro, R., Hui, L., Manera, M., \& Chan, K.~C. 2012,
+Phys.\ Rev.\ D, 85, 083002.
 
 \end{thebibliography}
 

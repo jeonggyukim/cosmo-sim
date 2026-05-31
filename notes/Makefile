@@ -40,7 +40,8 @@ FIGURES = figures/box_window.pdf figures/tophat_window.pdf figures/pgrid_compari
           figures/alias_diagram.pdf figures/zoom_ic_comparison.pdf \
           figures/zoom_ic_pk_full.pdf \
           figures/grf_exponential.pdf \
-          figures/complex_modes.pdf
+          figures/complex_modes.pdf \
+          figures/meyer.pdf
 
 all : figures notes
 
@@ -129,6 +130,9 @@ figures/grf_exponential.pdf : figures/plot_grf_exponential.py
 
 figures/complex_modes.pdf : figures/plot_complex_modes.py
 	cd figures && $(PYTHON) plot_complex_modes.py
+
+figures/meyer.pdf : figures/plot_meyer.py
+	cd figures && $(PYTHON) plot_meyer.py
 
 # --- LaTeX ---
 notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
