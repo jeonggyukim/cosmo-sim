@@ -66,7 +66,8 @@ def main():
     L_s = fmt(args.boxlength)
 
     ic_filename = f"data/ics_swift_n{N_s}_z{z_s}_L{L_s}{suffix}{seed_suffix}.hdf5"
-    # Write config to conf/ relative to repo root (three levels up from scripts/pipeline/)
+    # Write config to conf/ relative to repo root (three levels up from icpipe/cli/<file>.py).
+    # Editable install keeps __file__ inside the repo, so this resolves correctly.
     repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     conf_dir = os.path.join(repo_root, "conf")
     conf_filename = args.output or os.path.join(

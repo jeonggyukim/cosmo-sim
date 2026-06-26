@@ -190,7 +190,7 @@ fi
 # ---------------------------------------------------------------------------
 if [ ! -f "$CONF_FILE" ]; then
     log "Generating MUSIC2 config..."
-    conda run -n cosmo python scripts/pipeline/make_music_conf.py -N "$NGRID" -z "$ZSTART" -L "$LBOX" --fix-amplitude "$FIX_AMP" ${SEED:+--seed "$SEED"}
+    conda run -n cosmo make-music-conf -N "$NGRID" -z "$ZSTART" -L "$LBOX" --fix-amplitude "$FIX_AMP" ${SEED:+--seed "$SEED"}
 else
     log "MUSIC2 config already exists — skipping ($CONF_FILE)"
 fi
@@ -292,7 +292,7 @@ fi
 # ---------------------------------------------------------------------------
 if [ ! -f "$RBINS_FILE" ]; then
     log "Generating rbins..."
-    conda run -n cosmo python scripts/pipeline/make_rbins.py --hdf5 "$IC_FILE"
+    conda run -n cosmo make-rbins --hdf5 "$IC_FILE"
 else
     log "rbins already exist — skipping ($RBINS_FILE)"
 fi
@@ -345,7 +345,7 @@ echo "    Saved: $VEL_CIC_FILE"
 # ---------------------------------------------------------------------------
 PK_FILE="data/pk_${STEM}.txt"
 log "Measuring P(k) with compute_pk.py..."
-conda run -n cosmo python scripts/pipeline/compute_pk.py \
+conda run -n cosmo compute-pk \
     "$IC_FILE" \
     --H0 "$H0" \
     -o "$PK_FILE"
@@ -374,7 +374,7 @@ echo "    Saved: $PK_FILE"
 # ---------------------------------------------------------------------------
 PLOT_FILE="plots/pk_${STEM}.png"
 log "Plotting diagnostics with plot_ic.py..."
-conda run -n cosmo python scripts/pipeline/plot_ic.py \
+conda run -n cosmo plot-ic \
     "$PK_FILE" \
     --theory "$CLASS_PKS" \
     --theory-zref 0 \

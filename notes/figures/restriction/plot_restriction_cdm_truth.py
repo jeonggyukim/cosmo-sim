@@ -18,7 +18,7 @@ from pathlib import Path
 
 from icpipe import LinearTheory
 
-CLASS_PK = Path(__file__).resolve().parents[2] / 'data' / 'class_pk_z200_pk.dat'
+CLASS_PK = Path(__file__).resolve().parents[3] / 'data' / 'class_pk_z200_pk.dat'
 
 rng = np.random.default_rng(42)
 N, N2, L = 64, 128, 500.0

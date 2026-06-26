@@ -25,7 +25,7 @@ trapz = np.trapezoid   # numpy >= 2.0
 # ---------------------------------------------------------------------------
 # Load CLASS P(k)
 # ---------------------------------------------------------------------------
-data = np.loadtxt('../../data/class_pk_z200_pk.dat', comments='#')
+data = np.loadtxt('../../../data/class_pk_z200_pk.dat', comments='#')
 k_class, P_class = data[:, 0], data[:, 1]   # h/Mpc, (Mpc/h)^3
 
 Pk_interp = interp1d(np.log(k_class), np.log(P_class),

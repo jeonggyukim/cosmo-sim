@@ -21,18 +21,15 @@ bin/
 memory/
 .claude/
 
-# Figures (generated; only the three box/tophat/pgrid PDFs copied to notes/ root are versioned)
+# Figures (all generated; notes/figures/** are produced by notes/Makefile)
 plots/
 # Prevent accidental root-level figure drops (use plots/ instead)
 /*.png
 /*.pdf
 notes/*.png
 notes/*.pdf
-!notes/box_window.pdf
-!notes/tophat_window.pdf
-!notes/pgrid_comparison.pdf
-notes/figures/*.pdf
-notes/figures/*.png
+notes/figures/**/*.pdf
+notes/figures/**/*.png
 
 # LaTeX auxiliary files (never version these)
 *.aux
@@ -52,9 +49,6 @@ __pycache__/
 # Jupyter scratch notebooks (regenerable, never versioned)
 notebooks/scratch-pad.ipynb
 notebooks/.ipynb_checkpoints/
-
-# Exploratory script outputs (regenerable)
-scripts/restriction_*.png
 
 # Python package build artifacts
 *.egg-info/

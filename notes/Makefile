@@ -29,33 +29,51 @@ endif
 
 TIDY = rm -f *.aux *.log *.blg *.out *.toc
 
-FIGURES = figures/box_window.pdf figures/tophat_window.pdf figures/pgrid_comparison.pdf \
-          figures/pancake.pdf figures/growth.pdf figures/dft_pairs.pdf figures/cft_pairs.pdf \
-          figures/aliasing.pdf \
-          figures/restriction_density.pdf figures/restriction_psi.pdf \
-          figures/restriction_deformation.pdf figures/restriction_phi.pdf \
-          figures/restriction_phi_spectral.pdf \
-          figures/restriction_cdm.pdf figures/restriction_cdm_truth.pdf \
-          figures/window_compare.pdf \
-          figures/alias_diagram.pdf figures/zoom_ic_comparison.pdf \
-          figures/zoom_ic_pk_full.pdf \
-          figures/grf_exponential.pdf \
-          figures/complex_modes.pdf \
-          figures/meyer.pdf
+# Figures live in subdirectories under figures/, grouped by parent .tex.
+# Scripts that are shared by several .tex (growth, aliasing) stay at the top.
+FIGURES = \
+    figures/growth.pdf figures/aliasing.pdf \
+    figures/ic_sampling/box_window.pdf \
+    figures/ic_sampling/tophat_window.pdf \
+    figures/ic_sampling/pgrid_comparison.pdf \
+    figures/cosmo_ic/pancake.pdf \
+    figures/fft/dft_pairs.pdf figures/fft/cft_pairs.pdf \
+    figures/fft/grf_exponential.pdf figures/fft/complex_modes.pdf \
+    figures/restriction/restriction_density.pdf \
+    figures/restriction/restriction_psi.pdf \
+    figures/restriction/restriction_deformation.pdf \
+    figures/restriction/restriction_phi.pdf \
+    figures/restriction/restriction_phi_spectral.pdf \
+    figures/restriction/restriction_cdm.pdf \
+    figures/restriction/restriction_cdm_truth.pdf \
+    figures/restriction/window_compare.pdf \
+    figures/restriction/alias_diagram.pdf \
+    figures/restriction/zoom_ic_comparison.pdf \
+    figures/restriction/zoom_ic_pk_full.pdf \
+    figures/music2/meyer.pdf
 
 all : figures notes
 
 # --- Figures ---
 figures : $(FIGURES)
 
-figures/box_window.pdf : figures/plot_box_window.py
-	cd figures && $(PYTHON) plot_box_window.py
+# Each plot script is invoked from its own directory so any relative paths
+# inside the script (e.g. data lookups) stay sane and the resulting PDF
+# lands next to the script.
+figures/growth.pdf : figures/plot_growth.py
+	cd figures && $(PYTHON) plot_growth.py
 
-figures/tophat_window.pdf : figures/plot_tophat_window.py
-	cd figures && $(PYTHON) plot_tophat_window.py
+figures/aliasing.pdf : figures/plot_aliasing.py
+	cd figures && $(PYTHON) plot_aliasing.py
 
-figures/pgrid_comparison.pdf : figures/plot_pgrid.py ../data/class_pk_z200_pk.dat
-	cd figures && $(PYTHON) plot_pgrid.py
+figures/ic_sampling/box_window.pdf : figures/ic_sampling/plot_box_window.py
+	cd figures/ic_sampling && $(PYTHON) plot_box_window.py
+
+figures/ic_sampling/tophat_window.pdf : figures/ic_sampling/plot_tophat_window.py
+	cd figures/ic_sampling && $(PYTHON) plot_tophat_window.py
+
+figures/ic_sampling/pgrid_comparison.pdf : figures/ic_sampling/plot_pgrid.py ../data/class_pk_z200_pk.dat
+	cd figures/ic_sampling && $(PYTHON) plot_pgrid.py
 
 # Generate CLASS P(k) at z=45 from any existing MUSIC2-written CLASS ini.
 # Picks the first conf/input_class_parameters_*.ini (they share cosmology);
@@ -77,62 +95,56 @@ CLASS_INI  := $(firstword $(wildcard $(REPO_ROOT)/conf/input_class_parameters_*.
 	cd $(REPO_ROOT)/data && $(CLASS_BIN) $$TMP && \
 	rm -f $$TMP
 
-figures/pancake.pdf : figures/plot_pancake.py
-	cd figures && $(PYTHON) plot_pancake.py
+figures/cosmo_ic/pancake.pdf : figures/cosmo_ic/plot_pancake.py
+	cd figures/cosmo_ic && $(PYTHON) plot_pancake.py
 
-figures/growth.pdf : figures/plot_growth.py
-	cd figures && $(PYTHON) plot_growth.py
+figures/fft/dft_pairs.pdf : figures/fft/plot_dft_pairs.py
+	cd figures/fft && $(PYTHON) plot_dft_pairs.py
 
-figures/dft_pairs.pdf : figures/plot_dft_pairs.py
-	cd figures && $(PYTHON) plot_dft_pairs.py
+figures/fft/cft_pairs.pdf : figures/fft/plot_cft_pairs.py
+	cd figures/fft && $(PYTHON) plot_cft_pairs.py
 
-figures/cft_pairs.pdf : figures/plot_cft_pairs.py
-	cd figures && $(PYTHON) plot_cft_pairs.py
+figures/fft/grf_exponential.pdf : figures/fft/plot_grf_exponential.py
+	cd figures/fft && $(PYTHON) plot_grf_exponential.py
 
-figures/aliasing.pdf : figures/plot_aliasing.py
-	cd figures && $(PYTHON) plot_aliasing.py
+figures/fft/complex_modes.pdf : figures/fft/plot_complex_modes.py
+	cd figures/fft && $(PYTHON) plot_complex_modes.py
 
-figures/restriction_density.pdf : figures/plot_restriction_density.py
-	cd figures && $(PYTHON) plot_restriction_density.py
+figures/restriction/restriction_density.pdf : figures/restriction/plot_restriction_density.py
+	cd figures/restriction && $(PYTHON) plot_restriction_density.py
 
-figures/restriction_psi.pdf : figures/plot_restriction_psi.py
-	cd figures && $(PYTHON) plot_restriction_psi.py
+figures/restriction/restriction_psi.pdf : figures/restriction/plot_restriction_psi.py
+	cd figures/restriction && $(PYTHON) plot_restriction_psi.py
 
-figures/restriction_deformation.pdf : figures/plot_restriction_deformation.py
-	cd figures && $(PYTHON) plot_restriction_deformation.py
+figures/restriction/restriction_deformation.pdf : figures/restriction/plot_restriction_deformation.py
+	cd figures/restriction && $(PYTHON) plot_restriction_deformation.py
 
-figures/restriction_phi.pdf : figures/plot_restriction_phi.py
-	cd figures && $(PYTHON) plot_restriction_phi.py
+figures/restriction/restriction_phi.pdf : figures/restriction/plot_restriction_phi.py
+	cd figures/restriction && $(PYTHON) plot_restriction_phi.py
 
-figures/restriction_phi_spectral.pdf : figures/plot_restriction_phi_spectral.py
-	cd figures && $(PYTHON) plot_restriction_phi_spectral.py
+figures/restriction/restriction_phi_spectral.pdf : figures/restriction/plot_restriction_phi_spectral.py
+	cd figures/restriction && $(PYTHON) plot_restriction_phi_spectral.py
 
-figures/restriction_cdm.pdf : figures/plot_restriction_cdm.py ../data/class_pk_z200_pk.dat
-	cd figures && $(PYTHON) plot_restriction_cdm.py
+figures/restriction/restriction_cdm.pdf : figures/restriction/plot_restriction_cdm.py ../data/class_pk_z200_pk.dat
+	cd figures/restriction && $(PYTHON) plot_restriction_cdm.py
 
-figures/restriction_cdm_truth.pdf : figures/plot_restriction_cdm_truth.py ../data/class_pk_z200_pk.dat
-	cd figures && $(PYTHON) plot_restriction_cdm_truth.py
+figures/restriction/restriction_cdm_truth.pdf : figures/restriction/plot_restriction_cdm_truth.py ../data/class_pk_z200_pk.dat
+	cd figures/restriction && $(PYTHON) plot_restriction_cdm_truth.py
 
-figures/window_compare.pdf : figures/plot_window_compare.py
-	cd figures && $(PYTHON) plot_window_compare.py
+figures/restriction/window_compare.pdf : figures/restriction/plot_window_compare.py
+	cd figures/restriction && $(PYTHON) plot_window_compare.py
 
-figures/alias_diagram.pdf : figures/plot_alias_diagram.py
-	cd figures && $(PYTHON) plot_alias_diagram.py
+figures/restriction/alias_diagram.pdf : figures/restriction/plot_alias_diagram.py
+	cd figures/restriction && $(PYTHON) plot_alias_diagram.py
 
-figures/zoom_ic_comparison.pdf : figures/plot_zoom_ic_comparison.py
-	cd figures && $(PYTHON) plot_zoom_ic_comparison.py
+figures/restriction/zoom_ic_comparison.pdf : figures/restriction/plot_zoom_ic_comparison.py
+	cd figures/restriction && $(PYTHON) plot_zoom_ic_comparison.py
 
-figures/zoom_ic_pk_full.pdf : figures/plot_zoom_ic_pk_full.py
-	cd figures && $(PYTHON) plot_zoom_ic_pk_full.py
+figures/restriction/zoom_ic_pk_full.pdf : figures/restriction/plot_zoom_ic_pk_full.py
+	cd figures/restriction && $(PYTHON) plot_zoom_ic_pk_full.py
 
-figures/grf_exponential.pdf : figures/plot_grf_exponential.py
-	cd figures && $(PYTHON) plot_grf_exponential.py
-
-figures/complex_modes.pdf : figures/plot_complex_modes.py
-	cd figures && $(PYTHON) plot_complex_modes.py
-
-figures/meyer.pdf : figures/plot_meyer.py
-	cd figures && $(PYTHON) plot_meyer.py
+figures/music2/meyer.pdf : figures/music2/plot_meyer.py
+	cd figures/music2 && $(PYTHON) plot_meyer.py
 
 # --- LaTeX ---
 notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
@@ -147,4 +159,6 @@ notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
 
 clean :
 	rm -f *.aux *.log *.bbl *.blg *.out *.toc *.fls *.synctex.gz
-	rm -f figures/*.png $(FIGURES) $(addsuffix .pdf, $(NOTES))
+	rm -f figures/*.png figures/*.pdf $(FIGURES) $(addsuffix .pdf, $(NOTES))
+	rm -f figures/ic_sampling/*.png figures/cosmo_ic/*.png \
+	      figures/fft/*.png figures/restriction/*.png figures/music2/*.png

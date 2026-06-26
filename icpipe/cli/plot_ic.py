@@ -316,7 +316,7 @@ class ICPlotter:
         xi_subsample_std = np.zeros_like(xi_cf)
         nseeds_used = 0
 
-        xi_binary = os.path.join(repo_root, 'compute_xi') if repo_root else None
+        xi_binary = os.path.join(repo_root, 'bin', 'compute_xi') if repo_root else None
         if (nseeds > 1
                 and xi_binary and os.path.exists(xi_binary)
                 and rbins_file and os.path.exists(rbins_file)

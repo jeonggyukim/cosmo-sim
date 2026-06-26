@@ -1,231 +1,119 @@
 # cosmo-pipeline
 
-Scripts and configuration for cosmological IC generation with MUSIC2 and IC validation.
+End-to-end IC generation (MUSIC2) + IC validation (CIC P(k), Corrfunc
+ξ(r), CIC ξ/ψ) for cosmological SWIFT simulations.
 
 ## Directory layout
 
-```
-src/                — C source files + Makefile (compute_xi.c, compute_xi_cic.c)
-bin/                — compiled C binaries (gitignored)
-icpipe/             — installable Python library (ICField, LinearTheory, io)
-scripts/pipeline/   — Python CLIs invoked by run_pipeline.sh
-                      (make_music_conf, make_rbins, compute_pk, compute_pv, plot_ic)
-scripts/analysis/   — ad-hoc CLIs / inspection tools
-                      (check_ic, plot_box_size_comparison, plot_dr_histogram)
-tools/              — build/clean shell scripts + cluster sbatch templates
-                      (build-music.sh, build-corrfunc.sh, clean.sh, mpirun_restart.sbatch)
-conf/               — MUSIC2 config files
-data/               — CLASS outputs, rbins, measured P(k)/ξ/ψ tables  (HDF5/bin files gitignored)
-plots/              — output figures  (gitignored)
-notes/              — LaTeX write-ups and supporting plot scripts
-```
+| dir                 | purpose                                                  | sub-README |
+|---------------------|----------------------------------------------------------|-----------|
+| `src/`              | C sources + Makefile (`compute_xi`, `compute_xi_cic`)    | —         |
+| `bin/`              | compiled C binaries (gitignored)                         | —         |
+| `icpipe/`           | Python library: `ICField`, `LinearTheory`, `io`          | [`icpipe/README.md`](icpipe/README.md) |
+| `icpipe/cli/`       | pipeline-step console scripts                            | (in `icpipe/README.md`) |
+| `scripts/analysis/` | ad-hoc inspection CLIs (not in `run_pipeline.sh`)        | [`scripts/analysis/README.md`](scripts/analysis/README.md) |
+| `tools/`            | build / clean / cluster sbatch scripts                   | [`tools/README.md`](tools/README.md) |
+| `conf/`             | MUSIC2 config files (template + generated)               | —         |
+| `data/`             | CLASS outputs, rbins, measured P/ξ/ψ tables (gitignored) | —         |
+| `plots/`            | output figures (gitignored)                              | —         |
+| `notes/`            | LaTeX write-ups                                          | (sources) |
+| `notes/figures/`    | plot scripts feeding the LaTeX figures                   | [`notes/figures/README.md`](notes/figures/README.md) |
+| `notebooks/`        | worked examples using `icpipe`                           | [`notebooks/README.md`](notebooks/README.md) |
+| `tests/validation/` | bundled validation tests (e.g. matched-noise zoom)       | (per-test) |
 
 ## Setup
 
 ```bash
 conda env create -f env.yml
 conda activate cosmo
+pip install -e ".[plot,test]"     # installs icpipe + the pipeline-step CLIs onto $PATH
 ```
 
-## Workflow
+The `pip install -e .` step also wires `make-music-conf`, `make-rbins`,
+`compute-pk`, `compute-pv`, and `plot-ic` as commands on `$PATH`.  See
+[`icpipe/README.md`](icpipe/README.md) for the full library API and CLI table.
 
-### Run the full pipeline (recommended)
+## Run the full pipeline
 
 ```bash
 ./run_pipeline.sh                                          # defaults: N=256, L=1024 Mpc/h, z=200
-./run_pipeline.sh --ngrid 256 --lbox 512  --zstart 200     # 256³, L=512  Mpc/h, z=200
-./run_pipeline.sh --ngrid 256 --lbox 256  --zstart 200     # 256³, L=256  Mpc/h, z=200
+./run_pipeline.sh --ngrid 256 --lbox 512 --zstart 200      # 256³, L=512 Mpc/h, z=200
+./run_pipeline.sh --ngrid 256 --lbox 256 --zstart 200      # 256³, L=256 Mpc/h, z=200
 ```
 
-The pipeline runs all steps below automatically, skipping any that are already complete.
+Each step is skipped if its output already exists:
 
-Pipeline steps:
-1. Build MUSIC2 (skipped if binary exists)
-2. Build `compute_xi` (skipped if binary exists)
-3. Generate MUSIC2 config from template
-4. Run MUSIC2 → IC HDF5 + `input_class_parameters.ini`
+1. Build MUSIC2 (clones source if absent — `tools/build-music.sh`)
+2. Build `compute_xi` / `compute_xi_cic` C binaries → `bin/`
+3. Generate MUSIC2 config from `conf/CV_22_MUSIC_template.conf`
+4. Run MUSIC2 → `data/ics_swift_*.hdf5` + `conf/input_class_parameters_*.ini`
 5. Run CLASS → `data/class_pk_z{z}_pk.dat`
 6. Generate Corrfunc radial bin file
-7. Measure ξ(r) with Corrfunc pair counting
-8. Measure ξ(r) and ψ(r) on CIC grid (`compute_xi_cic --vel`)
-9. Measure P(k) with CIC+FFT (`compute_pk.py`)
-10. Plot diagnostics (`plot_ic.py`) → `plots/pk_{STEM}.png`
+7. Measure ξ(r) with Corrfunc pair counting (skipped at z ≳ 10; shot-noise dominated)
+8. Measure ξ(r) and ψ(r) on a CIC grid (`bin/compute_xi_cic --vel`)
+9. Measure P(k) with CIC + FFT (`compute-pk`)
+10. Plot diagnostics (`plot-ic`) → `plots/pk_{stem}.png`
 
----
+Clean up with `tools/clean.sh` (or `tools/clean.sh --all` to also wipe ICs / wnoise / MUSIC2 build).
 
-### Step by step
+## Run a single step
 
-#### 1. Build MUSIC2
-
-```bash
-tools/build-music.sh
-```
-
-Only needed once (or after source changes). Clones MUSIC2 from GitHub if the source directory
-does not exist. Detects macOS vs cluster automatically.
-Binary placed at `music_build/MUSIC`; CLASS built at `music_build/_deps/class-build/class`.
-
----
-
-#### 2. Generate a MUSIC2 config
+Each pipeline-step CLI is also runnable on its own.  See
+[`icpipe/README.md`](icpipe/README.md) for command-line flags;
+typical invocations:
 
 ```bash
-conda run -n cosmo python scripts/pipeline/make_music_conf.py -N 256 -z 200 -L 1024
-# → conf/CV_22_MUSIC_n256_z200_L1024.conf
+make-music-conf -N 256 -z 200 -L 1024                          # writes conf/CV_22_MUSIC_n256_z200_L1024.conf
+./music_build/MUSIC conf/CV_22_MUSIC_n256_z200_L1024.conf      # runs MUSIC2
+compute-pk data/ics_swift_n256_z200_L1024.hdf5 \
+    -o data/pk_n256_z200_L1024.txt                             # CIC + FFT
+make-rbins --hdf5 data/ics_swift_n256_z200_L1024.hdf5          # Corrfunc bin edges
+./bin/compute_xi_cic --input data/ics_swift_n256_z200_L1024.hdf5 \
+    --nthreads 8 --output data/xi_cic_n256_z200_L1024.txt --vel
+plot-ic data/pk_n256_z200_L1024.txt \
+    --theory data/class_pk_z0_pk.dat --theory-zref 0           # plots/pk_*.png
 ```
 
-Arguments: `-N` particles per side, `-z` starting redshift, `-L` box size in Mpc/h.
-Uses `conf/CV_22_MUSIC_template.conf` (CV_22 cosmology, SWIFT output format).
+`plot-ic` auto-detects `xi_*.txt`, `xi_cic_*.txt`, and `vel_cic_*.txt`
+alongside the input `pk_*.txt` and overlays them.  Pass several
+`pk_*.txt` files to overlay multiple box sizes.
 
----
+## Units & conventions (gotchas)
 
-#### 3. Run MUSIC2
-
-```bash
-./music_build/MUSIC conf/CV_22_MUSIC_n256_z200_L1024.conf
-# → data/ics_swift_n256_z200_L1024.hdf5
-# → conf/input_class_parameters_n256_z200_L1024.ini  (moved from repo root by pipeline)
-```
-
-SWIFT stores coordinates and BoxSize in **Mpc** (not Mpc/h). The on-disk `Velocities`
-dataset written by MUSIC2 is the **peculiar velocity in km/s** (`v_pec = a·H·f·Ψ`); SWIFT
-itself converts to its internal canonical-momentum variable `u = a·v_pec` only at IC read
-time. So measured ψ(r) from `compute_xi_cic` is already in (km/s)² — no a² rescaling.
-
----
-
-#### 4. Generate CLASS theory P(k)
-
-The pipeline derives the CLASS ini from `input_class_parameters.ini` (written by MUSIC2),
-changing `output` to `mPk` and setting `z_pk` to the IC redshift. No hand-edited ini needed.
-
-```bash
-# Manually (after MUSIC2 has run):
-TMP=$(mktemp /tmp/class_pk_XXXXXX)
-sed -e "s/^output =.*/output = mPk/" -e "s/^z_pk =.*/z_pk = 2/" \
-    -e "/^extra metric transfer functions/d" -e "/^gauge/d" \
-    conf/input_class_parameters_n256_z200_L1024.ini > "$TMP"
-echo "root = class_pk_z2_" >> "$TMP"
-./music_build/_deps/class-build/class "$TMP"
-mv class_pk_z2_pk.dat data/
-```
-
----
-
-#### 5. Validate ICs — power spectrum
-
-```bash
-conda run -n cosmo python scripts/pipeline/compute_pk.py \
-    data/ics_swift_n256_z200_L1024.hdf5 \
-    -o data/pk_n256_z200_L1024.txt
-
-conda run -n cosmo python scripts/pipeline/plot_ic.py \
-    data/pk_n256_z200_L1024.txt \
-    --theory data/class_pk_z2_pk.dat
-# → plots/pk_n256_z200_L1024.png
-```
-
-Overlay multiple box sizes:
-```bash
-conda run -n cosmo python scripts/pipeline/plot_ic.py \
-    data/pk_n256_z2_L172.txt data/pk_n256_z2_L344.txt data/pk_n256_z200_L1024.txt \
-    --theory data/class_pk_z2_pk.dat -o plots/comparison.png
-```
-
----
-
-#### 6. Validate ICs — correlation functions
-
-```bash
-# Corrfunc pair-counting ξ(r) (low z; shot-noise dominated at z ≳ 10):
-conda run -n cosmo python scripts/pipeline/make_rbins.py \
-    --hdf5 data/ics_swift_n256_z200_L1024.hdf5
-# → data/rbins_n256_z200_L1024.txt
-
-./bin/compute_xi data/ics_swift_n256_z200_L1024.hdf5 \
-             data/rbins_n256_z200_L1024.txt 8 \
-             > data/xi_n256_z200_L1024.txt
-
-# CIC grid ξ(r) and ψ(r) = ⟨v_pec·v_pec'⟩ (works at any z):
-./bin/compute_xi_cic \
-    --input    data/ics_swift_n256_z200_L1024.hdf5 \
-    --nthreads 8 \
-    --output   data/xi_cic_n256_z200_L1024.txt \
-    --vel
-# → data/xi_cic_n256_z200_L1024.txt
-# → data/vel_cic_n256_z200_L1024.txt
-```
-
-`plot_ic.py` auto-detects all `xi_*`, `xi_cic_*`, and `vel_cic_*` files alongside the pk file
-and overlays them. Theory ψ(r) = [a·H(z)·f(z)]²/(2π²) ∫ P(k) j₀(kr) dk is computed from
-CLASS P(k); the measured ψ is already in (km/s)² since MUSIC2 writes peculiar velocities
-to disk in km/s.
-
----
-
-#### 7. Clean generated outputs
-
-```bash
-tools/clean.sh          # remove plots, P(k)/xi tables, rbins, configs, CLASS outputs
-tools/clean.sh --all    # also remove IC HDF5 files and wnoise binaries (slow to regenerate)
-```
-
----
-
-#### 8. Diagnostic plots
-
-```bash
-# Particle displacement histogram (dr/dx from lattice)
-conda run -n cosmo python scripts/analysis/plot_dr_histogram.py \
-    data/ics_swift_n256_z200_L1024.hdf5
-```
-
----
-
-## Python package: `icpipe`
-
-Reusable IC-analysis library used by the `compute_pk.py` /
-`compute_pv.py` CLIs and by the example notebooks. Install once:
-
-```bash
-pip install -e .                 # icpipe + numpy/scipy/h5py
-pip install -e ".[plot,test]"    # also matplotlib + pytest
-pytest icpipe/tests/             # 17 tests
-```
-
-API entry points:
-- `from icpipe import ICField` — load HDF5, build CIC grids, compute `power('delta')` / `power('velocity')`.
-- `from icpipe import LinearTheory` — `LinearTheory.from_class(...)` gives `Pk`, `Pv`, `xi`, `psi` from a single CLASS table.
-
-Worked examples in `notebooks/` (see `notebooks/README.md`).
+- SWIFT stores coordinates and `BoxSize` in **Mpc** (not Mpc/h).  All
+  internal calculations use Mpc; conversion to Mpc/h uses `h = H0/100`.
+- The on-disk `Velocities` dataset is the **peculiar velocity in km/s**
+  (`v_pec = a·H·f·Ψ`).  SWIFT itself converts to its internal
+  canonical-momentum variable `u = a·v_pec` only at IC read time.  So
+  ψ(r) measured by `bin/compute_xi_cic` is already in (km/s)² — no
+  a² rescaling.
+- MUSIC2 always writes `wnoise_NNNN.bin` and `input_class_parameters.ini`
+  to the CWD; `run_pipeline.sh` moves them into `data/` and `conf/`
+  automatically.
+- Always generate rbins per-IC with `make-rbins` (rmin = 2 × mean
+  spacing, rmax = L/3).  Reusing rbins from a different box size or
+  resolution silently produces empty bins or periodic-boundary artifacts.
 
 ## Notes
 
-Four LaTeX write-ups live in `notes/`. Source `.tex` files are tracked
-in git; readers should open the compiled `.pdf` in the same directory.
-Build all PDFs with:
+LaTeX write-ups under `notes/`:
+
+| note                     | contents |
+|--------------------------|----------|
+| `fft.tex`                | FFT reference: DFT, Cooley–Tukey, FFTW, multi-dim row–column, MPI slab vs. pencil, `BlockFFT` |
+| `cosmo_ic.tex`           | Cosmological ICs: fluid eqs, ZA, 2LPT, pancake, IC generation, P(k)/ξ(r)/ψ(r), MUSIC2 / monofonIC internals |
+| `ic_sampling.tex`        | Pen 1997 / Sirko 2005 / Hahn 2011 IC sampling methods; box window truncation |
+| `restriction_lpt.tex`    | Restriction of δ, Ψ⁽¹⁾, deformation, S⁽²⁾, φ⁽¹⁾; zoom-IC application |
+| `music2_internals.tex`   | MUSIC2 internals walk-through; GRF appendix; Meyer-window figure |
+
+Build all with:
 
 ```bash
-cd notes
-make
+make -C notes              # regenerate figures + compile all PDFs (opens automatically)
+make -C notes figures      # figures only
+make -C notes notes        # compile PDFs only
+make -C notes clean        # remove figures, PDFs, LaTeX aux
 ```
 
-| Note | Contents |
-|------|----------|
-| `fft.pdf` | FFT reference: DFT definition, Cooley–Tukey radix-2, FFTW mixed-radix, multi-dimensional row–column algorithm, MPI slab vs. pencil decomposition, FFTW API, fftMPI (Plimpton 2019) API and Tigris `BlockFFT` usage |
-| `cosmo_ic.pdf` | Cosmological ICs: fluid equations, ZA, 2LPT derivation, Zel'dovich pancake, IC generation algorithm, starting redshifts, P(k)/ξ(r)/ψ(r), one-loop P(k); §11 implementation details for MUSIC2 and monofonIC (refinement hierarchy, hybrid Poisson solve, 2LPT/3LPT source, PLT, Orszag 3/2 rule, back-scaling). §1 has a notation table. Appendix A: Fourier conventions. Appendix B: P(k) estimation from N-body. |
-| `ic_sampling.pdf` | IC sampling literature (Pen 1997, Sirko 2005, Hahn & Abel 2011): P-sampled vs ξ-sampled methods, box window truncation errors, implications for MUSIC2/monofonIC |
-| `restriction_lpt.pdf` | Restriction (block-averaging) of a density field: cell window + aliasing in Fourier space; effect on δ, 1LPT displacement Ψ⁽¹⁾, deformation tensor, 2LPT source S⁽²⁾; why restricting the displacement potential φ⁽¹⁾ is Poisson-inconsistent; application to zoom-in IC generation (bin-avg δ vs bin-avg φ⁽¹⁾ vs k-truncation of μ). |
-
-**Reading order**: `fft.pdf` → `cosmo_ic.pdf` → `ic_sampling.pdf` → `restriction_lpt.pdf`. See `notes/README.md` for a longer explanation.
-
-```bash
-cd notes
-make            # regenerate figures + compile all PDFs (opens automatically)
-make figures    # regenerate figures only
-make notes      # compile PDFs only (assumes figures exist)
-make clean      # remove figures, PDFs, and LaTeX aux files
-```
-
-Figures are generated from `plot_box_window.py`, `plot_tophat_window.py`, and
-`plot_pgrid.py` (the last requires `data/class_pk_z2_pk.dat`).
+See [`notes/figures/README.md`](notes/figures/README.md) for the
+figure-script layout.
