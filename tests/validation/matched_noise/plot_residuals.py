@@ -78,7 +78,10 @@ plt.rcParams.update({'font.size': 12, 'axes.titlesize': 11,
 # Geometry and run-identification, all from environment.
 # ---------------------------------------------------------------------------
 LEVELMAX = int(os.environ.get('LEVELMAX', '9'))
+LEVELMIN = int(os.environ.get('LEVELMIN', str(LEVELMAX - 1)))
 N = 1 << LEVELMAX                                   # unigrid resolution (cells per side)
+N_COARSE = 1 << LEVELMIN                            # coarse-unigrid resolution
+COARSE_STRIDE = 1 << (LEVELMAX - LEVELMIN)          # fine cells per coarse cell
 MARGIN = int(os.environ.get('MARGIN', '16'))        # interior margin for rms readout
 base = os.path.expanduser('~/Documents/music_validation')
 TAG = os.environ.get('TAG', 'matched_noise')
@@ -259,3 +262,297 @@ fig.tight_layout()
 out = os.environ.get('OUT', f'{base}/figures/matched_noise_{LPT_TAG}.png')
 fig.savefig(out, dpi=300, bbox_inches='tight')
 print(f'wrote {out}')
+
+# ---------------------------------------------------------------------------
+# Exterior figure: comparison at COARSE resolution.
+#
+# Outside Ω the zoom run only stores a coarse-level field, so the
+# comparison must be made at coarse resolution.  Apply the restriction
+# operator (block-average 2^d → 1, i.e. the A1 kernel of
+# restriction_lpt §3) to the fine-unigrid field; then compare cell-by-cell
+# against the zoom's level-LEVELMIN field on the coarse grid.
+#
+# The restriction operator is the right coarse-grain for both δ
+# (mass-weighted mean inside the block) and Ψ (centre-of-mass displacement
+# of the 2^d sub-cells), so the same operator applies column-by-column.
+#
+#   Row 1: zoom coarse-level field (level LEVELMIN).
+#   Row 2: restriction of fine-unigrid R[Ψ_fine] at coarse resolution
+#          (same colour scale as row 1).
+#   Row 3: residual zoom − R[fine-unigrid] at coarse resolution.
+#          Inside the patch footprint the zoom intentionally couples to
+#          the fine level; outside, the residual is the genuine
+#          construction error of the zoom's coarse representation.
+#   Row 4: residual pdf, outside Ω (green) vs inside Ω footprint (orange).
+# ---------------------------------------------------------------------------
+# Patch footprint at coarse resolution.
+cPL = tuple(p // COARSE_STRIDE for p in PL_xyz)
+cPS = tuple(s // COARSE_STRIDE for s in PS_xyz)
+print(f'exterior geometry: N_COARSE={N_COARSE}, cPL={cPL}, cPS={cPS}')
+
+
+def trim_halo(a, n):
+    """Strip the symmetric convolution halo around an n**3 level grid."""
+    out = a
+    for axis in range(3):
+        halo = (a.shape[axis] - n) // 2
+        out = out.take(np.arange(halo, halo + n), axis=axis)
+    return out
+
+
+def block_avg(a, b):
+    """Restrict an n**3 field to (n/b)**3 by averaging each b^3 block
+    (the A1 kernel of restriction_lpt §3; cos-product window, attenuates
+    coarse-Nyquist modes by ~3D corner factor ≈ 0.35 in amplitude)."""
+    n = a.shape[0]
+    nc = n // b
+    return a.reshape(nc, b, nc, b, nc, b).mean(axis=(1, 3, 5))
+
+
+def truncate_B(a, b):
+    """Restrict an n**3 field to (n/b)**3 by sharp Fourier truncation
+    inside the coarse Brillouin zone (the B kernel of restriction_lpt §3).
+    No window attenuation up to coarse Nyquist; modes outside the coarse
+    BZ are discarded.  Equivalent to projecting the fine field onto the
+    subspace spanned by coarse-grid Fourier modes and evaluating at the
+    coarse-grid positions."""
+    n = a.shape[0]
+    nc = n // b
+    h = nc // 2
+    F = np.fft.fftn(a)
+    Fc = np.empty((nc, nc, nc), dtype=F.dtype)
+    # Extract the 8 corner blocks of the fine FFT (low |k| modes per axis)
+    # into the (nc, nc, nc) coarse FFT array.
+    for sx, dx_dst, dx_src in ((0, slice(0, h),  slice(0, h)),
+                               (1, slice(h, nc), slice(n - h, n))):
+        for sy, dy_dst, dy_src in ((0, slice(0, h),  slice(0, h)),
+                                   (1, slice(h, nc), slice(n - h, n))):
+            for sz, dz_dst, dz_src in ((0, slice(0, h),  slice(0, h)),
+                                       (1, slice(h, nc), slice(n - h, n))):
+                Fc[dx_dst, dy_dst, dz_dst] = F[dx_src, dy_src, dz_src]
+    # ifftn on coarse grid normalises by nc**3 instead of n**3; rescale so
+    # the result equals the projection of the fine field onto coarse modes.
+    return np.fft.ifftn(Fc).real * (nc / n) ** 3
+
+
+# Zoom level-LEVELMIN field, already at coarse resolution.
+with h5py.File(f'{base}/{zoom_stem}/{zoom_stem}_g.hdf5', 'r') as f:
+    dz_c = [trim_halo(f[f'level_{LEVELMIN:03d}_DM_rho'][:], N_COARSE),
+            trim_halo(f[f'level_{LEVELMIN:03d}_DM_dx'][:],  N_COARSE),
+            trim_halo(f[f'level_{LEVELMIN:03d}_DM_dy'][:],  N_COARSE),
+            trim_halo(f[f'level_{LEVELMIN:03d}_DM_dz'][:],  N_COARSE)]
+# Restriction of fine-unigrid to coarse resolution.
+#   du_c   : R_A1[Ψ_fine] = block average (cos-product window)
+#   du_c_B : R_B [Ψ_fine] = sharp Fourier truncation inside coarse BZ
+du_c   = [block_avg(trim_halo(u, N), COARSE_STRIDE) for u in du]
+du_c_B = [truncate_B(trim_halo(u, N), COARSE_STRIDE) for u in du]
+
+
+def upsample_nn(a, s):
+    """Nearest-neighbour upsample by s along every axis."""
+    out = a
+    for ax in range(3):
+        out = np.repeat(out, s, axis=ax)
+    return out
+
+
+# Fine-resolution display fields for rows 0 and 1 (rows 2+ stay at coarse
+# resolution, since the residual analysis is at coarse).
+#   zoom_disp_f: what the zoom IC actually carries — fine values inside Ω
+#                and the coarse-level value broadcast (NN) to each 2^d
+#                block of fine cells outside Ω.  Outside-Ω cells are
+#                visibly blocky; inside-Ω cells carry the fine patch.
+#   uni_disp_f : fine-unigrid truth at fine resolution.
+zoom_fine_patches = [zp(a) for a in dz]
+uni_disp_f = [trim_halo(u, N) for u in du]
+zoom_disp_f = []
+for zc, zf in zip(dz_c, zoom_fine_patches):
+    full = upsample_nn(zc, COARSE_STRIDE)
+    full[PL_xyz[0]:PL_xyz[0]+PS_xyz[0],
+         PL_xyz[1]:PL_xyz[1]+PS_xyz[1],
+         PL_xyz[2]:PL_xyz[2]+PS_xyz[2]] = zf
+    zoom_disp_f.append(full)
+mid_f = PL_xyz[2] + PS_xyz[2] // 2
+
+# Boolean mask: True inside the patch footprint at coarse resolution.
+ix = np.arange(N_COARSE)
+inside_x = (ix >= cPL[0]) & (ix < cPL[0] + cPS[0])
+inside_y = (ix >= cPL[1]) & (ix < cPL[1] + cPS[1])
+inside_z = (ix >= cPL[2]) & (ix < cPL[2] + cPS[2])
+mask_inside = inside_x[:, None, None] & inside_y[None, :, None] & inside_z[None, None, :]
+mask_outside = ~mask_inside
+
+# Slice index along q_z: patch z-midplane in coarse cells.
+mid_c = cPL[2] + cPS[2] // 2
+
+def shell_average(field_a, field_b=None, n_bins=None):
+    """Spherical-shell average of <|A|^2> (if field_b is None) or
+    Re<A B*> (cross-spectrum) over a 3D FFT grid.  Returns (k_bin_centres,
+    average) with k in cell-index units (so k=1 means k = 2π/box-length on
+    the coarse grid)."""
+    n = field_a.shape[0]
+    Fa = np.fft.fftn(field_a)
+    if field_b is None:
+        P = (Fa * Fa.conj()).real
+    else:
+        Fb = np.fft.fftn(field_b)
+        P = (Fa * Fb.conj()).real
+    kx = np.fft.fftfreq(n) * n
+    K = np.sqrt(kx[:, None, None]**2 + kx[None, :, None]**2 + kx[None, None, :]**2)
+    if n_bins is None:
+        n_bins = n // 2
+    bins = np.linspace(0, n // 2, n_bins + 1)
+    idx = np.digitize(K.ravel(), bins) - 1
+    Psum = np.zeros(n_bins); cnt = np.zeros(n_bins, dtype=int)
+    mask = (idx >= 0) & (idx < n_bins)
+    np.add.at(Psum, idx[mask], P.ravel()[mask])
+    np.add.at(cnt,  idx[mask], 1)
+    return 0.5 * (bins[:-1] + bins[1:]), Psum / np.maximum(cnt, 1)
+
+
+fig2, axes2 = plt.subplots(6, 4, figsize=(20, 30))
+for col, (lbl, pz, pu, pu_B) in enumerate(zip(labels, dz_c, du_c, du_c_B)):
+    diff = pz - pu
+    sigma = pu.std()
+    rms_all = np.sqrt((diff**2).mean()) / sigma
+    rms_out = np.sqrt((diff[mask_outside]**2).mean()) / sigma
+    rms_in = np.sqrt((diff[mask_inside]**2).mean()) / sigma
+
+    # Rows 0, 1 display at FINE resolution so the inside-Ω patch shows the
+    # fine cells the zoom actually carries.  Outside Ω the zoom row is
+    # nearest-upsampled coarse (visibly blocky); the unigrid row is fine
+    # everywhere.  Normalise by each row's own σ so the colour scale spans
+    # the field's natural range.
+    zs_f = zoom_disp_f[col][:, :, mid_f]
+    us_f = uni_disp_f[col][:, :, mid_f]
+    sigma_zf = zoom_disp_f[col].std()
+    sigma_uf = uni_disp_f[col].std()
+    zslice = zs_f / sigma_zf
+    uslice = us_f / sigma_uf
+    vmax = max(3.0, np.percentile(np.abs(zslice), 99),
+                    np.percentile(np.abs(uslice), 99))
+
+    # Row 0: zoom IC at fine resolution.  Inside Ω: fine patch values;
+    # outside Ω: each coarse value broadcast to its 2^d fine cells.
+    ax = axes2[0, col]
+    im = ax.imshow(zslice.T, origin='lower', cmap='RdBu_r', vmin=-vmax, vmax=vmax)
+    ax.add_patch(plt.Rectangle((PL_xyz[0] - 0.5, PL_xyz[1] - 0.5),
+                               PS_xyz[0], PS_xyz[1],
+                               fill=False, ec='k', lw=1.0, ls='--'))
+    ax.set_title(f'{lbl}  zoom IC  (fine inside Ω, blocky coarse outside)')
+    ax.set_xlabel('$q_x$ (fine cells)'); ax.set_ylabel('$q_y$ (fine cells)')
+    cax = make_axes_locatable(ax).append_axes('right', size='5%', pad=0.05)
+    plt.colorbar(im, cax=cax, label=r'$q_{\rm zoom}/\sigma_{q,\rm zoom}$')
+
+    # Row 1: fine-unigrid truth at fine resolution.
+    ax = axes2[1, col]
+    im = ax.imshow(uslice.T, origin='lower', cmap='RdBu_r', vmin=-vmax, vmax=vmax)
+    ax.add_patch(plt.Rectangle((PL_xyz[0] - 0.5, PL_xyz[1] - 0.5),
+                               PS_xyz[0], PS_xyz[1],
+                               fill=False, ec='k', lw=1.0, ls='--'))
+    ax.set_title(f'{lbl}  fine-unigrid (truth at fine resolution)')
+    ax.set_xlabel('$q_x$ (fine cells)'); ax.set_ylabel('$q_y$ (fine cells)')
+    cax = make_axes_locatable(ax).append_axes('right', size='5%', pad=0.05)
+    plt.colorbar(im, cax=cax, label=r'$q_{\rm uni}/\sigma_{q,\rm uni}$')
+
+    # Row 2: residual slice at coarse resolution.
+    ax = axes2[2, col]
+    lr = np.log10(np.abs(diff[:, :, mid_c]) / sigma + 1e-12)
+    im = ax.imshow(lr.T, origin='lower', cmap='jet', vmin=-4, vmax=0)
+    ax.add_patch(plt.Rectangle((cPL[0] - 0.5, cPL[1] - 0.5), cPS[0], cPS[1],
+                               fill=False, ec='k', lw=1.0, ls='--'))
+    ax.set_title(f'{lbl}  residual\n'
+                 f'rms (all)       = {rms_all:.2e}\n'
+                 f'rms (outside Ω) = {rms_out:.2e}\n'
+                 f'rms (inside Ω)  = {rms_in:.2e}')
+    ax.set_xlabel('$q_x$'); ax.set_ylabel('$q_y$')
+    cax = make_axes_locatable(ax).append_axes('right', size='5%', pad=0.05)
+    plt.colorbar(im, cax=cax, label=r'$\log_{10}|\Delta q / \sigma_q|$')
+
+    # Row 3: residual PDF, outside Ω vs inside Ω footprint, at coarse res.
+    ax = axes2[3, col]
+    out_vals = (diff[mask_outside] / sigma).ravel()
+    in_vals = (diff[mask_inside] / sigma).ravel()
+    bins = np.linspace(-6, 1, 71)
+    ax.hist(np.log10(np.abs(out_vals) + 1e-12), bins=bins,
+            color='C2', alpha=0.55,
+            label=f'outside Ω  (N={out_vals.size:,})')
+    ax.hist(np.log10(np.abs(in_vals) + 1e-12), bins=bins,
+            color='C1', alpha=0.55,
+            label=f'inside Ω footprint  (N={in_vals.size:,})')
+    ax.axvline(np.log10(rms_out), color='C2', ls='--', lw=1)
+    ax.axvline(np.log10(rms_in), color='C1', ls='--', lw=1)
+    ax.set_xlim(-6, 1); ax.set_xlabel(r'$\log_{10}|\Delta q / \sigma_q|$')
+    ax.set_ylabel('# of cells'); ax.set_yscale('log')
+    ax.set_title(f'{lbl}  (residual distribution, coarse resolution)')
+    ax.legend(loc='upper left', frameon=True, framealpha=0.85)
+
+    # Row 4: Fourier-space diagnostics on the coarse grid.
+    #   • amplitude ratios  sqrt(P_zoom(k)/P_R(k)) for R = A1 (solid) and B
+    #     (dashed) restrictions of the fine field.  R_A1 attenuates near
+    #     coarse Nyquist by the block-average window; R_B is flat inside
+    #     the coarse BZ — direct comparison reveals which restriction is a
+    #     fairer reference at high k.
+    #   • cross-correlation  r(k) (against R_A1; against R_B is identical
+    #     for k below the B truncation by construction).
+    ax = axes2[4, col]
+    k_bins, Pz_k   = shell_average(pz)
+    _,       Pu_k   = shell_average(pu)
+    _,       Pc_k   = shell_average(pz, pu)
+    _,       Pu_kB  = shell_average(pu_B)
+    amp_ratio_A1 = np.sqrt(np.maximum(Pz_k, 0) / np.maximum(Pu_k,  1e-300))
+    amp_ratio_B  = np.sqrt(np.maximum(Pz_k, 0) / np.maximum(Pu_kB, 1e-300))
+    xcorr = Pc_k / np.sqrt(np.maximum(Pz_k * Pu_k, 1e-300))
+    ax.plot(k_bins, amp_ratio_A1, color='C0', lw=1.6,
+            label=r'$\sqrt{P_{\rm zoom}/P_{R_{A1}[\mathrm{fine}]}}$')
+    ax.plot(k_bins, amp_ratio_B,  color='C2', lw=1.6, ls='--',
+            label=r'$\sqrt{P_{\rm zoom}/P_{R_{B}[\mathrm{fine}]}}$')
+    ax.plot(k_bins, xcorr, color='C3', lw=1.2,
+            label=r'$r(k)$ (vs $R_{A1}$)')
+    ax.axhline(1, color='gray', ls=':', lw=0.8)
+    ax.set_xlabel('$k$  (cells$^{-1}$ on coarse grid)')
+    ax.set_ylabel('ratio')
+    ax.set_xscale('log')
+    ax.set_xlim(1, N_COARSE // 2)
+    ax.set_ylim(0, 1.4)
+    ax.set_title(f'{lbl}  Fourier ratios')
+    ax.legend(loc='lower left', fontsize=8, frameon=True, framealpha=0.85)
+
+    # Row 5: residual slice using R_B[fine] (sharp Fourier truncation)
+    # instead of R_A1 — exposes how much of the row-2 residual was the
+    # block-average window vs the genuine noise mismatch.
+    diff_B = pz - pu_B
+    sigma_B = pu_B.std()
+    rmsB_all = np.sqrt((diff_B**2).mean()) / sigma_B
+    rmsB_out = np.sqrt((diff_B[mask_outside]**2).mean()) / sigma_B
+    rmsB_in  = np.sqrt((diff_B[mask_inside ]**2).mean()) / sigma_B
+    ax = axes2[5, col]
+    lr = np.log10(np.abs(diff_B[:, :, mid_c]) / sigma_B + 1e-12)
+    im = ax.imshow(lr.T, origin='lower', cmap='jet', vmin=-4, vmax=0)
+    ax.add_patch(plt.Rectangle((cPL[0] - 0.5, cPL[1] - 0.5), cPS[0], cPS[1],
+                               fill=False, ec='k', lw=1.0, ls='--'))
+    ax.set_title(f'{lbl}  residual vs $R_B[\\mathrm{{fine}}]$\n'
+                 f'rms (all)       = {rmsB_all:.2e}\n'
+                 f'rms (outside Ω) = {rmsB_out:.2e}\n'
+                 f'rms (inside Ω)  = {rmsB_in:.2e}')
+    ax.set_xlabel('$q_x$'); ax.set_ylabel('$q_y$')
+    cax = make_axes_locatable(ax).append_axes('right', size='5%', pad=0.05)
+    plt.colorbar(im, cax=cax, label=r'$\log_{10}|\Delta q / \sigma_q|$')
+
+fig2.suptitle(
+    'MUSIC2 fork: exterior matched-noise at COARSE resolution.\n'
+    r'Reference is the restriction $R[\Psi_{\rm fine}]$ of the fine-unigrid; '
+    r'$R_{A1}$ = $2^d\to 1$ block average, $R_B$ = sharp Fourier truncation '
+    'inside coarse BZ.  Dashed rectangle = patch footprint.\n'
+    'Row 1: zoom IC at fine resolution (fine inside Ω, blocky coarse '
+    'outside).  '
+    'Row 2: fine-unigrid (truth at fine resolution).  '
+    r'Row 3: residual at COARSE resolution vs $R_{A1}[\mathrm{fine}]$.  '
+    r'Row 4: residual pdf ($R_{A1}$).  '
+    r'Row 5: Fourier amplitude ratios — $R_{A1}$ (solid) vs $R_B$ (dashed), '
+    r'plus cross-correlation $r(k)$.  '
+    r'Row 6: residual vs $R_B[\mathrm{fine}]$ at coarse resolution.')
+fig2.tight_layout()
+out_ext = out.replace('.png', '_exterior.png')
+fig2.savefig(out_ext, dpi=300, bbox_inches='tight')
+print(f'wrote {out_ext}')

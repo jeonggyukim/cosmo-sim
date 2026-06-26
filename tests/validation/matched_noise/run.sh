@@ -122,5 +122,5 @@ mkdir -p "$(dirname "$OUT")"
 # Geometry (PL_xyz, PS_xyz) is parsed from MUSIC2's music_generic.log inside
 # the script, so non-cubic patches and other LEVELMAX values work too.
 OUT="$OUT" TAG="$TAG" LPT_TAG="$LPT_TAG" \
-  LEVELMAX="$LEVELMAX" REF_EXTENT="$REF_EXTENT" \
+  LEVELMIN="$LEVELMIN" LEVELMAX="$LEVELMAX" REF_EXTENT="$REF_EXTENT" \
   conda run -n cosmo python "$SCRIPT_DIR/plot_residuals.py"
