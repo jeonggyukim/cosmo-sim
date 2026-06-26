@@ -35,7 +35,7 @@ The default file names in the notebooks (`pk_n256_z200_L*.txt`,
 ```bash
 for L in 256 512 1024; do
   ./run_pipeline.sh --ngrid 256 --lbox $L --zstart 200
-  python scripts/compute_pv.py data/ics_swift_n256_z200_L${L}.hdf5
+  python scripts/pipeline/compute_pv.py data/ics_swift_n256_z200_L${L}.hdf5
 done
 ```
 

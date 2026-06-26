@@ -23,7 +23,7 @@ Inputs (defaults expect outputs from the standard pipeline at z=200):
     data/class_pk_z200_pk.dat
 
 Usage:
-    conda run -n cosmo python scripts/plot_box_size_comparison.py
+    conda run -n cosmo python scripts/analysis/plot_box_size_comparison.py
     # output: plots/box_size_comparison.png
 
 References:

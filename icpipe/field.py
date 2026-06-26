@@ -16,8 +16,8 @@ from .windows import cic_window_squared
 # CIC mass / momentum assignment (NumPy implementation)
 # ---------------------------------------------------------------------------
 
-def _cic_assign_scalar(pos: np.ndarray, boxsize: float, ngrid: int,
-                       weights: np.ndarray | None = None) -> np.ndarray:
+def cic_deposit(pos: np.ndarray, boxsize: float, ngrid: int,
+                weights: np.ndarray | None = None) -> np.ndarray:
     """Single-pass CIC deposit of a scalar weight (mass by default)."""
     cellsize = boxsize / ngrid
     g = pos / cellsize
@@ -159,13 +159,13 @@ class ICField:
         """Interlaced-CIC FFT of mass weights ``weights_real`` (or unit per
         particle if None). Returns the real-FFT array delta_k of shape
         (ngrid, ngrid, ngrid//2+1)."""
-        rho1 = _cic_assign_scalar(self.coords, self.boxsize_mpc, self.ngrid,
+        rho1 = cic_deposit(self.coords, self.boxsize_mpc, self.ngrid,
                                   weights_real)
         if not self.interlace:
             return np.fft.rfftn(rho1)
         dx = self.boxsize_mpc / self.ngrid
         coords2 = (self.coords + dx / 2) % self.boxsize_mpc
-        rho2 = _cic_assign_scalar(coords2, self.boxsize_mpc, self.ngrid,
+        rho2 = cic_deposit(coords2, self.boxsize_mpc, self.ngrid,
                                   weights_real)
         f1 = np.fft.rfftn(rho1)
         f2 = np.fft.rfftn(rho2)
@@ -177,7 +177,7 @@ class ICField:
     def density_field(self) -> np.ndarray:
         """Real-space CIC overdensity delta(x) = rho(x)/rho_bar - 1.
         (Single grid; no interlacing.)"""
-        rho = _cic_assign_scalar(self.coords, self.boxsize_mpc, self.ngrid)
+        rho = cic_deposit(self.coords, self.boxsize_mpc, self.ngrid)
         return rho / (self.N / self.ngrid**3) - 1.0
 
     @cached_property
@@ -214,10 +214,10 @@ class ICField:
         if self.velocities is None:
             raise RuntimeError("Velocities not loaded; pass load_velocities=True.")
         # Build real-space velocity grid via momentum / density (in cell-count units)
-        rho_real = _cic_assign_scalar(self.coords, self.boxsize_mpc, self.ngrid)
+        rho_real = cic_deposit(self.coords, self.boxsize_mpc, self.ngrid)
         v_grids = []
         for a in range(3):
-            mom_real = _cic_assign_scalar(self.coords, self.boxsize_mpc, self.ngrid,
+            mom_real = cic_deposit(self.coords, self.boxsize_mpc, self.ngrid,
                                           self.velocities[:, a])
             v = np.zeros_like(mom_real)
             mask = rho_real > 0
@@ -227,10 +227,10 @@ class ICField:
         if self.interlace:
             dx = self.boxsize_mpc / self.ngrid
             coords2 = (self.coords + dx / 2) % self.boxsize_mpc
-            rho2 = _cic_assign_scalar(coords2, self.boxsize_mpc, self.ngrid)
+            rho2 = cic_deposit(coords2, self.boxsize_mpc, self.ngrid)
             v_grids2 = []
             for a in range(3):
-                mom2 = _cic_assign_scalar(coords2, self.boxsize_mpc, self.ngrid,
+                mom2 = cic_deposit(coords2, self.boxsize_mpc, self.ngrid,
                                           self.velocities[:, a])
                 v = np.zeros_like(mom2)
                 mask = rho2 > 0

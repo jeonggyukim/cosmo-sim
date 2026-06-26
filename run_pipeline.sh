@@ -54,8 +54,8 @@ NTHREADS=$(sysctl -n hw.logicalcpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 FIX_AMP=yes   # fix_mode_amplitude: yes = fixed amplitudes (CV); no = Gaussian draw
 SEED=""       # random seed override for the IC level; empty = use template default
 STOP_AFTER_MUSIC=no  # if yes, exit after Step 4 (skip CLASS, ξ, P(k), plots)
-MUSIC2_DIR=""     # optional: path to MUSIC2 source (default: ~/Dropbox/Projects/MUSIC2 or cloned)
-CORRFUNC_DIR=""   # optional: path to built Corrfunc (default: ~/Corrfunc or cloned)
+MUSIC2_DIR=""     # optional: path to MUSIC2 source (default: ../MUSIC2 or cloned)
+CORRFUNC_DIR=""   # optional: path to built Corrfunc (default: ../Corrfunc or cloned)
 
 print_help() {
     cat <<EOF
@@ -190,7 +190,7 @@ fi
 # ---------------------------------------------------------------------------
 if [ ! -f "$CONF_FILE" ]; then
     log "Generating MUSIC2 config..."
-    conda run -n cosmo python scripts/make_music_conf.py -N "$NGRID" -z "$ZSTART" -L "$LBOX" --fix-amplitude "$FIX_AMP" ${SEED:+--seed "$SEED"}
+    conda run -n cosmo python scripts/pipeline/make_music_conf.py -N "$NGRID" -z "$ZSTART" -L "$LBOX" --fix-amplitude "$FIX_AMP" ${SEED:+--seed "$SEED"}
 else
     log "MUSIC2 config already exists — skipping ($CONF_FILE)"
 fi
@@ -292,7 +292,7 @@ fi
 # ---------------------------------------------------------------------------
 if [ ! -f "$RBINS_FILE" ]; then
     log "Generating rbins..."
-    conda run -n cosmo python scripts/make_rbins.py --hdf5 "$IC_FILE"
+    conda run -n cosmo python scripts/pipeline/make_rbins.py --hdf5 "$IC_FILE"
 else
     log "rbins already exist — skipping ($RBINS_FILE)"
 fi
@@ -345,7 +345,7 @@ echo "    Saved: $VEL_CIC_FILE"
 # ---------------------------------------------------------------------------
 PK_FILE="data/pk_${STEM}.txt"
 log "Measuring P(k) with compute_pk.py..."
-conda run -n cosmo python scripts/compute_pk.py \
+conda run -n cosmo python scripts/pipeline/compute_pk.py \
     "$IC_FILE" \
     --H0 "$H0" \
     -o "$PK_FILE"
@@ -374,7 +374,7 @@ echo "    Saved: $PK_FILE"
 # ---------------------------------------------------------------------------
 PLOT_FILE="plots/pk_${STEM}.png"
 log "Plotting diagnostics with plot_ic.py..."
-conda run -n cosmo python scripts/plot_ic.py \
+conda run -n cosmo python scripts/pipeline/plot_ic.py \
     "$PK_FILE" \
     --theory "$CLASS_PKS" \
     --theory-zref 0 \

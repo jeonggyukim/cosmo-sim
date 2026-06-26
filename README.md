@@ -5,12 +5,16 @@ Scripts and configuration for cosmological IC generation with MUSIC2 and IC vali
 ## Directory layout
 
 ```
-src/        — C source files (compute_xi.c, compute_xi_cic.c)
-scripts/   — Python scripts
-conf/      — MUSIC2 config files
-data/      — CLASS outputs, rbins, measured P(k)/ξ/ψ tables  (HDF5/bin files gitignored)
-plots/     — output figures  (gitignored)
-notes/     — LaTeX write-ups and supporting plot scripts
+src/                — C source files (compute_xi.c, compute_xi_cic.c)
+icpipe/             — installable Python library (ICField, LinearTheory, io)
+scripts/pipeline/   — Python CLIs invoked by run_pipeline.sh
+                      (make_music_conf, make_rbins, compute_pk, compute_pv, plot_ic)
+scripts/analysis/   — ad-hoc CLIs / inspection tools
+                      (check_ic, plot_box_size_comparison, plot_dr_histogram)
+conf/               — MUSIC2 config files
+data/               — CLASS outputs, rbins, measured P(k)/ξ/ψ tables  (HDF5/bin files gitignored)
+plots/              — output figures  (gitignored)
+notes/              — LaTeX write-ups and supporting plot scripts
 ```
 
 ## Setup
@@ -63,7 +67,7 @@ Binary placed at `music_build/MUSIC`; CLASS built at `music_build/_deps/class-bu
 #### 2. Generate a MUSIC2 config
 
 ```bash
-conda run -n cosmo python scripts/make_music_conf.py -N 256 -z 200 -L 1024
+conda run -n cosmo python scripts/pipeline/make_music_conf.py -N 256 -z 200 -L 1024
 # → conf/CV_22_MUSIC_n256_z200_L1024.conf
 ```
 
@@ -108,11 +112,11 @@ mv class_pk_z2_pk.dat data/
 #### 5. Validate ICs — power spectrum
 
 ```bash
-conda run -n cosmo python scripts/compute_pk.py \
+conda run -n cosmo python scripts/pipeline/compute_pk.py \
     data/ics_swift_n256_z200_L1024.hdf5 \
     -o data/pk_n256_z200_L1024.txt
 
-conda run -n cosmo python scripts/plot_ic.py \
+conda run -n cosmo python scripts/pipeline/plot_ic.py \
     data/pk_n256_z200_L1024.txt \
     --theory data/class_pk_z2_pk.dat
 # → plots/pk_n256_z200_L1024.png
@@ -120,7 +124,7 @@ conda run -n cosmo python scripts/plot_ic.py \
 
 Overlay multiple box sizes:
 ```bash
-conda run -n cosmo python scripts/plot_ic.py \
+conda run -n cosmo python scripts/pipeline/plot_ic.py \
     data/pk_n256_z2_L172.txt data/pk_n256_z2_L344.txt data/pk_n256_z200_L1024.txt \
     --theory data/class_pk_z2_pk.dat -o plots/comparison.png
 ```
@@ -131,7 +135,7 @@ conda run -n cosmo python scripts/plot_ic.py \
 
 ```bash
 # Corrfunc pair-counting ξ(r) (low z; shot-noise dominated at z ≳ 10):
-conda run -n cosmo python scripts/make_rbins.py \
+conda run -n cosmo python scripts/pipeline/make_rbins.py \
     --hdf5 data/ics_swift_n256_z200_L1024.hdf5
 # → data/rbins_n256_z200_L1024.txt
 
@@ -169,7 +173,7 @@ to disk in km/s.
 
 ```bash
 # Particle displacement histogram (dr/dx from lattice)
-conda run -n cosmo python scripts/plot_dr_histogram.py \
+conda run -n cosmo python scripts/analysis/plot_dr_histogram.py \
     data/ics_swift_n256_z200_L1024.hdf5
 ```
 

@@ -88,3 +88,65 @@ def read_pv(path: str) -> dict[str, np.ndarray]:
     arr = np.loadtxt(path, comments="#")
     return dict(k=arr[:, 0], Pv_raw=arr[:, 1], Pv_nodeconv=arr[:, 2],
                 sigma_Pv=arr[:, 3], nmodes=arr[:, 4].astype(int))
+
+
+# ---------------------------------------------------------------------------
+# Raw IC / white-noise readers (inspection helpers; not used by ICField).
+# ---------------------------------------------------------------------------
+
+def read_wnoise(path: str, dtype=np.float32) -> np.ndarray:
+    """Read a MUSIC2 ``wnoise_NNNN.bin`` white-noise dump.
+
+    File layout: three uint32 dimensions (nx, ny, nz), followed by
+    nx*ny*nz scalars of ``dtype`` (MUSIC2 default is float32).
+
+    Returns
+    -------
+    numpy.ndarray of shape (nx, ny, nz).
+    """
+    with open(path, "rb") as f:
+        nx, ny, nz = np.frombuffer(f.read(12), dtype=np.uint32)
+        data = np.frombuffer(
+            f.read(int(nx) * int(ny) * int(nz) * np.dtype(dtype).itemsize),
+            dtype=dtype,
+        )
+    return data.reshape(nx, ny, nz)
+
+
+def read_swift_ics(path: str) -> tuple[dict, dict]:
+    """Read a SWIFT-format IC HDF5 file and return ``(header, parts)``.
+
+    ``header`` is a dict of the ``/Header`` attributes.  ``parts`` maps
+    ``PartType`` index → dict of dataset_name → ndarray, covering every
+    ``PartType*`` group present.  Compared to :func:`read_ic_hdf5`, this
+    is a general inspection reader (all particle types, all datasets);
+    :func:`read_ic_hdf5` is the focused loader used by ``ICField``.
+    """
+    with h5py.File(path, "r") as f:
+        header = dict(f["Header"].attrs)
+        parts: dict[int, dict[str, np.ndarray]] = {}
+        for key in f.keys():
+            if not key.startswith("PartType"):
+                continue
+            ptype = int(key.replace("PartType", ""))
+            grp = f[key]
+            parts[ptype] = {k: grp[k][()] for k in grp.keys()}
+    return header, parts
+
+
+def print_swift_ics_summary(path: str) -> None:
+    """Pretty-print header attributes and per-PartType dataset summaries."""
+    header, parts = read_swift_ics(path)
+    print("=== Header ===")
+    for k, v in sorted(header.items()):
+        print(f"  {k}: {v}")
+    print("\n=== Particle groups ===")
+    for ptype, data in sorted(parts.items()):
+        npart = next(iter(data.values())).shape[0]
+        print(f"\n  PartType{ptype}  ({npart} particles)")
+        for field, arr in sorted(data.items()):
+            print(f"    {field:20s}  shape={arr.shape}  dtype={arr.dtype}")
+            if arr.ndim == 1:
+                print(f"      min={arr.min():.6g}  max={arr.max():.6g}")
+            else:
+                print(f"      min={arr.min():.6g}  max={arr.max():.6g}  (per component)")

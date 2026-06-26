@@ -106,7 +106,7 @@ def main():
 
     # Default output path: data/ relative to repo root
     if args.output is None:
-        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         data_dir = os.path.join(repo_root, "data")
         stem = os.path.splitext(os.path.basename(args.hdf5))[0] if args.hdf5 else f"n{npart}"
         stem = stem.replace("ics_swift_", "")

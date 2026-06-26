@@ -23,32 +23,7 @@ import argparse
 import h5py
 import numpy as np
 
-
-def cic_deposit(pos, L, ngrid, weights=None):
-    """CIC deposit into a periodic (ngrid,)*3 grid.  Returns float64 array."""
-    grid = np.zeros((ngrid, ngrid, ngrid), dtype=np.float64)
-    dx = L / ngrid
-    w = np.ones(len(pos)) if weights is None else weights
-
-    x = pos[:, 0] / dx
-    y = pos[:, 1] / dx
-    z = pos[:, 2] / dx
-    i0 = np.floor(x).astype(np.int64)
-    j0 = np.floor(y).astype(np.int64)
-    k0 = np.floor(z).astype(np.int64)
-    fx, fy, fz = x - i0, y - j0, z - k0
-    i0 %= ngrid
-    j0 %= ngrid
-    k0 %= ngrid
-    i1 = (i0 + 1) % ngrid
-    j1 = (j0 + 1) % ngrid
-    k1 = (k0 + 1) % ngrid
-
-    for (ii, fi) in [(i0, 1 - fx), (i1, fx)]:
-        for (jj, fj) in [(j0, 1 - fy), (j1, fy)]:
-            for (kk, fk) in [(k0, 1 - fz), (k1, fz)]:
-                np.add.at(grid, (ii, jj, kk), w * fi * fj * fk)
-    return grid
+from icpipe import cic_deposit
 
 
 def check(path, ngrid=None):
