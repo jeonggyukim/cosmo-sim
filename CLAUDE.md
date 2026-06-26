@@ -6,12 +6,15 @@ This repo contains scripts and configuration files for running cosmological simu
 
 ```
 cosmo-pipeline/
-  src/                — C source files (compute_xi.c, compute_xi_cic.c)
+  src/                — C source files + Makefile (compute_xi.c, compute_xi_cic.c)
+  bin/                — compiled C binaries (gitignored)
   icpipe/             — installable Python library (ICField, LinearTheory, io)
   scripts/pipeline/   — pipeline-step CLIs invoked by run_pipeline.sh
                         (make_music_conf, make_rbins, compute_pk, compute_pv, plot_ic)
   scripts/analysis/   — ad-hoc inspection / one-off CLIs
                         (check_ic, plot_box_size_comparison, plot_dr_histogram)
+  tools/              — build/clean shell scripts + cluster sbatch templates
+                        (build-music.sh, build-corrfunc.sh, clean.sh, mpirun_restart.sbatch)
   data/               — IC HDF5 files, CLASS P(k) outputs, rbins files, wnoise binaries, measured P/xi tables
   plots/       — PNG/PDF figures (pk_*.png, xi_*.png, ...)
   conf/        — MUSIC2 configs (CV_22_MUSIC*.conf) and log files
@@ -50,14 +53,14 @@ Pipeline steps (each skipped if output already exists):
 9. Measure P(k) with CIC+FFT (`compute_pk.py`)
 10. Plot diagnostics (`plot_ic.py`) → `plots/pk_{STEM}.png`
 
-Remove outputs with `./clean.sh` (or `--all` to also remove IC HDF5 files).
+Remove outputs with `tools/clean.sh` (or `--all` to also remove IC HDF5 files).
 
 ## Key Files
 
 ### Pipeline scripts
 - `run_pipeline.sh` — end-to-end pipeline: build → IC generation → CLASS P(k) → ξ(r) → CIC ξ/ψ → P(k) → plot
-- `clean.sh` — remove generated outputs; `--all` also removes IC HDF5 files and wnoise binaries
-- `build-music.sh` — builds MUSIC2 from source (see below)
+- `tools/clean.sh` — remove generated outputs; `--all` also removes IC HDF5 files and wnoise binaries
+- `tools/build-music.sh` — builds MUSIC2 from source (see below)
 
 ### IC generation (MUSIC2 / CLASS)
 - `conf/CV_22_MUSIC_template.conf` — template config with `{BOXLENGTH}`, `{ZSTART}`, `{LEVEL}`, `{FILENAME}` placeholders
@@ -82,8 +85,8 @@ Reusable analysis library for IC fields. Install once with `pip install -e .` fr
 - `scripts/analysis/plot_box_size_comparison.py` — 4-panel figure (P_δ, P_v, ξ, ψ across box sizes) showing density-vs-velocity sensitivity to L.
 - `scripts/pipeline/plot_ic.py` — IC diagnostics plotter: reads `pk_*.txt`, auto-detects `xi_*.txt` / `xi_cic_*.txt` / `vel_cic_*.txt`; overlays CLASS theory P(k), ξ(r), ψ(r); class-based (`ICPlotter`)
 - `scripts/pipeline/make_rbins.py` — generates Corrfunc bin file appropriate for a given IC run (rmin=2×mean spacing, rmax=L/3)
-- `src/compute_xi.c` / `compute_xi` — measures ξ(r) from IC particles using Corrfunc (C, compiled via `make`)
-- `src/compute_xi_cic.c` / `compute_xi_cic` — measures ξ(r) and ψ(r) via CIC density/velocity grid autocorrelation (C, compiled via `make`); use `--vel` for velocity correlation
+- `src/compute_xi.c` → `bin/compute_xi` — measures ξ(r) from IC particles using Corrfunc (C, compiled via `make`; root Makefile forwards to `src/Makefile`)
+- `src/compute_xi_cic.c` → `bin/compute_xi_cic` — measures ξ(r) and ψ(r) via CIC density/velocity grid autocorrelation (C, compiled via `make`); use `--vel` for velocity correlation
 
 ### Utilities
 - `icpipe.io.read_wnoise(path)` — reads `wnoise_NNNN.bin` white noise binary into a numpy array
@@ -137,11 +140,11 @@ At high z, P(k) is suppressed by D(z)² ≈ 1/(1+z)², so P_shot wins at lower k
 ```bash
 # Pair counting (Corrfunc):
 conda run -n cosmo python scripts/pipeline/make_rbins.py --hdf5 data/ics_swift_n256_z2_L172.hdf5
-./compute_xi data/ics_swift_n256_z2_L172.hdf5 data/rbins_n256_z2_L172.txt 8 \
+./bin/compute_xi data/ics_swift_n256_z2_L172.hdf5 data/rbins_n256_z2_L172.txt 8 \
     > data/xi_n256_z2_L172.txt
 
 # CIC grid ξ(r) and ψ(r) (works at any z):
-./compute_xi_cic --input data/ics_swift_n256_z200_L1024.hdf5 \
+./bin/compute_xi_cic --input data/ics_swift_n256_z200_L1024.hdf5 \
     --nthreads 8 --output data/xi_cic_n256_z200_L1024.txt --vel
 ```
 
@@ -189,10 +192,10 @@ instructions, IC generation pipeline, transfer function internals, and file form
 
 ```bash
 # Build (first time or after source changes); MUSIC2 source auto-resolved
-./build-music.sh
+tools/build-music.sh
 
 # Use a specific MUSIC2 source directory
-MUSIC2_SOURCE_DIR=/path/to/MUSIC2 ./build-music.sh
+MUSIC2_SOURCE_DIR=/path/to/MUSIC2 tools/build-music.sh
 
 # Generate a config (canonical CV_22 run: N=256, z=127, L=25 Mpc/h)
 conda run -n cosmo python scripts/pipeline/make_music_conf.py -N 256 -z 127 -L 25
@@ -205,7 +208,7 @@ conda run -n cosmo python scripts/pipeline/make_music_conf.py -N 256 -z 127 -L 2
 # them manually: mv wnoise_*.bin data/  &&  mv input_class_parameters.ini conf/
 ```
 
-### build-music.sh
+### tools/build-music.sh
 
 MUSIC2 source directory resolution order:
 1. `$MUSIC2_SOURCE_DIR` environment variable (if set)

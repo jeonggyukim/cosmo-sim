@@ -14,9 +14,8 @@ music_build/
 # All pipeline data outputs (HDF5, binaries, P(k), xi, CLASS outputs)
 data/
 
-# Compiled C binaries
-compute_xi
-compute_xi_cic
+# Compiled C binaries (in bin/, written by src/Makefile)
+bin/
 
 # Claude Code auto-memory (machine-local)
 memory/

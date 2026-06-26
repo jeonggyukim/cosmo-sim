@@ -5,12 +5,15 @@ Scripts and configuration for cosmological IC generation with MUSIC2 and IC vali
 ## Directory layout
 
 ```
-src/                — C source files (compute_xi.c, compute_xi_cic.c)
+src/                — C source files + Makefile (compute_xi.c, compute_xi_cic.c)
+bin/                — compiled C binaries (gitignored)
 icpipe/             — installable Python library (ICField, LinearTheory, io)
 scripts/pipeline/   — Python CLIs invoked by run_pipeline.sh
                       (make_music_conf, make_rbins, compute_pk, compute_pv, plot_ic)
 scripts/analysis/   — ad-hoc CLIs / inspection tools
                       (check_ic, plot_box_size_comparison, plot_dr_histogram)
+tools/              — build/clean shell scripts + cluster sbatch templates
+                      (build-music.sh, build-corrfunc.sh, clean.sh, mpirun_restart.sbatch)
 conf/               — MUSIC2 config files
 data/               — CLASS outputs, rbins, measured P(k)/ξ/ψ tables  (HDF5/bin files gitignored)
 plots/              — output figures  (gitignored)
@@ -55,7 +58,7 @@ Pipeline steps:
 #### 1. Build MUSIC2
 
 ```bash
-./build-music.sh
+tools/build-music.sh
 ```
 
 Only needed once (or after source changes). Clones MUSIC2 from GitHub if the source directory
@@ -139,12 +142,12 @@ conda run -n cosmo python scripts/pipeline/make_rbins.py \
     --hdf5 data/ics_swift_n256_z200_L1024.hdf5
 # → data/rbins_n256_z200_L1024.txt
 
-./compute_xi data/ics_swift_n256_z200_L1024.hdf5 \
+./bin/compute_xi data/ics_swift_n256_z200_L1024.hdf5 \
              data/rbins_n256_z200_L1024.txt 8 \
              > data/xi_n256_z200_L1024.txt
 
 # CIC grid ξ(r) and ψ(r) = ⟨v_pec·v_pec'⟩ (works at any z):
-./compute_xi_cic \
+./bin/compute_xi_cic \
     --input    data/ics_swift_n256_z200_L1024.hdf5 \
     --nthreads 8 \
     --output   data/xi_cic_n256_z200_L1024.txt \
@@ -163,8 +166,8 @@ to disk in km/s.
 #### 7. Clean generated outputs
 
 ```bash
-./clean.sh          # remove plots, P(k)/xi tables, rbins, configs, CLASS outputs
-./clean.sh --all    # also remove IC HDF5 files and wnoise binaries (slow to regenerate)
+tools/clean.sh          # remove plots, P(k)/xi tables, rbins, configs, CLASS outputs
+tools/clean.sh --all    # also remove IC HDF5 files and wnoise binaries (slow to regenerate)
 ```
 
 ---

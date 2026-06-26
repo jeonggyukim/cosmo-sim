@@ -30,8 +30,8 @@ log "Removing generated MUSIC2 configs and CLASS ini files..."
 rm -f conf/CV_22_MUSIC_n*.conf
 rm -f conf/input_class_parameters_*.ini
 
-log "Removing compiled compute_xi binary..."
-rm -f compute_xi
+log "Removing compiled compute_xi binaries..."
+rm -f bin/compute_xi bin/compute_xi_cic
 
 log "Removing CLASS P(k) outputs..."
 rm -f data/class_pk_z*.dat

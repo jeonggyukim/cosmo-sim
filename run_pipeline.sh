@@ -157,9 +157,9 @@ mkdir -p data plots conf
 if [ ! -f "$MUSIC_BIN" ]; then
     log "Building MUSIC2..."
     if [ -n "$MUSIC2_DIR" ]; then
-        MUSIC2_SOURCE_DIR="$MUSIC2_DIR" ./build-music.sh
+        MUSIC2_SOURCE_DIR="$MUSIC2_DIR" tools/build-music.sh
     else
-        ./build-music.sh
+        tools/build-music.sh
     fi
 else
     log "MUSIC2 already built — skipping"
@@ -168,10 +168,10 @@ fi
 # ---------------------------------------------------------------------------
 # Step 2: Build compute_xi
 # Skipped if the binary already exists.
-# Compiled via the repo-root Makefile; links against Corrfunc.
-# If --corrfunc-dir is given, pass CORRFUNCDIR to make.
+# Compiled via src/Makefile (root Makefile forwards there); links against Corrfunc.
+# Binaries land in bin/.  If --corrfunc-dir is given, pass CORRFUNCDIR to make.
 # ---------------------------------------------------------------------------
-if [ ! -f "compute_xi" ]; then
+if [ ! -f "bin/compute_xi" ]; then
     log "Building compute_xi..."
     if [ -n "$CORRFUNC_DIR" ]; then
         make CORRFUNCDIR="$CORRFUNC_DIR"
@@ -309,7 +309,7 @@ if (( $(echo "$ZSTART > 10" | bc -l) )); then
     log "Skipping Corrfunc ξ(r) — z=${ZSTART} > 10 (shot-noise dominated; use CIC P(k))"
 else
     log "Measuring ξ(r) with compute_xi (${NTHREADS} threads)..."
-    ./compute_xi "$IC_FILE" "$RBINS_FILE" "$NTHREADS" > "$XI_FILE"
+    ./bin/compute_xi "$IC_FILE" "$RBINS_FILE" "$NTHREADS" > "$XI_FILE"
     echo "    Saved: $XI_FILE"
 fi
 
@@ -327,7 +327,7 @@ fi
 XI_CIC_FILE="data/xi_cic_${STEM}.txt"
 VEL_CIC_FILE="data/vel_cic_${STEM}.txt"
 log "Measuring ξ(r) and ψ(r) on CIC grid with compute_xi_cic (${NTHREADS} threads)..."
-./compute_xi_cic \
+./bin/compute_xi_cic \
     --input    "$IC_FILE" \
     --Ngrid    128 \
     --nthreads "$NTHREADS" \
