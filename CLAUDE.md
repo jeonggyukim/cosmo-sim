@@ -85,8 +85,8 @@ Reusable analysis library for IC fields. Install once with `pip install -e .` fr
 - `scripts/analysis/plot_box_size_comparison.py` — 4-panel figure (P_δ, P_v, ξ, ψ across box sizes) showing density-vs-velocity sensitivity to L.
 - `icpipe/cli/plot_ic.py` (`plot-ic`) — IC diagnostics plotter: reads `pk_*.txt`, auto-detects `xi_*.txt` / `xi_cic_*.txt` / `vel_cic_*.txt`; overlays CLASS theory P(k), ξ(r), ψ(r); class-based (`ICPlotter`)
 - `icpipe/cli/make_rbins.py` (`make-rbins`) — generates Corrfunc bin file appropriate for a given IC run (rmin=2×mean spacing, rmax=L/3)
-- `src/compute_xi.c` → `bin/compute_xi` — measures ξ(r) from IC particles using Corrfunc (C, compiled via `make`; root Makefile forwards to `src/Makefile`)
-- `src/compute_xi_cic.c` → `bin/compute_xi_cic` — measures ξ(r) and ψ(r) via CIC density/velocity grid autocorrelation (C, compiled via `make`); use `--vel` for velocity correlation
+- `src/compute_xi.c` → `bin/compute_xi` — measures ξ(r) from IC particles using Corrfunc (C, compiled via `make -C src`)
+- `src/compute_xi_cic.c` → `bin/compute_xi_cic` — measures ξ(r) and ψ(r) via CIC density/velocity grid autocorrelation (C, compiled via `make -C src`); use `--vel` for velocity correlation
 
 ### Utilities
 - `icpipe.io.read_wnoise(path)` — reads `wnoise_NNNN.bin` white noise binary into a numpy array
@@ -174,10 +174,10 @@ Planning docs (markdown, kept next to the notes):
 
 ```bash
 cd notes
-make            # regenerate figures + compile all PDFs (opens automatically)
-make figures    # regenerate figures only
-make notes      # compile PDFs only (assumes figures exist)
-make clean      # remove figures, PDFs, and LaTeX aux files
+make -C notes              # regenerate figures + compile all PDFs (opens automatically)
+make -C notes figures      # regenerate figures only
+make -C notes notes        # compile PDFs only (assumes figures exist)
+make -C notes clean        # remove figures, PDFs, and LaTeX aux files
 ```
 
 Figures are generated from `plot_box_window.py`, `plot_tophat_window.py`, and `plot_pgrid.py`
@@ -269,7 +269,7 @@ load-bearing for code-validation paper figures, not for science runs.
 ### Corrfunc
 
 `compute_xi` links against Corrfunc. Resolution order:
-1. `CORRFUNCDIR` make variable: `make CORRFUNCDIR=/path/to/Corrfunc`
+1. `CORRFUNCDIR` make variable: `make -C src CORRFUNCDIR=/path/to/Corrfunc`
 2. `--corrfunc-dir` flag: `./run_pipeline.sh --corrfunc-dir /path/to/Corrfunc`
 3. `../Corrfunc` — sibling of the repo root (default)
 4. Clones from `https://github.com/manodeep/Corrfunc` into `../Corrfunc` and builds if not found

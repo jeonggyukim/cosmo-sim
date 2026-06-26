@@ -174,9 +174,9 @@ fi
 if [ ! -f "bin/compute_xi" ]; then
     log "Building compute_xi..."
     if [ -n "$CORRFUNC_DIR" ]; then
-        make CORRFUNCDIR="$CORRFUNC_DIR"
+        make -C src CORRFUNCDIR="$CORRFUNC_DIR"
     else
-        make
+        make -C src
     fi
 else
     log "compute_xi already built — skipping"
