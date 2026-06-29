@@ -4,7 +4,6 @@
 
 UNAME_S := $(shell uname -s)
 UNAME_N := $(shell uname -n)
-USER    := $(shell whoami)
 
 # Directory containing this Makefile (src/) and the repo root (one up).
 SRC_DIR  := $(dir $(lastword $(MAKEFILE_LIST)))
@@ -65,7 +64,7 @@ endif
 
 CORRFUNC_VERSION := $(shell cd $(CORRFUNCDIR) && git describe --tags --abbrev=0 2>/dev/null || echo "2.5.3")
 
-CFLAGS := -O3 -std=c99 -Wall $(OMP_CFLAGS) \
+CFLAGS := -O3 -std=c99 -Wall -Wno-unused-local-typedef $(OMP_CFLAGS) \
           $(addprefix -I, $(CORRFUNC_INC)) -I$(HDF5_INC) \
           -DVERSION=\"$(CORRFUNC_VERSION)\"
 
