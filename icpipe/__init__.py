@@ -14,12 +14,12 @@ Submodules:
 """
 
 from . import binning, io, theory, windows
-from .field import ICField, PowerSpectrumResult, cic_deposit
+from .field import ICField, PowerSpectrumResult, deposit
 from .theory import LinearTheory
 
 __version__ = "0.1.0"
 __all__ = [
-    "ICField", "PowerSpectrumResult", "cic_deposit",
+    "ICField", "PowerSpectrumResult", "deposit",
     "LinearTheory",
     "binning", "io", "theory", "windows",
 ]

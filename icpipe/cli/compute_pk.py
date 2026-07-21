@@ -26,10 +26,12 @@ import numpy as np
 
 from icpipe import ICField
 from icpipe.io import write_pk
+from icpipe.windows import ASSIGNMENT_ORDER
 
 
 def _measure_one_level(coords, boxsize_mpc, ngrid, h, interlace, nkbins,
-                       *, kmin_mpch=None, kmax_mpch=None, shot_noise=True):
+                       *, assignment="cic", kmin_mpch=None, kmax_mpch=None,
+                       shot_noise=True):
     """One-level helper: build a transient ICField from already-loaded
     coords (so we can fold positions in-place for sub-Nyquist levels)."""
     # We bypass the file loader by constructing an empty ICField and
@@ -44,6 +46,8 @@ def _measure_one_level(coords, boxsize_mpc, ngrid, h, interlace, nkbins,
     obj.h = h
     obj.ngrid = ngrid
     obj.interlace = interlace
+    obj.assignment = assignment
+    obj.order = ASSIGNMENT_ORDER[assignment]
     res = obj.power("delta", nkbins=nkbins,
                     kmin_mpch=kmin_mpch, kmax_mpch=kmax_mpch,
                     shot_noise=shot_noise)
@@ -60,7 +64,11 @@ def main():
     p.add_argument("--H0", type=float, default=67.11,
                    help="H0 in km/s/Mpc for h conversion (default: 67.11)")
     p.add_argument("--no-interlace", action="store_true", default=False,
-                   help="Disable interlaced CIC (default: on)")
+                   help="Disable interlaced assignment (default: on)")
+    p.add_argument("--assignment", choices=["ngp", "cic", "tsc", "pcs"], default="cic",
+                   help="Mass-assignment scheme (Sefusatti+ 2016). Higher order = "
+                        "less near-Nyquist aliasing; 'pcs' + interlacing is the most "
+                        "accurate (default: cic).")
     p.add_argument("--fold", type=int, nargs="+", default=[], metavar="M",
                    help="Folding factors (Jenkins+ 1998). Each M folds positions "
                         "into a sub-box of size L/M, extending k_Nyquist by M and "
@@ -75,7 +83,7 @@ def main():
 
     # --- Build base ICField (loads HDF5, caches metadata) ---
     f = ICField(args.hdf5, ngrid=args.ngrid, interlace=interlace, h=h,
-                load_velocities=False)
+                load_velocities=False, assignment=args.assignment)
     print(f)
     print(f"BoxSize    : {f.boxsize_mpc:.4g} Mpc  =  {f.boxsize_mpch:.4g} Mpc/h")
     print(f"k_Nyquist  : {f.knyq_mpch:.4g} h/Mpc")
@@ -106,8 +114,9 @@ def main():
         print(f"k range    : [{kmin_fold:.4g}, {kmax_fold:.4g}] h/Mpc")
         pos_fold = f.coords % sub_box
         res = _measure_one_level(pos_fold, sub_box, f.ngrid, h, interlace,
-                                 args.nkbins, kmin_mpch=kmin_fold,
-                                 kmax_mpch=kmax_fold, shot_noise=True)
+                                 args.nkbins, assignment=args.assignment,
+                                 kmin_mpch=kmin_fold, kmax_mpch=kmax_fold,
+                                 shot_noise=True)
         print(f"P_shot     : {res.P_shot:.4e} (Mpc/h)^3 "
               f"(= P_shot_base / {m}^3)")
         all_k.append(res.k);     all_Praw.append(res.P_raw)

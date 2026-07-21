@@ -1,8 +1,27 @@
-"""CIC mass-assignment window function and deconvolution helpers."""
+"""Mass-assignment window functions and deconvolution helpers."""
 
 from __future__ import annotations
 
 import numpy as np
+
+# Interpolation order p for each mass-assignment scheme (Sefusatti et al. 2016):
+# NGP=1, CIC=2, TSC=3, PCS=4. The per-axis Fourier window is sinc(k/2k_Ny)^p,
+# so the squared window used to deconvolve |delta(k)|^2 is sinc(...)^(2p).
+ASSIGNMENT_ORDER = {"ngp": 1, "cic": 2, "tsc": 3, "pcs": 4}
+
+
+def assignment_window_squared(KX: np.ndarray, KY: np.ndarray, KZ: np.ndarray,
+                              knyq: float, order: int = 2) -> np.ndarray:
+    """Squared mass-assignment window, prod_a [sinc(k_a / 2 k_Ny)]^(2*order).
+
+    ``order`` is the interpolation order p (NGP=1, CIC=2, TSC=3, PCS=4). Dividing
+    |delta(k)|^2 by this corrects for the assignment smoothing. Higher order also
+    shrinks the residual aliasing images (Sefusatti et al. 2016), especially with
+    interlacing on.
+    """
+    def s(k):
+        return np.sinc(k / (2.0 * knyq))
+    return (s(KX) * s(KY) * s(KZ)) ** (2 * order)
 
 
 def cic_window_squared(KX: np.ndarray, KY: np.ndarray, KZ: np.ndarray,

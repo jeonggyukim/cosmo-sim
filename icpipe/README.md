@@ -96,18 +96,19 @@ header, parts = read_swift_ics("data/ics_swift_n256_z200_L1024.hdf5")
 print_swift_ics_summary("data/ics_swift_n256_z200_L1024.hdf5")
 ```
 
-### `cic_deposit`
+### `deposit`
 
 ```python
-from icpipe import cic_deposit
-rho = cic_deposit(positions, boxsize, ngrid)        # mass
-mom = cic_deposit(positions, boxsize, ngrid,
-                  weights=velocities[:, 0])         # x-momentum
+from icpipe import deposit
+rho = deposit(positions, boxsize, ngrid)            # mass (CIC, order 2)
+mom = deposit(positions, boxsize, ngrid, order=4,   # PCS assignment
+              weights=velocities[:, 0])             # x-momentum
 ```
 
-Periodic CIC mass / scalar-weight deposit on an `ngrid³` grid; the
-primitive `ICField` uses for every density / momentum / velocity
-grid it builds.
+Periodic mass / scalar-weight deposit on an `ngrid³` grid using a B-spline
+of the given interpolation order (NGP=1, CIC=2, TSC=3, PCS=4; Sefusatti
+et al. 2016); the primitive `ICField` uses for every density / momentum /
+velocity grid it builds.
 
 ## Tests + examples
 
@@ -119,8 +120,8 @@ grid it builds.
 
 ```
 icpipe/
-├── __init__.py         # public re-exports (ICField, LinearTheory, cic_deposit, io, ...)
-├── field.py            # ICField + cic_deposit
+├── __init__.py         # public re-exports (ICField, LinearTheory, deposit, io, ...)
+├── field.py            # ICField + deposit
 ├── theory.py           # LinearTheory.from_class(...)
 ├── io.py               # read/write_pk, read/write_pv, read_wnoise, read_swift_ics
 ├── binning.py          # radial binning helpers

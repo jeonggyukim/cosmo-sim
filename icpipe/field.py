@@ -9,34 +9,65 @@ import numpy as np
 
 from .binning import log_bin_edges, radial_mean
 from .io import read_ic_hdf5
-from .windows import cic_window_squared
+from .windows import ASSIGNMENT_ORDER, assignment_window_squared
 
 
 # ---------------------------------------------------------------------------
 # CIC mass / momentum assignment (NumPy implementation)
 # ---------------------------------------------------------------------------
 
-def cic_deposit(pos: np.ndarray, boxsize: float, ngrid: int,
-                weights: np.ndarray | None = None) -> np.ndarray:
-    """Single-pass CIC deposit of a scalar weight (mass by default)."""
-    cellsize = boxsize / ngrid
-    g = pos / cellsize
-    i0 = np.floor(g).astype(int)
-    dx = g - i0
+def _axis_stencil(ga: np.ndarray, order: int) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Per-axis (cell indices, weights) for a B-spline of the given interpolation
+    order (NGP=1, CIC=2, TSC=3, PCS=4). Returns ``order`` (idx, weight) pairs whose
+    weights sum to 1. Weight forms are the standard mass-assignment kernels (see
+    Sefusatti et al. 2016, eqs. 15-18)."""
+    if order == 1:  # NGP
+        return [(np.round(ga).astype(int), np.ones_like(ga))]
+    if order == 2:  # CIC
+        base = np.floor(ga).astype(int)
+        dx = ga - base
+        return [(base, 1.0 - dx), (base + 1, dx)]
+    if order == 3:  # TSC (centred on the nearest grid point)
+        n = np.round(ga).astype(int)
+        out = []
+        for c_off in (-1, 0, 1):
+            c = n + c_off
+            t = np.abs(ga - c)
+            w = np.where(t < 0.5, 0.75 - t * t, 0.5 * (1.5 - t) ** 2)
+            out.append((c, w))
+        return out
+    if order == 4:  # PCS
+        m = np.floor(ga).astype(int)
+        out = []
+        for c_off in (-1, 0, 1, 2):
+            c = m + c_off
+            t = np.abs(ga - c)
+            w = np.where(t < 1.0, (4.0 - 6.0 * t * t + 3.0 * t ** 3) / 6.0,
+                         (2.0 - t) ** 3 / 6.0)
+            out.append((c, w))
+        return out
+    raise ValueError(f"Unsupported assignment order {order} (use 1..4)")
+
+
+def deposit(pos: np.ndarray, boxsize: float, ngrid: int, order: int = 2,
+            weights: np.ndarray | None = None) -> np.ndarray:
+    """Mass-assignment deposit of a scalar weight onto an ngrid^3 grid using a
+    B-spline of the given interpolation order (NGP=1, CIC=2, TSC=3, PCS=4)."""
+    g = pos / (boxsize / ngrid)
     if weights is None:
         weights = np.ones(len(pos))
     out = np.zeros((ngrid, ngrid, ngrid), dtype=np.float64)
-    for dxi in range(2):
-        wx = (1 - dx[:, 0]) if dxi == 0 else dx[:, 0]
-        ix = (i0[:, 0] + dxi) % ngrid
-        for dyi in range(2):
-            wy = (1 - dx[:, 1]) if dyi == 0 else dx[:, 1]
-            iy = (i0[:, 1] + dyi) % ngrid
-            for dzi in range(2):
-                wz = (1 - dx[:, 2]) if dzi == 0 else dx[:, 2]
-                iz = (i0[:, 2] + dzi) % ngrid
-                w = wx * wy * wz * weights
-                np.add.at(out, (ix, iy, iz), w)
+    sx = _axis_stencil(g[:, 0], order)
+    sy = _axis_stencil(g[:, 1], order)
+    sz = _axis_stencil(g[:, 2], order)
+    for ix, wx in sx:
+        ixm = ix % ngrid
+        for iy, wy in sy:
+            iym = iy % ngrid
+            wxy = wx * wy
+            for iz, wz in sz:
+                izm = iz % ngrid
+                np.add.at(out, (ixm, iym, izm), wxy * wz * weights)
     return out
 
 
@@ -99,7 +130,7 @@ class ICField:
     # ----- constructor & basic accessors --------------------------------
     def __init__(self, hdf5_path: str, ngrid: int | None = None,
                  interlace: bool = True, h: float = 0.6711,
-                 load_velocities: bool = True):
+                 load_velocities: bool = True, assignment: str = "cic"):
         d = read_ic_hdf5(hdf5_path, want_velocities=load_velocities)
         self.coords      = d["coords"]
         self.velocities  = d.get("velocities")
@@ -111,6 +142,13 @@ class ICField:
         npart_side = round(self.N ** (1.0 / 3.0))
         self.ngrid     = int(ngrid) if ngrid else int(npart_side)
         self.interlace = interlace
+        # Mass-assignment scheme: ngp/cic/tsc/pcs -> interpolation order 1/2/3/4.
+        self.assignment = assignment.lower()
+        self.order = ASSIGNMENT_ORDER[self.assignment]
+
+    def _dep(self, coords: np.ndarray, weights: np.ndarray | None = None) -> np.ndarray:
+        """Deposit onto the grid with this field's assignment order."""
+        return deposit(coords, self.boxsize_mpc, self.ngrid, self.order, weights)
 
     # ----- k-space coordinate grids ------------------------------------
     @cached_property
@@ -138,7 +176,7 @@ class ICField:
     def _W2(self) -> np.ndarray:
         KX, KY, KZ = self._Kgrid
         knyq = np.pi * self.ngrid / self.boxsize_mpc
-        W2 = cic_window_squared(KX, KY, KZ, knyq)
+        W2 = assignment_window_squared(KX, KY, KZ, knyq, self.order)
         W2[0, 0, 0] = 1.0
         return W2
 
@@ -159,14 +197,12 @@ class ICField:
         """Interlaced-CIC FFT of mass weights ``weights_real`` (or unit per
         particle if None). Returns the real-FFT array delta_k of shape
         (ngrid, ngrid, ngrid//2+1)."""
-        rho1 = cic_deposit(self.coords, self.boxsize_mpc, self.ngrid,
-                                  weights_real)
+        rho1 = self._dep(self.coords, weights_real)
         if not self.interlace:
             return np.fft.rfftn(rho1)
         dx = self.boxsize_mpc / self.ngrid
         coords2 = (self.coords + dx / 2) % self.boxsize_mpc
-        rho2 = cic_deposit(coords2, self.boxsize_mpc, self.ngrid,
-                                  weights_real)
+        rho2 = self._dep(coords2, weights_real)
         f1 = np.fft.rfftn(rho1)
         f2 = np.fft.rfftn(rho2)
         KX, KY, KZ = self._Kgrid
@@ -177,7 +213,7 @@ class ICField:
     def density_field(self) -> np.ndarray:
         """Real-space CIC overdensity delta(x) = rho(x)/rho_bar - 1.
         (Single grid; no interlacing.)"""
-        rho = cic_deposit(self.coords, self.boxsize_mpc, self.ngrid)
+        rho = self._dep(self.coords)
         return rho / (self.N / self.ngrid**3) - 1.0
 
     @cached_property
@@ -214,11 +250,10 @@ class ICField:
         if self.velocities is None:
             raise RuntimeError("Velocities not loaded; pass load_velocities=True.")
         # Build real-space velocity grid via momentum / density (in cell-count units)
-        rho_real = cic_deposit(self.coords, self.boxsize_mpc, self.ngrid)
+        rho_real = self._dep(self.coords)
         v_grids = []
         for a in range(3):
-            mom_real = cic_deposit(self.coords, self.boxsize_mpc, self.ngrid,
-                                          self.velocities[:, a])
+            mom_real = self._dep(self.coords, self.velocities[:, a])
             v = np.zeros_like(mom_real)
             mask = rho_real > 0
             v[mask] = mom_real[mask] / rho_real[mask]
@@ -227,11 +262,10 @@ class ICField:
         if self.interlace:
             dx = self.boxsize_mpc / self.ngrid
             coords2 = (self.coords + dx / 2) % self.boxsize_mpc
-            rho2 = cic_deposit(coords2, self.boxsize_mpc, self.ngrid)
+            rho2 = self._dep(coords2)
             v_grids2 = []
             for a in range(3):
-                mom2 = cic_deposit(coords2, self.boxsize_mpc, self.ngrid,
-                                          self.velocities[:, a])
+                mom2 = self._dep(coords2, self.velocities[:, a])
                 v = np.zeros_like(mom2)
                 mask = rho2 > 0
                 v[mask] = mom2[mask] / rho2[mask]
