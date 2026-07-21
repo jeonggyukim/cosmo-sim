@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-plot = ["matplotlib>=3.5"]
+plot = ["matplotlib>=3.5", "mcfit"]
 test = ["pytest>=7"]
 
 [project.scripts]

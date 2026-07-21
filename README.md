@@ -1,7 +1,70 @@
 # cosmo-pipeline
 
-End-to-end IC generation (MUSIC2) + IC validation (CIC P(k), Corrfunc
-ξ(r), CIC ξ/ψ) for cosmological SWIFT simulations.
+Generate cosmological initial conditions with **MUSIC2** and validate them.
+The pipeline measures the density power spectrum **P(k)** (CIC + FFT), the
+two-point correlation **ξ(r)** (Corrfunc pair counting and a CIC-grid
+estimator), and the velocity correlation **ψ(r)**, then compares them against
+linear theory from **CLASS**.
+
+The reusable analysis code is the installable Python package **`icpipe`**
+(`ICField`, `LinearTheory`, `io`, and the pipeline-step CLIs). The end-to-end
+run is driven by `run_pipeline.sh`; the C tools `compute_xi` / `compute_xi_cic`
+handle the pair-counting and CIC-grid measurements.
+
+## Install
+
+`icpipe` is a standard `pyproject.toml` package. Pick one of the three options
+below — all use an editable install (`-e`) so edits to `icpipe/` take effect
+without reinstalling. Installing also wires the pipeline-step CLIs onto `$PATH`:
+`make-music-conf`, `make-rbins`, `compute-pk`, `compute-pv`, `plot-ic`.
+
+**Option 1 — conda + pip** (recommended; full analysis environment)
+```bash
+conda env create -f env.yml        # creates the `cosmo` env with all dependencies
+conda activate cosmo
+pip install -e . --no-deps          # installs icpipe + its CLIs; conda provides the deps
+```
+
+**Option 2 — conda + [uv](https://docs.astral.sh/uv/)** (same env, faster editable resolve)
+```bash
+conda env create -f env.yml
+conda activate cosmo
+uv pip install -e . --no-deps       # uv uses the active conda env
+```
+
+**Option 3 — uv only (no conda)**
+```bash
+uv venv --python 3.12
+source .venv/bin/activate           # Windows: .venv\Scripts\activate
+uv pip install -e ".[plot]"         # numpy/scipy/h5py + matplotlib/mcfit from PyPI
+```
+
+`--no-deps` on the conda paths keeps pip/uv from pulling PyPI wheels over the
+conda-forge binaries (`corrfunc`, `h5py`, …); there `env.yml` is the dependency
+source. The uv-only path resolves every dependency from PyPI via `pyproject.toml`
+(add the `test` extra — `".[plot,test]"` — to run the test suite).
+
+Sanity check any option:
+```bash
+python -c "import icpipe; print(icpipe.__file__)"
+pytest icpipe/tests/                # 17 tests (needs the `test` extra)
+```
+
+Note: the uv-only environment has the `icpipe` library but not the conda-only
+analysis extras (`corrfunc` Python bindings, `astropy`, `jupyter`) or the
+compiled C tools. The `bin/compute_xi*` binaries and the MUSIC2 / CLASS builds
+are separate and need system libraries — see `tools/build-music.sh`,
+`tools/build-corrfunc.sh`, and [`tools/README.md`](tools/README.md).
+
+## Uninstall
+
+```bash
+pip uninstall icpipe                 # or: uv pip uninstall icpipe
+```
+Remove the whole conda environment with `conda env remove -n cosmo`, or delete
+the uv virtualenv with `rm -rf .venv`. Generated pipeline outputs are cleared
+separately with `tools/clean.sh` (`--all` also removes ICs, wnoise binaries,
+and the MUSIC2 build).
 
 ## Directory layout
 
@@ -20,18 +83,6 @@ End-to-end IC generation (MUSIC2) + IC validation (CIC P(k), Corrfunc
 | `notes/figures/`    | plot scripts feeding the LaTeX figures                   | [`notes/figures/README.md`](notes/figures/README.md) |
 | `notebooks/`        | worked examples using `icpipe`                           | [`notebooks/README.md`](notebooks/README.md) |
 | `tests/validation/` | bundled validation tests (e.g. matched-noise zoom)       | (per-test) |
-
-## Setup
-
-```bash
-conda env create -f env.yml
-conda activate cosmo
-pip install -e ".[plot,test]"     # installs icpipe + the pipeline-step CLIs onto $PATH
-```
-
-The `pip install -e .` step also wires `make-music-conf`, `make-rbins`,
-`compute-pk`, `compute-pv`, and `plot-ic` as commands on `$PATH`.  See
-[`icpipe/README.md`](icpipe/README.md) for the full library API and CLI table.
 
 ## Run the full pipeline
 
