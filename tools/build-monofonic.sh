@@ -48,21 +48,19 @@ if [ ! -d "$MONOFONICDIR" ]; then
 fi
 
 # --- Parse command line arguments ---
-BUILDDIR_DEFAULT="$REPO_ROOT/monofonic_build"
 BUILDDIR=""
+usage() { echo "Usage: $0 [-d|--builddir DIR]"; }
 
-while getopts "d:" opt; do
-    case $opt in
-        d)
-            BUILDDIR="$OPTARG"
-            ;;
-        \?)
-            echo "Usage: $0 [-d BUILDDIR]"
-            exit 1
-            ;;
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -d|--builddir) BUILDDIR="$2"; shift 2 ;;
+        --builddir=*)  BUILDDIR="${1#*=}"; shift ;;
+        -h|--help)     usage; exit 0 ;;
+        *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
     esac
 done
 
+BUILDDIR_DEFAULT="$REPO_ROOT/monofonic_build"
 BUILDDIR="${BUILDDIR:-$BUILDDIR_DEFAULT}"
 
 # --- Build ---

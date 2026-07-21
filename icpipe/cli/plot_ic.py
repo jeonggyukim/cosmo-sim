@@ -104,7 +104,11 @@ class ICPlotter:
 
     @staticmethod
     def _label_from_stem(stem):
-        """Format stem 'n256_z200_L172' → 'N256_L172_Z200'."""
+        """Format stem 'n256_z200_L172_mono' → 'N256_L172_Z200_mono'.
+
+        Any variant tag after the box size (_mono, _noplt, _nofix, _s42, ...) is
+        kept so overlaid runs that differ only in the tag stay distinguishable.
+        """
         mn = re.search(r'n(\d+)', stem)
         mz = re.search(r'_z([\d.]+)', stem)
         ml = re.search(r'_L(\d+)', stem)
@@ -115,6 +119,10 @@ class ICPlotter:
             parts.append(f'L{ml.group(1)}')
         if mz:
             parts.append(f'Z{mz.group(1)}')
+        if ml:
+            tail = stem[ml.end():].lstrip('_')   # e.g. "mono_noplt"
+            if tail:
+                parts.append(tail)
         return '_'.join(parts) if parts else stem
 
     @staticmethod
