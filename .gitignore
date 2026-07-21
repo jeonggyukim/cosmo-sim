@@ -10,6 +10,7 @@ conf/CV_22_MUSIC_n*.conf
 
 # MUSIC2 build output
 music_build/
+monofonic_build/
 
 # All pipeline data outputs (HDF5, binaries, P(k), xi, CLASS outputs)
 data/

@@ -22,10 +22,11 @@ test = ["pytest>=7"]
 
 [project.scripts]
 make-music-conf = "icpipe.cli.make_music_conf:main"
-make-rbins      = "icpipe.cli.make_rbins:main"
-compute-pk      = "icpipe.cli.compute_pk:main"
-compute-pv      = "icpipe.cli.compute_pv:main"
-plot-ic         = "icpipe.cli.plot_ic:main"
+make-monofonic-conf = "icpipe.cli.make_monofonic_conf:main"
+make-rbins = "icpipe.cli.make_rbins:main"
+compute-pk = "icpipe.cli.compute_pk:main"
+compute-pv = "icpipe.cli.compute_pv:main"
+plot-ic = "icpipe.cli.plot_ic:main"
 
 [tool.setuptools]
 packages = ["icpipe", "icpipe.cli"]

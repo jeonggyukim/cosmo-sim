@@ -10,11 +10,13 @@ cosmo-pipeline/
   bin/                — compiled C binaries (gitignored)
   icpipe/             — installable Python library (ICField, LinearTheory, io)
   icpipe/cli/         — pipeline-step CLI modules exposed as console_scripts
-                        (make-music-conf, make-rbins, compute-pk, compute-pv, plot-ic)
+                        (make-music-conf, make-monofonic-conf, make-rbins,
+                         compute-pk, compute-pv, plot-ic)
   scripts/analysis/   — ad-hoc inspection / one-off CLIs
                         (check_ic, plot_box_size_comparison, plot_dr_histogram)
   tools/              — build/clean shell scripts + cluster sbatch templates
-                        (build-music.sh, build-corrfunc.sh, clean.sh, mpirun_restart.sbatch)
+                        (build-music.sh, build-monofonic.sh, build-corrfunc.sh,
+                         clean.sh, mpirun_restart.sbatch)
   data/               — IC HDF5 files, CLASS P(k) outputs, rbins files, wnoise binaries, measured P/xi tables
   plots/       — PNG/PDF figures (pk_*.png, xi_*.png, ...)
   conf/        — MUSIC2 configs (CV_22_MUSIC*.conf) and log files
@@ -30,14 +32,33 @@ Use `conda run -n cosmo python ...` for all Python scripts in this project.
 
 ## Pipeline: Quick Start
 
-```bash
-./run_pipeline.sh                                          # defaults: N=256, L=1000 Mpc/h, z=200
-./run_pipeline.sh --ngrid 256 --lbox 512  --zstart 200     # 256³, L=512  Mpc/h, z=200
-./run_pipeline.sh --ngrid 256 --lbox 256  --zstart 200     # 256³, L=256  Mpc/h, z=200
+Two IC codes are supported. Use the Python driver `run_pipeline.py` with
+`--ic-code`; the legacy bash `run_pipeline.sh` (MUSIC only) is kept as a fallback.
 
-# Point to existing MUSIC2/Corrfunc installations instead of the default ../MUSIC2, ../Corrfunc
-./run_pipeline.sh --music2-dir /path/to/MUSIC2 --corrfunc-dir /path/to/Corrfunc
+```bash
+conda run -n cosmo python run_pipeline.py                                   # MUSIC (default), N=256, L=1000, z=200
+conda run -n cosmo python run_pipeline.py --ic-code monofonic              # MUSIC2-monofonIC (PLT, 3LPT)
+conda run -n cosmo python run_pipeline.py --ngrid 256 --lbox 512 --zstart 200
+conda run -n cosmo python run_pipeline.py --ic-code monofonic --lpt-order 3
+
+# Point the IC-code build at an existing source checkout (else sibling dir or clone)
+conda run -n cosmo python run_pipeline.py --ic-source-dir /path/to/MUSIC2 --corrfunc-dir /path/to/Corrfunc
+
+# Legacy bash driver (MUSIC only)
+./run_pipeline.sh --ngrid 256 --lbox 512 --zstart 200
 ```
+
+`--ic-code music` and `--ic-code monofonic` runs at the same N, z, L coexist:
+monofonIC outputs carry a `_mono` tag in every stem (e.g.
+`data/ics_swift_n256_z200_L1000_mono.hdf5`). Both codes write a CLASS ini during
+the run (MUSIC: `input_class_parameters.ini`; monofonIC:
+`<config-basename>_input_class_parameters.ini`, prefixed and written to the CWD);
+the driver normalizes it to `conf/input_class_parameters_{stem}.ini` and adapts
+it for the matter-P(k) CLASS run. The result `data/class_pk_z0_pk.dat` is
+cosmology-keyed and reused across runs (identical CV_22 cosmology). monofonIC
+links CLASS as a library and builds no standalone `class` binary, so a
+monofonic-only setup regenerates the theory with MUSIC's CLASS binary or a
+prebuilt `class_pk` (else the theory overlay is skipped).
 
 **Thread count**: `run_pipeline.sh` defaults `--nthreads` to all logical CPUs on the current machine (detected via `sysctl -n hw.logicalcpu` on macOS or `nproc` on Linux). Override with `--nthreads N` to match a cluster job allocation.
 
@@ -58,14 +79,32 @@ Remove outputs with `tools/clean.sh` (or `--all` to also remove IC HDF5 files).
 ## Key Files
 
 ### Pipeline scripts
-- `run_pipeline.sh` — end-to-end pipeline: build → IC generation → CLASS P(k) → ξ(r) → CIC ξ/ψ → P(k) → plot
+- `run_pipeline.py` — unified Python driver; `--ic-code {music,monofonic}` selects
+  the IC generator. Front-end (build → config → run) branches on the code; the
+  downstream (CLASS P(k) → ξ(r) → CIC ξ/ψ → P(k) → plot) is code-agnostic (both
+  write SWIFT HDF5). Preferred entry point.
+- `run_pipeline.sh` — legacy bash pipeline (MUSIC only); kept as a fallback
 - `tools/clean.sh` — remove generated outputs; `--all` also removes IC HDF5 files and wnoise binaries
-- `tools/build-music.sh` — builds MUSIC2 from source (see below)
+- `tools/build-music.sh` — builds legacy MUSIC from source (see below)
+- `tools/build-monofonic.sh` — builds MUSIC2-monofonIC from source into
+  `monofonic_build/` (binary `monofonic_build/monofonIC`) with `-DENABLE_PLT=ON`
+  (monofonIC defaults PLT OFF), `-DENABLE_MPI=ON` (required — monofonIC's source
+  does not compile without MPI; the binary still runs single-rank, no mpirun),
+  PANPHASIA off, CLASS on. macOS deps: Homebrew gcc, gsl, open-mpi, FFTW3-with-MPI,
+  parallel `hdf5-mpi` (or the conda env's serial HDF5). Source resolution:
+  `$MONOFONIC_SOURCE_DIR`, `../monofonIC`, else clone. CLASS is fetched
+  automatically by monofonIC's CMake (FetchContent).
 
 ### IC generation (MUSIC2 / CLASS)
-- `conf/CV_22_MUSIC_template.conf` — template config with `{BOXLENGTH}`, `{ZSTART}`, `{LEVEL}`, `{FILENAME}` placeholders
+- `conf/CV_22_MUSIC_template.conf` — MUSIC template config with `{BOXLENGTH}`, `{ZSTART}`, `{LEVEL}`, `{FILENAME}` placeholders
 - `conf/CV_22_MUSIC.conf` — canonical MUSIC2 config: 25 Mpc/h box, 256³ (level 8), z=127, SWIFT output
-- `icpipe/cli/make_music_conf.py` (`make-music-conf`) — generates a config from the template given N, z, L
+- `icpipe/cli/make_music_conf.py` (`make-music-conf`) — generates a MUSIC config from the template given N, z, L
+- `conf/CV_22_monofonIC_template.conf` — monofonIC template with `{GRIDRES}`, `{BOXLENGTH}`,
+  `{ZSTART}`, `{LPTORDER}`, `{DOFIXING}`, `{SEED}`, `{NTHREADS}`, `{FILENAME}` placeholders;
+  same CV_22 cosmology as the MUSIC template
+- `icpipe/cli/make_monofonic_conf.py` (`make-monofonic-conf`) — generates a monofonIC config;
+  flags `--lpt-order` (1/2/3, default 3), `--fixing` (DoFixing), `--seed`, `--nthreads`.
+  Output IC stem carries a `_mono` tag
 - `input_class_parameters.ini` — written by MUSIC2 to repo root during each run; adapted by the pipeline for CLASS P(k) (gitignored)
 - `data/class_pk_z{z}_pk.dat` — CLASS P(k) output at redshift z; generated by `run_pipeline.sh` (gitignored)
 - `music_build/MUSIC` — compiled MUSIC2 binary (gitignored)

@@ -105,6 +105,45 @@ seed            = 12345
    algorithms; extend with a subsection on the concrete pipeline
    plumbing).
 
+## Implementation status (2026-07)
+
+- **Done (steps 1–3, machinery + build + run):**
+  - `tools/build-monofonic.sh` — builds monofonIC into `monofonic_build/` with
+    `-DENABLE_MPI=ON -DENABLE_PLT=ON -DENABLE_PANPHASIA=OFF -DENABLE_CLASS=ON`.
+    MPI is ON because monofonIC's source (e.g. `grid_ghosts.hh`) does not compile
+    without it; the binary still runs single-rank. Needs open-mpi, FFTW3-with-MPI,
+    parallel HDF5 (or the conda env's serial HDF5), and GSL. On macOS the script
+    detects the newest Homebrew gcc and hints GSL_ROOT_DIR / HDF5_ROOT. CLASS is
+    fetched by monofonIC's CMake (FetchContent), not a manual submodule.
+  - `conf/CV_22_monofonIC_template.conf` — CV_22 cosmology matched to the MUSIC
+    template; placeholders filled by the generator below.
+  - `icpipe/cli/make_monofonic_conf.py` (`make-monofonic-conf`) — config generator
+    paralleling `make_music_conf.py` (lives in `icpipe/cli/`, not `scripts/`, to
+    match the current console-script layout). `--lpt-order`, `--fixing`, `--seed`.
+  - `run_pipeline.py` — unified Python driver with `--ic-code {music,monofonic}`,
+    replacing the bash `--ic-code` plan. Front-end branches on the code; downstream
+    is shared. `run_pipeline.sh` kept as a MUSIC-only fallback.
+  - CLASS handling: both codes write a CLASS ini to the CWD (MUSIC:
+    `input_class_parameters.ini`; monofonIC: `<config-basename>_input_class_parameters.ini`,
+    via `src/plugins/transfer_CLASS.cc`). The driver normalizes it to
+    `conf/input_class_parameters_{stem}.ini` and runs the unified CLASS step.
+    monofonIC also writes `<basename>_input_powerspec.txt`, `_input_transfer.txt`,
+    and `_log.txt` to the CWD (moved to `data/`). Because monofonIC links CLASS
+    as a library (no standalone `class` binary), a monofonic-only setup needs
+    MUSIC's CLASS binary or a prebuilt `data/class_pk_z0_pk.dat` to regenerate
+    the theory; otherwise the overlay is skipped.
+  - Validated end to end: both the MUSIC path and the monofonIC path run to a
+    finished diagnostic plot. A monofonIC N=64, L=500, z=200 run built and ran
+    with PLT on and LPT order 3 (confirmed in the SWIFT `ICs_parameters` header
+    and the run log), wrote SWIFT HDF5 that `compute-pk` / `compute_xi_cic` /
+    `plot-ic` read correctly, and the CLASS-ini normalization + aux-file moves
+    worked as designed.
+- **Pending (step 3 science + step 4 docs):**
+  - Overplot P_meas/P_theory vs k/k_Ny for MUSIC and monofonIC at identical
+    cosmology + seed + box (the PLT flatness check near k_Ny). Machinery is ready;
+    this is a science comparison, not a plumbing task.
+  - Extend `cosmo_ic.tex` §11 with a subsection on the concrete pipeline plumbing.
+
 ## Other artifacts worth checking while migrating
 
 From the earlier audit:

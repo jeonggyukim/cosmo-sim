@@ -86,11 +86,25 @@ and the MUSIC2 build).
 
 ## Run the full pipeline
 
+Two IC codes are supported, selected with `--ic-code` on the Python driver
+`run_pipeline.py` (preferred). The legacy bash `run_pipeline.sh` runs MUSIC only
+and is kept as a fallback.
+
 ```bash
-./run_pipeline.sh                                          # defaults: N=256, L=1000 Mpc/h, z=200
-./run_pipeline.sh --ngrid 256 --lbox 512 --zstart 200      # 256³, L=512 Mpc/h, z=200
-./run_pipeline.sh --ngrid 256 --lbox 256 --zstart 200      # 256³, L=256 Mpc/h, z=200
+python run_pipeline.py                                     # MUSIC (default): N=256, L=1000 Mpc/h, z=200
+python run_pipeline.py --ic-code monofonic                 # MUSIC2-monofonIC (adds PLT, 3LPT)
+python run_pipeline.py --ngrid 256 --lbox 512 --zstart 200 # 256³, L=512 Mpc/h, z=200
+python run_pipeline.py --ic-code monofonic --lpt-order 3   # explicit LPT order
+
+./run_pipeline.sh --ngrid 256 --lbox 256 --zstart 200      # legacy bash driver (MUSIC only)
 ```
+
+`music` and `monofonic` runs at the same N, z, L coexist — monofonIC outputs
+carry a `_mono` stem tag. **monofonIC** (Michaux et al. 2020) is the unigrid
+successor to MUSIC: it adds the PLT (particle linear theory) correction, on via
+`tools/build-monofonic.sh` (`-DENABLE_PLT=ON`), which fixes the near-Nyquist mode
+amplitudes that legacy ZA/2LPT gets wrong on a particle lattice. MUSIC remains the
+tool for nested zoom ICs. The downstream validation is identical for both codes.
 
 Each step is skipped if its output already exists:
 
