@@ -12,6 +12,10 @@
 \usetikzlibrary{arrows.meta,positioning,calc,decorations.pathreplacing}
 \usepackage{tcolorbox}
 \usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{ltablex}
+\keepXColumns
 \usepackage{lineno}
 \linenumbers
 \tcbuselibrary{breakable,skins}
@@ -22,6 +26,11 @@
 \newcommand{\bk}{\mathbf{k}}
 \newcommand{\br}{\mathbf{r}}
 \newcommand{\bR}{\mathbf{R}}
+\newcommand{\bs}{\mathbf{s}}
+\newcommand{\bd}{\mathbf{d}}
+\newcommand{\bH}{\mathbf{H}}
+\newcommand{\bC}{\mathbf{C}}
+\newcommand{\bN}{\mathbf{N}}
 \newcommand{\bG}{\mathbf{G}}
 \newcommand{\bPsi}{\boldsymbol{\Psi}}
 \newcommand{\bv}{\mathbf{v}}
@@ -70,18 +79,14 @@ accounts for mode coupling and reduces transient artefacts caused by
 initializing simulations at finite redshift.  Third-order and
 arbitrary-order schemes have since been developed
 \citep{Michaux2020,RampfHahn2021} and are available in modern
-IC generators.  \textsc{music2}
-\citep{Hahn2011} implements 1LPT and 2LPT for nested-grid zooms,
-controlled by the conf key \texttt{use\_2LPT = yes}; its unigrid
-sibling \texttt{monofonIC} additionally supports 3LPT for full-box
-runs.  For a comprehensive and up-to-date overview of IC generation
+IC generators.  For a comprehensive and up-to-date overview of IC generation
 techniques (forward vs.\ backscaling, reduced-variance sampling,
 constrained realisations, particle loads, and discreteness effects)
 together with the broader landscape of large-scale dark-matter
 simulations, we refer the reader to the Living Review by
 \citet{Angulo2022}.
 
-\paragraph{Organisation and pressure.}
+\paragraph{Scope: pressureless matter.}
 Most of this note treats matter as a single \emph{pressureless} fluid,
 which is exact for cold dark matter and adequate for baryons on scales
 well above the Jeans length.  The main body of the note (Sections~\ref{sec:fluid} onward) therefore
@@ -89,12 +94,12 @@ uses the pressureless continuity/Euler/Poisson system, which is what
 Lagrangian perturbation theory (ZA, 2LPT, 3LPT) assumes by
 construction.  Baryonic pressure, the associated two-fluid growth
 equations, and the practical machinery for generating joint
-baryon$+$CDM ICs (two transfer functions, compensated mode,
-\texttt{do\_baryons} in \texttt{MUSIC2}/\texttt{monofonIC}) are
+baryon$+$CDM ICs (two transfer functions, compensated mode) are
 collected separately in Section~\ref{sec:baryons_cdm}, so the LPT
 derivation flow is not interrupted.  The intervening sections can
-therefore be read as the $c_s \to 0$ limit of the full two-fluid
-treatment, which is restored in Section~\ref{sec:baryons_cdm}.
+therefore be read as the vanishing-sound-speed (pressureless) limit
+of the full two-fluid treatment, which is restored in
+Section~\ref{sec:baryons_cdm}.
 
 %----------------------------------------------------------------------
 \section{Notation}
@@ -104,59 +109,70 @@ A reference table of the symbols used throughout. Entries are grouped
 by topic; cross-references point to the section where each is
 introduced or used most centrally.
 
-\begin{tcolorbox}[
-  title={Notation summary},
-  colback=blue!4, colframe=blue!50!black, coltitle=white, fonttitle=\bfseries,
-  breakable, before skip=0.6em, after skip=0.6em
-]
-
-\paragraph{Coordinates and motion.}
-\begin{tabular}{l p{0.78\textwidth}}
+\begingroup
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\setlength{\LTpre}{0.4em}
+\setlength{\LTpost}{0.4em}
+\begin{tabularx}{\linewidth}{@{}l X@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Symbol} & \textbf{Meaning} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{2}{r}{\emph{continued on next page}} \\
+\endfoot
+\bottomrule
+\endlastfoot
+\multicolumn{2}{@{}l}{\textit{Coordinates and motion}} \\
+\midrule
 $\bq$           & Lagrangian (initial-time) comoving position of a fluid element \\
 $\bx$           & Eulerian (current-time) comoving position; $\bx=\bq+\bPsi$ \\
 $a(t)$, $z$     & cosmological scale factor; redshift $z = 1/a - 1$ \\
 $H(t)$          & Hubble rate, $H = \dot a/a$ \\
-$\calH(\eta)$   & conformal Hubble rate, $\calH = a'/a = aH$ (prime $= d/d\eta$) \\
-$\bv_{\rm pec}$ & peculiar velocity (deviation from Hubble flow), $\bv = a\dot{\bx}$
-\end{tabular}
-
-\paragraph{Density and gravitational potential.}
-\begin{tabular}{l p{0.78\textwidth}}
+$\eta$          & conformal time, $d\eta = dt/a$ \\
+$\calH(\eta)$   & conformal Hubble rate, $\calH = (da/d\eta)/a = aH$ \\
+$\bv_{\rm pec}$ & peculiar velocity (deviation from Hubble flow), $\bv = a\dot{\bx}$ \\
+\midrule
+\multicolumn{2}{@{}l}{\textit{Density and gravitational potential}} \\
+\midrule
 $\rho$, $\bar\rho$ & total matter density and its background (mean) value \\
 $\delta$           & density contrast, $\delta \equiv \rho/\bar\rho - 1$ \\
 $\delta_{\rm lin}$ & linear-theory density contrast at a reference epoch \\
-$\Phi$             & Newtonian gravitational potential, $\nabla^2\Phi = 4\pi G\bar\rho a^2\delta$
-\end{tabular}
-
-\paragraph{Lagrangian perturbation theory (\S\ref{sec:lpt}).}
-\begin{tabular}{l p{0.78\textwidth}}
+$\Phi$             & Newtonian gravitational potential, $\nabla^2\Phi = 4\pi G\bar\rho a^2\delta$ \\
+\midrule
+\multicolumn{2}{@{}l}{\textit{Lagrangian perturbation theory (\S\ref{sec:lpt})}} \\
+\midrule
 $\bPsi$, $\bPsi^{(1)}$, $\bPsi^{(2)}$ & total, first-, and second-order displacements \\
 $\phi^{(1)}$, $\phi^{(2)}$            & first-, second-order displacement (Lagrangian) potentials, $\bPsi^{(n)} = -\nabla_\bq\phi^{(n)}$ \\
 $\Dp(t)$                              & linear (first-order) growth factor, $\delta\propto\Dp$ \\
 $\Dpp(t)$                             & second-order growth factor; $\Dpp\approx -\tfrac{3}{7}\Dp^2$ in matter domination \\
 $f(z)$                                & linear growth rate, $f \equiv d\ln\Dp/d\ln a$ \\
 $J_{ij}$                              & deformation Jacobian, $J_{ij} = \partial x_i/\partial q_j$ \\
-$S^{(2)}$                             & 2LPT source $\propto$ off-diagonal invariants of $\partial_i\Psi^{(1)}_j$
-\end{tabular}
-
-\paragraph{Cosmological parameters.}
-\begin{tabular}{l p{0.78\textwidth}}
+$S^{(2)}$                             & 2LPT source $\propto$ off-diagonal invariants of $\partial_i\Psi^{(1)}_j$ \\
+\midrule
+\multicolumn{2}{@{}l}{\textit{Cosmological parameters}} \\
+\midrule
 $\Omm$, $\Omega_\Lambda$, $\Omega_b$ & matter, dark-energy, baryon density parameters today \\
 $h$                                   & dimensionless Hubble parameter, $H_0 = 100h\,\mathrm{km}\,\mathrm{s}^{-1}\,\mathrm{Mpc}^{-1}$ \\
 $n_s$                                 & primordial scalar spectral tilt (typically $\approx 0.965$) \\
-$\sigma_8$                            & rms density variance in 8\,$h^{-1}$Mpc spheres
-\end{tabular}
-
-\paragraph{Spectra and grids.}
-\begin{tabular}{l p{0.78\textwidth}}
+$\sigma_8$                            & rms density variance in 8\,$h^{-1}$Mpc spheres \\
+\midrule
+\multicolumn{2}{@{}l}{\textit{Spectra and grids}} \\
+\midrule
 $P(k)$, $P_{\rm lin}(k)$ & 3D matter power spectrum (and its linear-theory value) \\
 $T(k)$                    & matter transfer function, $\delta(k)\propto T(k)\delta_{\rm primordial}(k)$ \\
 $\xi(r)$                  & two-point correlation function (Fourier conjugate of $P(k)$) \\
 $L$                       & comoving box size of the simulation \\
 $N$                       & particle/grid count per side \\
 $k_{\rm Ny}=\pi N/L$      & Nyquist wavenumber (highest mode resolved on an $N^3$ grid) \\
-$k_{\rm fund}=2\pi/L$     & fundamental wavenumber (longest mode that fits in the box)
-\end{tabular}
+$k_{\rm fund}=2\pi/L$     & fundamental wavenumber (longest mode that fits in the box) \\
+\end{tabularx}
+\endgroup
 
 \paragraph{Length-unit conventions.}
 ``$h^{-1}\,\mathrm{Mpc}$'' is the standard cosmology distance unit:
@@ -165,15 +181,13 @@ $h$ so that observationally derived distances do not depend on its
 exact value. Conversions: $1\,\mathrm{Mpc} = 3.086\times 10^{24}\,\mathrm{cm}$;
 the present-day Hubble length is $c/H_0 \approx 2998\,h^{-1}\,\mathrm{Mpc}$.
 
-\end{tcolorbox}
-
 %----------------------------------------------------------------------
 \section{Preliminaries}
 \label{sec:preliminaries}
 
 This section collects background results from FLRW cosmology that the
-rest of the note draws on.  Further basic material can be added here
-as needed.
+rest of the note draws on.
+% Further basic material can be added here as needed.
 
 \subsection{Derivation from Einstein's equations}
 \label{sec:friedmann_derivation}
@@ -1792,9 +1806,9 @@ MUSIC2 implements this via \texttt{fix\_mode\_amplitude = yes}
 (the default in this pipeline).
 
 \textbf{Paired simulations.}
-A complementary technique is to generate a \emph{partner} IC with
-$\delta'(\bk) = -\delta(\bk)$, i.e.\ all phases shifted by $\pi$, which
-in real space gives $\delta'(\bx) = -\delta(\bx)$.
+A complementary technique \citep{Pontzen2016} is to generate a
+\emph{partner} IC with $\delta'(\bk) = -\delta(\bk)$, i.e.\ all phases
+shifted by $\pi$, which in real space gives $\delta'(\bx) = -\delta(\bx)$.
 For any observable $f$ that admits a perturbative expansion in $\delta$,
 %
 \begin{equation*}
@@ -1809,6 +1823,49 @@ averaging a pair of simulations dramatically reduces cosmic variance
 for two-point statistics ($P(k)$, $\xi(r)$, $\sigma_8$).
 The fixed-amplitude and pairing techniques are independent and can be
 combined for maximum variance suppression.
+MUSIC2 exposes the sign flip as \texttt{flip\_mode\_amplitude = yes};
+running a pair means submitting two identical configurations that differ
+only by this switch, and averaging the two resulting simulations at the
+statistic level.
+
+\textbf{Where the variance suppression breaks down.}
+Fixing removes the linear-in-$\delta$ contribution to the variance of an
+observable, and pairing removes the surviving odd-order contributions.
+What remains are the even mode-coupling terms
+$f^{(2)}[\delta,\delta]$, $f^{(4)}[\delta,\delta,\delta,\delta]$, \ldots,
+which are generated by nonlinear gravitational evolution.
+For the matter power spectrum these mode-coupling contributions dominate
+the variance at $k\gtrsim 0.3\,h\,\mathrm{Mpc}^{-1}$ at $z=1$
+\citep{Chuang2019}, so above this scale the fixed-and-paired ensemble
+behaves essentially like a standard one.
+The same limit shows up in configuration space at $r\lesssim
+20\,h^{-1}\,\mathrm{Mpc}$, and in the three-point statistics (bispectrum,
+three-point correlation function) at all scales relevant to BAO/RSD,
+which are dominated by the same mode-coupling terms.
+For halo-mass functions the variance reduction below the mass cut
+$M\lesssim 10^{13}\,h^{-1}M_\odot$ is only moderate, because halo
+positions and masses are sensitive to small-scale fluctuations that
+carry stochasticity beyond the fixed linear-mode amplitudes.
+
+\textbf{Empirical validation at survey scale.}
+The UNIT project \citep{Chuang2019} tested the fixed-and-paired
+construction on 800 FastPM boxes and two pairs of full N-body
+\textsc{Gadget} simulations at $L=1\,h^{-1}\,\mathrm{Gpc}$,
+$N_p=4096^3$ (particle mass $1.2\times10^9\,h^{-1}M_\odot$).
+No bias was detected in the two- or three-point statistics of dark
+matter or haloes, in real or redshift space, at BAO/RSD scales.
+The variance of $\xi(r)$ was reduced by a factor of about 40 relative
+to a non-fixed reference set, so a single pair of $1\,h^{-1}\,\mathrm{Gpc}$
+boxes has the effective volume of roughly 150 independent boxes
+($\approx 20\,(h^{-1}\mathrm{Gpc})^3$), which exceeds the
+DESI and Euclid survey volumes.
+\citet{VillaescusaNavarro2018} carried the same test into
+small-volume hydrodynamical simulations and confirmed the absence of
+detectable bias in the galaxy and CMB-lensing statistics they studied.
+For voids, the auto-correlation function shows only moderate improvement,
+consistent with the mode-coupling limit above, but the void--halo
+cross-correlation function improves significantly; \citet{Chuang2019}
+recommend fixed-amplitude pairs for void studies on this basis.
 
 \textbf{Why the field is no longer Gaussian.}
 A Gaussian random field (GRF) requires that the real and imaginary parts of
@@ -1976,6 +2033,274 @@ All transforms are 3D FFTs.}
 \end{figure}
 
 %----------------------------------------------------------------------
+\section{Constrained Realisations}
+\label{sec:constrained}
+
+The IC procedure of Section~\ref{sec:icgen} draws the white noise
+$n(\bq)$ from an \emph{unconstrained} Gaussian ensemble: any statistically
+identical realisation of the same $P(k)$ is equally acceptable, and no
+particular halo, cluster, or void is targeted.  For many science goals
+this is exactly what is wanted --- e.g.\ ensemble statistics of the halo
+mass function, of galaxy clustering, or of the CMB lensing signal.  For
+others one instead wants a specific realisation whose large-scale
+density and velocity fields match the observed nearby Universe:
+Virgo, Coma, and the Great Attractor in the right places; a Local Void
+of the right depth; the Milky Way and M31 falling toward each other with
+the observed relative velocity; and so on.  Simulations built this way
+are called \emph{constrained realisations} (CRs).  Their promise is to
+turn the local Universe into a laboratory in which halo assembly,
+satellite dynamics, and the reionisation history of the Local Group can
+be studied against a background that is not a random draw but the
+one draw we actually inhabit.
+
+Two broad approaches are used in practice.  The first, on which this
+section focuses, is the analytic \emph{constrained Gaussian random
+field} sampler of \citet{Bertschinger1987} and \citet{HoffmanRibak1991}:
+condition a linear Gaussian $\delta_{\rm lin}$ on a set of linear
+observables (peculiar velocities, cluster masses, void depths) and
+draw exactly from the resulting posterior.  The second is
+\emph{Bayesian forward modelling}, in which one samples the posterior
+on the initial density field given a galaxy survey by running a full
+non-linear structure-formation forward model (LPT, PM, or $N$-body)
+inside a Hamiltonian Monte Carlo loop
+\citep{JascheWandelt2013,Wang2014}.  The forward-modelling route
+handles non-linearities and redshift-space distortions self-consistently
+but is computationally much more expensive, and to date has been
+deployed on wider-field galaxy surveys rather than the immediate Local
+Volume.  Both approaches can only constrain the field above the
+non-linear scale set by the data; small-scale power is filled in from
+the residual Gaussian ensemble.
+
+\subsection{The mathematical problem}
+\label{sec:cr_problem}
+
+Let $\bs$ denote the Gaussian random field we want to generate --- for
+concreteness, the linear-theory density contrast on a grid, so
+$\bs\in\mathbb{R}^N$ with covariance
+%
+\begin{equation}
+  \bC \equiv \langle \bs\bs^{\!\top}\rangle,
+  \qquad
+  C_{ij} = \xi(|\bx_i-\bx_j|),
+\end{equation}
+%
+i.e.\ $\bC$ is the two-point correlation function on the grid points
+(diagonal in Fourier space with entries $P(k)$).  A set of $M$
+\emph{linear} constraints is imposed via a design matrix
+$\bH\in\mathbb{R}^{M\times N}$ and measured values $\bd\in\mathbb{R}^M$,
+%
+\begin{equation}
+  \bH\bs = \bd,
+  \label{eq:cr_constraints}
+\end{equation}
+%
+plus, optionally, a Gaussian noise covariance $\bN$ on the constraints
+(e.g.\ observational errors on peculiar velocities).  Typical examples:
+\begin{itemize}
+  \item \emph{Peculiar velocity constraints:}
+        $H_{ij} = W_i^{\rm smooth}(\bx_j)\,\hat{n}_i\!\cdot\!\nabla^{-1}\!\cdot\!(\ldots)$,
+        i.e.\ a Wiener kernel that maps the density field into the
+        line-of-sight peculiar velocity at galaxy $i$, with $d_i$ the
+        measured value (from CosmicFlows, e.g.\ \citealt{Sorce2018});
+  \item \emph{Cluster density peaks:}
+        $H_{ij}$ smooths $\delta$ on the cluster scale
+        $R_{\rm cl}\sim 5\,h^{-1}$Mpc at the cluster centre; $d_i$ is
+        the observed peak height;
+  \item \emph{Void constraints:}
+        same, with $d_i<0$.
+\end{itemize}
+The question is: what is the distribution of $\bs$ conditioned on
+Eq.~\eqref{eq:cr_constraints}, and how does one sample from it?
+
+\paragraph{Conditional Gaussian.}
+For a joint Gaussian $(\bs,\bd)$ with zero mean, the conditional
+distribution $p(\bs\mid\bd)$ is again Gaussian, with mean
+%
+\begin{equation}
+  \bar\bs \equiv \langle \bs\mid\bd\rangle
+    = \bC\bH^{\!\top}(\bH\bC\bH^{\!\top}+\bN)^{-1}\bd
+  \label{eq:cr_wiener}
+\end{equation}
+%
+and covariance
+%
+\begin{equation}
+  \bC_{\rm cond}
+    = \bC - \bC\bH^{\!\top}(\bH\bC\bH^{\!\top}+\bN)^{-1}\bH\bC.
+  \label{eq:cr_cov}
+\end{equation}
+%
+Equation~\eqref{eq:cr_wiener} is the \emph{Wiener filter}: the
+minimum-variance linear reconstruction of $\bs$ from the constraint data
+$\bd$ \citep{Zaroubi1995}.  It is the ``expected'' field given the data
+--- smooth on scales that the constraints cannot resolve --- and by
+itself is \emph{not} a valid IC: its power spectrum is suppressed
+wherever the data are silent.
+
+\paragraph{Hoffman--Ribak algorithm.}
+The trick of \citet{HoffmanRibak1991} is to sample the conditional
+distribution without ever forming $\bC_{\rm cond}$ or its Cholesky
+factor.  Draw an unconstrained realisation $\tilde\bs\sim\mathcal{N}(\mathbf{0},\bC)$
+using the usual white-noise+transfer-function machinery.  Compute the
+Wiener filter of its own constraint values
+$\tilde\bd\equiv\bH\tilde\bs$,
+%
+\begin{equation}
+  \tilde\bs_{\rm WF}
+    = \bC\bH^{\!\top}(\bH\bC\bH^{\!\top}+\bN)^{-1}\tilde\bd,
+\end{equation}
+%
+and subtract it from $\tilde\bs$.  Then add the Wiener filter of the
+\emph{desired} data $\bd$:
+%
+\begin{equation}
+  \bs_{\rm CR}
+    = \tilde\bs
+      + \bC\bH^{\!\top}(\bH\bC\bH^{\!\top}+\bN)^{-1}
+        \bigl(\bd - \bH\tilde\bs\bigr).
+  \label{eq:hr_sampler}
+\end{equation}
+%
+A direct calculation shows that $\bs_{\rm CR}$ is Gaussian with mean
+$\bar\bs$ and covariance $\bC_{\rm cond}$, i.e.\ it is a draw from the
+correct conditional ensemble.  The two intuitions are:
+\begin{itemize}
+  \item $\bs_{\rm CR}$ equals the Wiener mean $\bar\bs$ \emph{plus} the
+        residual $\tilde\bs - \tilde\bs_{\rm WF}$ of an unconstrained
+        realisation.  The residual carries the full unconstrained power
+        on scales the constraints cannot resolve, restoring statistical
+        realism where the WF alone would be smooth.
+  \item The residual is orthogonal to $\bH$ in the covariance-weighted
+        inner product, so $\bH\bs_{\rm CR}=\bd$ exactly (or, if
+        $\bN\neq 0$, within the prescribed noise).
+\end{itemize}
+The only expensive operation is the $M\times M$ inverse
+$(\bH\bC\bH^{\!\top}+\bN)^{-1}$, whose size is set by the number of
+constraints, not by the grid size $N$.  For $M\sim 10^3$ galaxy
+velocities and $N\sim 10^9$ grid points this is a huge saving.
+
+\subsection{Where the constraints come from}
+\label{sec:cr_data}
+
+For simulations of the local Universe the dominant data source is
+\emph{galaxy peculiar velocities}: distances from Tully--Fisher, the
+fundamental plane, surface-brightness fluctuations, and Type~Ia
+supernovae, combined with redshift, give a line-of-sight velocity
+after subtracting the Hubble flow.  The CosmicFlows compilations
+(currently CosmicFlows-4) supply $\sim\!10^{4-5}$ such velocities out to
+$\sim\!150\,h^{-1}$Mpc.  Peculiar velocities are the natural data for
+CRs because they are sourced by the \emph{linear} density field via
+$\bv\propto \nabla^{-1}\delta$ on the scales where the observations
+have signal-to-noise, so the mapping from field to data is linear and
+Eqs.~\eqref{eq:cr_wiener}--\eqref{eq:hr_sampler} apply directly.
+Bias corrections, Malmquist-like effects, and non-Gaussian error tails
+are handled at the constraint-building stage \citep{Sorce2018} rather
+than inside the HR sampler.
+
+Redshift-space galaxy positions, cluster masses, and CMB dipole
+constraints can also be folded in via linear operators on $\delta$
+(possibly at multiple smoothing scales).  Non-linear constraints ---
+e.g.\ ``a halo of mass $M$ at this position at $z=0$'' --- are not
+directly expressible as a linear $\bH\bs=\bd$, and instead require an
+iterative reverse-Zel'dovich or genetic-modification procedure
+\citep{Stopyra2021}.
+
+\subsection{Combining CRs with LPT and the IC pipeline}
+\label{sec:cr_pipeline}
+
+Constrained realisations enter the pipeline of Section~\ref{sec:icgen}
+at the \emph{white-noise draw} step, not at the LPT step.  Once
+$n(\bq)$ has been produced with the correct constrained statistics, the
+downstream operations --- convolution with the transfer function to
+form $\delta_{\rm lin}$, solving Poisson to get $\phi^{(1)}$, computing
+the 2LPT source, and assigning positions and velocities --- proceed
+unchanged.  In particular, PLT, back-scaling, and higher-order LPT
+corrections are all orthogonal to whether the underlying field is
+constrained or unconstrained.
+
+A subtlety in practice: the constraints are typically defined on a
+\emph{smoothed} density field with a smoothing scale of a few $h^{-1}$Mpc,
+matched to the coherence length of the velocity data.  On scales below
+that the field is effectively unconstrained, so a zoom refinement inside
+a CR box behaves like an ordinary zoom around a specified Lagrangian
+region; only the large-scale environment is fixed.  For CRs of the
+Local Group this means the tidal field acting on the Milky Way halo is
+reproduced, but the halo's small-scale merger history is one draw from
+the residual ensemble --- different runs with different unconstrained
+seeds give a distribution of assembly histories consistent with the
+same large-scale environment.
+
+\paragraph{Code landscape.}
+The Hoffman--Ribak algorithm predates modern IC generators and is
+usually implemented in a separate pipeline that produces a constrained
+white-noise cube, which is then read by an ordinary IC code
+(\texttt{GRAFIC-2}, \texttt{MUSIC2}, \texttt{monofonIC}) via its
+existing wnoise-input path.  \texttt{GenetIC} \citep{Stopyra2021}
+takes a related but distinct route --- \emph{genetic modification}
+--- in which one starts from an existing (constrained or
+unconstrained) IC and applies minimum-perturbation edits to hit
+additional constraints, useful for targeted studies of halo assembly.
+
+\subsection{Notable simulation projects}
+\label{sec:cr_projects}
+
+Constrained realisations have driven a decade-plus of Local Universe
+simulation campaigns; a non-exhaustive list of the most influential
+follows.
+
+\begin{itemize}
+  \item \textbf{CLUES} (Constrained Local UniversE Simulations;
+        \citealt{Gottloeber2010,Yepes2014}).  The founding effort:
+        peculiar-velocity constraints from MARK III and CosmicFlows-1/2,
+        applied via Hoffman--Ribak to \texttt{GRAFIC-2} white noise,
+        evolved with a variety of $N$-body and hydrodynamical codes.
+        Established the pipeline that later projects built on.
+  \item \textbf{Local Group Factory} \citep{Carlesi2016}.  A large
+        ensemble of CLUES-style CRs run with independent
+        unconstrained-mode seeds, producing hundreds of Local-Group
+        candidates from the same large-scale constraints.  Used to
+        study the scatter in Milky Way / M31 assembly at fixed
+        environment.
+  \item \textbf{ELUCID} \citep{Wang2016}.  A somewhat different
+        philosophy: reconstruct the $z\!\sim\!0$ density field from an
+        SDSS-based Hamiltonian Monte Carlo posterior, then run the
+        reverse-Zel'dovich map to obtain constrained ICs at high $z$.
+        Targets the SDSS volume rather than the Local Group.
+  \item \textbf{HESTIA} (High-resolution Environmental Simulations of
+        The Immediate Area; \citealt{Libeskind2020}).  Zoom-in
+        hydrodynamical resimulations of the Local Group inside CLUES
+        large-scale CRs, resolving Milky Way / M31 satellite
+        populations.
+  \item \textbf{CLONES} (Constrained LOcal and Nesting Environment
+        Simulations; \citealt{Sorce2021}).  Hydrodynamical
+        resimulations of specific cosmic-web features (voids,
+        filaments, clusters) inside a CosmicFlows-constrained parent
+        box, targeting environment-dependent galaxy formation.
+  \item \textbf{SIBELIUS / SIBELIUS-DARK}
+        \citep{Sawala2022,McAlpine2022}.  A $\sim\!1\,{\rm Gpc}$
+        constrained volume matching CosmicFlows-3, with a Milky Way
+        analogue at its centre.  Produces mock light-cone galaxy
+        catalogues out to $z\!\sim\!0.2$ that can be compared
+        object-by-object with real surveys.
+  \item \textbf{BORG} (Bayesian Origin Reconstruction from Galaxies;
+        \citealt{JascheWandelt2013}).  Not a single simulation but a
+        forward-modelling framework: HMC sampling of the initial
+        density field posterior conditioned on a galaxy survey (2M++,
+        SDSS-BOSS, etc.), which then yields an ensemble of constrained
+        ICs.  Representative of the second (Bayesian forward-model)
+        route.
+\end{itemize}
+Common science goals across these projects: Local-Group assembly
+history, satellite galaxy statistics conditioned on the observed
+tidal environment, cosmic-web classification of the Local Volume, and
+targeted mock catalogues for surveys that cover a specific patch of
+sky.  \citet{Sorce2016b} showed that at fixed large-scale constraints
+the scatter in cluster-mass properties across independent small-scale
+seeds is a factor of 2--3 smaller on $5\,h^{-1}$Mpc scales than for
+random simulations, quantifying the ``environmental fixing'' benefit
+of the CR approach for individual objects such as Virgo and Coma.
+
+%----------------------------------------------------------------------
 \section{Starting Redshifts and Convergence}
 \label{sec:zstart}
 
@@ -1993,7 +2318,6 @@ agree with those at $z_{\rm start}=400$ to better than $1\%$ at
 $z<6$, demonstrating convergence.
 
 \medskip
-In summary:
 \begin{itemize}
   \item \textbf{ZA}: transients $\propto a^{-1}$; convergence
     requires $z_{\rm start} \gg 1000$, which is impractical.
@@ -2678,6 +3002,23 @@ single-grid ICs for \emph{full-box} cosmological runs.  This section
 sketches the main algorithmic choices each code makes and the
 numerical subtleties that matter for IC quality.
 
+\paragraph{Other widely used IC generators.}  Several other public
+codes address adjacent parts of this space.  \texttt{GRAFIC-2}
+\citep{Bertschinger2001} was the original nested-grid zoom IC
+generator and remains the reference for the GRAFIC binary file
+format.  \texttt{N-GenIC} \citep{Springel2005}, shipped alongside
+\textsc{gadget}-2/3/4, generates single-grid ZA ICs from a tabulated
+transfer function; \texttt{2LPTic} \citep{Crocce2006} extends it to
+2LPT.  \texttt{Ginnungagap} \citep{Prunet2008} implements parallel
+1LPT/2LPT ICs with GRAFIC-compatible I/O.  For fast approximate
+simulations (mock catalogues, covariance estimation), the COLA-based
+\texttt{L-PICOLA} \citep{Howlett2015} and the particle-mesh
+\texttt{FastPM} \citep{Feng2016} generate their own 2LPT ICs
+internally.  \texttt{MUSIC2}/\texttt{monofonIC} is currently the
+highest-order option for production-quality ICs (1--3LPT with PLT
+and back-scaling); the review by \citet{Angulo2022} surveys the
+broader landscape.
+
 %----------------------------------------------------------------------
 \subsection{\texttt{MUSIC2}: nested-grid zoom ICs}
 \label{sec:music2}
@@ -3194,9 +3535,8 @@ slab-free FFT are a better fit for a laptop-scale testbed.
 \section{Baryon + CDM Initial Conditions}
 \label{sec:baryons_cdm}
 
-\emph{Placeholder.}  This section will collect the material that the
-pressureless treatment in Sections~\ref{sec:fluid} onward deliberately
-leaves out:
+This section covers the material that the pressureless treatment in
+Sections~\ref{sec:fluid} onward leaves out:
 %
 \begin{itemize}
   \item baryon Euler equation with the $-\nabla p/\rho_b$ term and the
@@ -3269,7 +3609,7 @@ leaves out:
 \label{app:diffgeo}
 
 This appendix is a self-contained primer on the differential-geometry
-tools used in \S\ref{sec:einstein}.  It covers, in order: (i)~the
+tools used in \S\ref{sec:friedmann_derivation}.  It covers, in order: (i)~the
 metric and what it means to have an inner product on a manifold;
 (ii)~connections, parallel transport, and the Levi-Civita choice;
 (iii)~Christoffel symbols and their computation; (iv)~the 3+1 split
@@ -3462,7 +3802,7 @@ raising/lowering indices commutes with $\nabla$.  (ii) The contracted
 Bianchi identity $\nabla_\mu G^{\mu\nu} = 0$ combined with
 $\nabla g = 0$ gives automatic energy--momentum conservation
 $\nabla_\mu T^{\mu\nu} = 0$, which underlies the continuity equation
-in \S\ref{sec:einstein}.
+in \S\ref{sec:friedmann_derivation}.
 
 \paragraph{Diagonal metrics.}
 For a diagonal metric (e.g.\ FLRW in spherical coordinates, or
@@ -3504,7 +3844,7 @@ Eq.~(\ref{eq:christoffel_formula}) and separating components:
   \item $\Gamma^i_{0j}$: $g^{ik}$ contracts with $\partial_0 g_{kj} =
     2a\dot a\,\gamma_{kj}$, giving $\Gamma^i_{0j} = H\,\delta^i_j$.
 \end{itemize}
-These match the values quoted in \S\ref{sec:einstein}.
+These match the values quoted in \S\ref{sec:friedmann_derivation}.
 
 \subsection{The 3+1 split and the $(3)$ notation}
 \label{app:3plus1}
@@ -3548,7 +3888,7 @@ The FLRW metric in $(r,\theta,\phi)$ coordinates has
 $g_{rr} = a^2/(1-Kr^2)$, which blows up at $r = 1/\sqrt{K}$ for
 $K>0$.  This is a \emph{coordinate} singularity, not a physical one:
 the geometry is perfectly smooth there, and switching to the
-$\chi$-coordinate used in \S\ref{sec:einstein} removes the
+$\chi$-coordinate used in \S\ref{sec:friedmann_derivation} removes the
 pathology.
 
 A clean 2D analogue lives on the unit 2-sphere.  The
@@ -3894,6 +4234,53 @@ subtraction, is therefore
 \end{equation}
 %
 Note that $1/\bar{n} = V/N_p$.
+
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=0.75\textwidth]{shotnoise_order.pdf}
+  \caption{Order of CIC-window deconvolution and shot-noise subtraction,
+    on a pure Poisson particle field ($P_{\rm signal}=0$, so every
+    measured power is shot noise), interlaced CIC, $N_p = 64^3$ on a
+    $64^3$ mesh.  Grey: the deconvolved spectrum $P^m/W^2$ without
+    subtraction is flat at $1/\bar{n}$, confirming that the raw shot
+    power is $W^2(\bk)/\bar{n}$ rather than white.  Green: subtracting
+    $1/\bar{n}$ \emph{after} deconvolution (Eq.~\ref{eq:Pk_full})
+    recovers $\hat P \approx 0$ at all $k$.  Magenta: subtracting
+    \emph{before} deconvolution over-corrects by
+    $\bar{n}^{-1}(W^{-2}-1)$ and drives $\hat P$ strongly negative
+    toward the Nyquist frequency.}
+  \label{fig:shotnoise_order}
+\end{figure}
+
+\paragraph{Ordering of the two operations.}
+Equation~(\ref{eq:Pk_full}) subtracts the flat level $1/\bar{n}$
+\emph{after} deconvolving by $W^2$, and the order matters.  Mass
+assignment convolves \emph{every} particle with the same window, so the
+discrete density transform factorises as
+%
+\begin{equation}
+  \tilde\delta_{\rm meas}(\bk) = W(\bk)\sum_p e^{-i\bk\cdot\bx_p},
+  \label{eq:shot_windowed}
+\end{equation}
+%
+and the raw shot power is $W^2(\bk)/\bar{n}$ — windowed, \emph{not}
+white.  Dividing by $W^2$ therefore flattens the shot term to the
+constant $1/\bar{n}$, which the subtraction in Eq.~(\ref{eq:Pk_full})
+then removes exactly.  Reversing the order,
+$[P^m(\bk) - 1/\bar{n}]/W^2$, subtracts a flat level from a windowed
+spectrum and over-corrects by
+%
+\begin{equation}
+  \frac{1}{\bar{n}}\!\left(\frac{1}{W^2(\bk)} - 1\right) \ge 0,
+  \label{eq:shot_oversub}
+\end{equation}
+%
+which grows toward the Nyquist frequency (where $W^2 \to$ small) and
+drives $\hat P$ negative there.  Figure~\ref{fig:shotnoise_order}
+demonstrates both orderings on a pure Poisson particle field.  The alias
+cross-terms neglected in Eq.~(\ref{eq:shot_windowed}) are cancelled by
+interlaced CIC assignment; without interlacing a small positive residual
+of the alias sum, Eq.~(\ref{eq:alias_cic}), survives near the grid scale.
 
 %----------------------------------------------------------------------
 \subsubsection*{Sub-Poissonian noise for lattice initial conditions}
