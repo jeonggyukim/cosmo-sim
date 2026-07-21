@@ -71,26 +71,32 @@ CFLAGS := -O3 -std=c99 -Wall -Wno-unused-local-typedef $(OMP_CFLAGS) \
 LDFLAGS := -L$(HDF5_LIB) -lhdf5 -lm $(OMP_LDFLAGS)
 
 # --- Targets ---
-all: $(BIN_DIR)/compute_xi $(BIN_DIR)/compute_xi_cic
+# Default build is the CIC-grid FFT-autocorrelation xi(r)/psi(r) estimator,
+# which works at any redshift and needs only HDF5 + FFTW (no Corrfunc).
+all: $(BIN_DIR)/compute_xi
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
-# Clone and build Corrfunc if the static library is missing
+$(BIN_DIR)/compute_xi: $(SRC_DIR)compute_xi.c | $(BIN_DIR)
+	$(CC) -O3 -std=c99 -Wall $(OMP_CFLAGS) -I$(HDF5_INC) -I$(FFTW_INC) \
+	      -L$(HDF5_LIB) -L$(FFTW_LIB) -lhdf5 -lfftw3 -lm $(OMP_LDFLAGS) \
+	      $< -o $@
+
+# Optional: the Corrfunc pair-counting xi(r) estimator (low z only).
+#   make -C src corrfunc            # build (clones + builds Corrfunc if missing)
+#   make -C src corrfunc CORRFUNCDIR=/path/to/Corrfunc
+corrfunc: $(BIN_DIR)/compute_xi_corrfunc
+
 $(CORRFUNC_LIB):
 	@echo "==> Corrfunc not found — cloning from GitHub..."
 	git clone --depth=1 https://github.com/manodeep/Corrfunc.git $(CORRFUNCDIR)
 	$(MAKE) -C $(CORRFUNCDIR) CC=$(CC) theory
 
-$(BIN_DIR)/compute_xi: $(SRC_DIR)compute_xi.c $(CORRFUNC_LIB) | $(BIN_DIR)
+$(BIN_DIR)/compute_xi_corrfunc: $(SRC_DIR)compute_xi_corrfunc.c $(CORRFUNC_LIB) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $< $(CORRFUNC_LIB) $(LDFLAGS) -o $@
 
-$(BIN_DIR)/compute_xi_cic: $(SRC_DIR)compute_xi_cic.c | $(BIN_DIR)
-	$(CC) -O3 -std=c99 -Wall $(OMP_CFLAGS) -I$(HDF5_INC) -I$(FFTW_INC) \
-	      -L$(HDF5_LIB) -L$(FFTW_LIB) -lhdf5 -lfftw3 -lm $(OMP_LDFLAGS) \
-	      $< -o $@
-
 clean:
-	rm -f $(BIN_DIR)/compute_xi $(BIN_DIR)/compute_xi_cic
+	rm -f $(BIN_DIR)/compute_xi $(BIN_DIR)/compute_xi_corrfunc
 
-.PHONY: all clean
+.PHONY: all clean corrfunc

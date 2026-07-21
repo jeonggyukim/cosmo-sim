@@ -10,16 +10,14 @@ codes write the same SWIFT HDF5 output.
 
 Steps (each skipped if its output already exists):
   1. Build the IC code
-  2. Build compute_xi / compute_xi_cic (C, Corrfunc)
+  2. Build compute_xi (C; CIC-grid FFT-autocorrelation xi/psi estimator)
   3. Generate the IC config from a template
   4. Run the IC code -> SWIFT IC HDF5 (+ a CLASS ini)
   5. CLASS matter P(k) at z=0 (adapt the CLASS ini; reuse the shared
      data/class_pk_z0_pk.dat if already present)
-  6. Corrfunc radial bin file
-  7. Corrfunc xi(r)         (skipped at z > 10; shot-noise dominated)
-  8. CIC-grid xi(r), psi(r) (any z)
-  9. CIC + FFT P(k)
- 10. Diagnostic plot
+  6. CIC-grid xi(r), psi(r) via FFT autocorrelation (any z)
+  7. CIC/PCS + FFT P(k)
+  8. Diagnostic plot
 
 All outputs are keyed by STEM under ``RunConfig.root`` (default: the current
 working directory):
@@ -74,7 +72,6 @@ class RunConfig:
     assignment: str = "pcs"   # P(k) mass-assignment scheme: ngp/cic/tsc/pcs
     seed: int | None = None
     ic_source_dir: str | None = None
-    corrfunc_dir: str | None = None
     launcher: str | None = None
     mpi_ranks: int = 1
     stop_after_ic: bool = False
@@ -173,11 +170,8 @@ def step_build_compute_xi(cfg: RunConfig) -> None:
     if _exists(cfg, "bin/compute_xi"):
         log("compute_xi already built — skipping")
         return
-    log("Building compute_xi / compute_xi_cic...")
-    cmd = ["make", "-C", "src"]
-    if cfg.corrfunc_dir:
-        cmd.append(f"CORRFUNCDIR={cfg.corrfunc_dir}")
-    run(cfg, cmd)
+    log("Building compute_xi...")
+    run(cfg, ["make", "-C", "src"])
 
 
 def step_gen_config(cfg: RunConfig, stem: str) -> str:
@@ -288,33 +282,13 @@ def step_class(cfg: RunConfig, stem: str) -> str | None:
     return CLASS_PKS
 
 
-def step_rbins(cfg: RunConfig, stem: str, ic_file: str) -> str:
-    rbins = f"data/rbins_{stem}.txt"
-    if _exists(cfg, rbins):
-        log(f"rbins already exist — skipping ({rbins})")
-        return rbins
-    log("Generating rbins...")
-    run(cfg, py_cli("icpipe.cli.make_rbins", "--hdf5", ic_file))
-    return rbins
-
-
-def step_xi(cfg: RunConfig, stem: str, ic_file: str, rbins: str) -> None:
-    xi_file = f"data/xi_{stem}.txt"
-    if float(cfg.zstart) > 10:
-        log(f"Skipping Corrfunc xi(r) — z={cfg.zstart} > 10 (shot-noise dominated; use CIC)")
-        return
-    log(f"Measuring xi(r) with compute_xi ({cfg.nthreads} threads)...")
-    with open(os.path.join(cfg.root, xi_file), "w") as out:
-        run(cfg, ["./bin/compute_xi", ic_file, rbins, str(cfg.nthreads)], stdout=out)
+def step_xi(cfg: RunConfig, stem: str, ic_file: str) -> None:
+    """Measure xi(r) and psi(r) via the CIC-grid FFT autocorrelation (any z)."""
+    xi_file = f"data/xi_cic_{stem}.txt"
+    log(f"Measuring xi(r) and psi(r) (CIC-grid FFT autocorrelation, {cfg.nthreads} threads)...")
+    run(cfg, ["./bin/compute_xi", "--input", ic_file, "--Ngrid", "128",
+              "--nthreads", str(cfg.nthreads), "--output", xi_file, "--vel"])
     print(f"    Saved: {xi_file}")
-
-
-def step_xi_cic(cfg: RunConfig, stem: str, ic_file: str) -> None:
-    xi_cic = f"data/xi_cic_{stem}.txt"
-    log(f"Measuring xi(r) and psi(r) on CIC grid ({cfg.nthreads} threads)...")
-    run(cfg, ["./bin/compute_xi_cic", "--input", ic_file, "--Ngrid", "128",
-              "--nthreads", str(cfg.nthreads), "--output", xi_cic, "--vel"])
-    print(f"    Saved: {xi_cic}")
     print(f"    Saved: data/vel_cic_{stem}.txt")
 
 
@@ -360,9 +334,7 @@ def run_pipeline(cfg: RunConfig) -> None:
         return
 
     theory = step_class(cfg, stem)
-    rbins = step_rbins(cfg, stem, ic_file)
-    step_xi(cfg, stem, ic_file, rbins)
-    step_xi_cic(cfg, stem, ic_file)
+    step_xi(cfg, stem, ic_file)
     pk_file = step_pk(cfg, stem, ic_file)
     plot_file = step_plot(cfg, stem, pk_file, theory)
 

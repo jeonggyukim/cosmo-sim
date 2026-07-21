@@ -44,7 +44,6 @@ def main():
                    help="Random seed for the IC white noise (paired-suite runs)")
     p.add_argument("--ic-source-dir", default=None,
                    help="Path to the IC-code source checkout (else sibling dir or clone)")
-    p.add_argument("--corrfunc-dir", default=None, help="Path to a built Corrfunc tree")
     p.add_argument("--launcher", default=None,
                    help='MPI launcher prefix for the IC step, e.g. "srun" or "srun -n 128" '
                         "(inherits the SLURM allocation). The orchestrator itself stays single-process.")
@@ -68,7 +67,6 @@ def main():
         assignment=args.assignment,
         seed=args.seed,
         ic_source_dir=args.ic_source_dir,
-        corrfunc_dir=args.corrfunc_dir,
         launcher=args.launcher,
         mpi_ranks=args.mpi_ranks,
         stop_after_ic=args.stop_after_ic,
