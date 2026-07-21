@@ -145,7 +145,8 @@ typedef struct {
     char    vel_output[512]; /* output file for ψ(r); auto-derived if empty */
     int     use_fft;      /* 1 = FFT autocorrelation (default for xyz-periodic);
                              0 = direct lag-sum */
-    int     order;        /* mass-assignment order: NGP=1 CIC=2 TSC=3 PCS=4 */
+    int     order;        /* ξ/ψ grid MAS order: NGP=1 CIC=2 TSC=3 PCS=4 */
+    int     pk_order;     /* P(k) MAS order (separate: ξ is not window-deconvolved) */
     int     compute_pk;   /* if set, also estimate and write P(k) */
     char    pk_output[512]; /* output file for P(k); auto-derived if empty */
     double  H0;           /* H0 [km/s/Mpc] for h = H0/100 (P(k) unit conversion) */
@@ -1221,11 +1222,15 @@ static void usage(const char *prog)
         "  --vel-output FILE  output file for ψ(r) (default: auto-derived from --output)\n"
         "  --no-fft           force direct O(N_lags × Ngrid³) lag sum instead of\n"
         "                     O(Ngrid³ log Ngrid) FFT (FFT is default when periodic=xyz)\n"
-        "  --assignment STR   mass assignment: ngp|cic|tsc|pcs (default pcs;\n"
-        "                     order 1/2/3/4 B-spline, Sefusatti+ 2016)\n"
+        "  --assignment STR   ξ/ψ grid mass assignment: ngp|cic|tsc|pcs (default cic;\n"
+        "                     order 1/2/3/4 B-spline, Sefusatti+ 2016). ξ/ψ is not\n"
+        "                     window-deconvolved, so higher order only over-smooths.\n"
         "  --pk               also estimate P(k); auto-names pk_<stem>.txt from --output\n"
         "  --pk-output FILE   also estimate P(k), writing to FILE\n"
         "  --nkbins INT       number of log k-bins for P(k) (default 60)\n"
+        "  --pk-assignment STR  P(k) mass assignment: ngp|cic|tsc|pcs (default pcs;\n"
+        "                     interlaced + W² deconvolution, so PCS is most accurate\n"
+        "                     near Nyquist — matches compute_pk.py)\n"
         "  --H0 FLOAT         H0 [km/s/Mpc] for h=H0/100 in P(k) units (default 67.11)\n"
         "  --help\n"
         "\n"
@@ -1251,7 +1256,13 @@ static Opts parse_args(int argc, char **argv)
     o.nthreads    = 0;        /* 0 → use OMP_NUM_THREADS environment variable */
     o.compute_vel = 0;        /* default: density xi only */
     o.use_fft     = 1;        /* default: FFT path (falls back to direct if non-periodic) */
-    o.order       = 4;        /* default: PCS (matches compute_pk.py) */
+    o.order       = 2;        /* ξ/ψ default: CIC. The ξ/ψ autocorrelation does not
+                                 deconvolve the MAS window, so higher order only widens
+                                 the real-space smoothing kernel — no gain, and worse at
+                                 small r. PCS's near-Nyquist anti-aliasing helps P(k), not
+                                 the correlation functions. */
+    o.pk_order    = 4;        /* P(k) default: PCS (interlaced + W² deconvolution; matches
+                                 compute_pk.py). Set separately with --pk-assignment. */
     o.compute_pk  = 0;        /* default: no P(k) output */
     o.H0          = 67.11;    /* default h = 0.6711 (CV_22 cosmology) */
     o.nkbins      = 60;       /* default: 60 log k-bins (matches compute_pk.py) */
@@ -1287,6 +1298,14 @@ static Opts parse_args(int argc, char **argv)
             else if (!strcmp(argv[i],"tsc")) o.order = 3;
             else if (!strcmp(argv[i],"pcs")) o.order = 4;
             else { fprintf(stderr,"Unknown assignment: %s (use ngp|cic|tsc|pcs)\n", argv[i]); exit(1); }
+        }
+        else if (!strcmp(argv[i], "--pk-assignment") && i+1<argc) {
+            i++;
+            if      (!strcmp(argv[i],"ngp")) o.pk_order = 1;
+            else if (!strcmp(argv[i],"cic")) o.pk_order = 2;
+            else if (!strcmp(argv[i],"tsc")) o.pk_order = 3;
+            else if (!strcmp(argv[i],"pcs")) o.pk_order = 4;
+            else { fprintf(stderr,"Unknown pk-assignment: %s (use ngp|cic|tsc|pcs)\n", argv[i]); exit(1); }
         }
         else if (!strcmp(argv[i], "--periodic") && i+1<argc) {
             i++;
@@ -1458,10 +1477,10 @@ int main(int argc, char **argv)
         }
         printf("\n-- Power spectrum P(k) --\n");
         printf("Estimating P(k): interlaced %s assignment, %d k-bins, h=%.4f ...\n",
-               order_name(o.order), o.nkbins, o.H0 / 100.0);
-        compute_and_write_pk(coords, N_total, boxsize, Ngrid, o.order,
+               order_name(o.pk_order), o.nkbins, o.H0 / 100.0);
+        compute_and_write_pk(coords, N_total, boxsize, Ngrid, o.pk_order,
                              o.H0 / 100.0, o.nkbins, redshift, o.ptype,
-                             o.input, order_name(o.order), pk_out_path);
+                             o.input, order_name(o.pk_order), pk_out_path);
     }
 
     /* coords still needed for velocity CIC assignment; free after that step */

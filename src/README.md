@@ -50,6 +50,12 @@ Estimator (Landy–Szalay over cells):
 Key options (see `--help` for the full set):
 
 - `--Ngrid N` — CIC grid resolution (default: `cbrt(N_particles)`).
+- `--assignment ngp|cic|tsc|pcs` — ξ/ψ grid mass assignment (default
+  **cic**).  The ξ/ψ autocorrelation is not window-deconvolved, so a
+  higher order only widens the real-space smoothing kernel — PCS's
+  near-Nyquist anti-aliasing advantage applies to P(k), not the
+  correlation functions.  The optional `--pk` output uses its own
+  `--pk-assignment` (default **pcs**, interlaced + W² deconvolution).
 - `--nbins / --rmin / --rmax` — radial binning (Mpc); defaults are
   cell-size and BoxSize/2.
 - `--mode 3d | 1d-x | 1d-y | 1d-z` — full 3D vs single-axis projection.
