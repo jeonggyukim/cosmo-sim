@@ -1,8 +1,8 @@
 # `tools/` — build & ops scripts
 
 Setup, build, cleanup, and SLURM templates.  These are NOT part of
-`run_pipeline.py` invocation surface (well — `build-music.sh` and
-`build-corrfunc.sh` ARE invoked by `run_pipeline.py` as needed; see
+`run-pipeline` invocation surface (well — `build-music.sh` and
+`build-corrfunc.sh` ARE invoked by `run-pipeline` as needed; see
 each script's header for the exact resolution order).
 
 ## Scripts

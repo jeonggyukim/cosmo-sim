@@ -17,7 +17,7 @@
 
 # --- Locate MUSIC2 source ---
 # Resolution order:
-#   1. $MUSIC2_SOURCE_DIR env var (set by run_pipeline.py --ic-source-dir)
+#   1. $MUSIC2_SOURCE_DIR env var (set by run-pipeline --ic-source-dir)
 #   2. ../MUSIC2  relative to this repo (sibling directory, default)
 #   3. Clone from GitHub into ../MUSIC2 if not found
 REPO_ROOT="$(dirname "$(readlink -f "$0")")"

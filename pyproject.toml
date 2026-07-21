@@ -27,6 +27,7 @@ make-rbins = "icpipe.cli.make_rbins:main"
 compute-pk = "icpipe.cli.compute_pk:main"
 compute-pv = "icpipe.cli.compute_pv:main"
 plot-ic = "icpipe.cli.plot_ic:main"
+run-pipeline = "icpipe.cli.run_pipeline:main"
 
 [tool.setuptools]
 packages = ["icpipe", "icpipe.cli"]

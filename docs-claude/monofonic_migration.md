@@ -120,9 +120,9 @@ seed            = 12345
   - `icpipe/cli/make_monofonic_conf.py` (`make-monofonic-conf`) — config generator
     paralleling `make_music_conf.py` (lives in `icpipe/cli/`, not `scripts/`, to
     match the current console-script layout). `--lpt-order`, `--fixing`, `--seed`.
-  - `run_pipeline.py` — unified Python driver with `--ic-code {music,monofonic}`,
+  - `run-pipeline` — unified Python driver with `--ic-code {music,monofonic}`,
     replacing the bash `--ic-code` plan. Front-end branches on the code; downstream
-    is shared. The bash `run_pipeline.sh` has been removed; `run_pipeline.py`
+    is shared. The bash `run_pipeline.sh` has been removed; `run-pipeline`
     covers both the MUSIC and monofonIC paths.
   - CLASS handling: both codes write a CLASS ini to the CWD (MUSIC:
     `input_class_parameters.ini`; monofonIC: `<config-basename>_input_class_parameters.ini`,

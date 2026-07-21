@@ -94,9 +94,12 @@ else
         done
         export CMAKE_PREFIX_PATH="$BREW_PREFIX:${CMAKE_PREFIX_PATH:-}"
     else
-        # Cluster: load required modules (no openmpi — this is an MPI-off build)
+        # Cluster: load required modules. MPI is required (see the cmake flags
+        # below), so this needs an MPI-enabled FFTW and a parallel HDF5. Module
+        # names vary by site — adjust to match `module avail`.
         module purge 1>/dev/null 2>&1
         module load gnu12/12.2.0
+        module load openmpi4/4.1.5
         module load fftw/3.3.10
         module load hdf5/1.14.0
         module load gsl/2.7.1

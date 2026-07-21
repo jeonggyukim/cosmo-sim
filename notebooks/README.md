@@ -8,7 +8,7 @@ Worked examples of the `icpipe` package on real IC data from this project.
 # from the project root
 conda activate cosmo                  # or your env
 pip install -e ".[plot]"              # icpipe + matplotlib
-python run_pipeline.py                # generate at least one IC + CLASS P(k)
+run-pipeline                # generate at least one IC + CLASS P(k)
 ```
 
 The notebooks read paths under `data/` (relative to the project root).
@@ -34,7 +34,7 @@ The default file names in the notebooks (`pk_n256_z200_L*.txt`,
 
 ```bash
 for L in 256 512 1024; do
-  python run_pipeline.py --ngrid 256 --lbox $L --zstart 200
+  run-pipeline --ngrid 256 --lbox $L --zstart 200
   compute-pv data/ics_swift_n256_z200_L${L}.hdf5
 done
 ```
