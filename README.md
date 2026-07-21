@@ -8,7 +8,7 @@ linear theory from **CLASS**.
 
 The reusable analysis code is the installable Python package **`icpipe`**
 (`ICField`, `LinearTheory`, `io`, and the pipeline-step CLIs). The end-to-end
-run is driven by `run_pipeline.sh`; the C tools `compute_xi` / `compute_xi_cic`
+run is driven by `run_pipeline.py`; the C tools `compute_xi` / `compute_xi_cic`
 handle the pair-counting and CIC-grid measurements.
 
 ## Install
@@ -74,7 +74,7 @@ and the MUSIC2 build).
 | `bin/`              | compiled C binaries (gitignored)                         | —         |
 | `icpipe/`           | Python library: `ICField`, `LinearTheory`, `io`          | [`icpipe/README.md`](icpipe/README.md) |
 | `icpipe/cli/`       | pipeline-step console scripts                            | (in `icpipe/README.md`) |
-| `scripts/analysis/` | ad-hoc inspection CLIs (not in `run_pipeline.sh`)        | [`scripts/analysis/README.md`](scripts/analysis/README.md) |
+| `scripts/analysis/` | ad-hoc inspection CLIs (not in `run_pipeline.py`)        | [`scripts/analysis/README.md`](scripts/analysis/README.md) |
 | `tools/`            | build / clean / cluster sbatch scripts                   | [`tools/README.md`](tools/README.md) |
 | `conf/`             | MUSIC2 config files (template + generated)               | —         |
 | `data/`             | CLASS outputs, rbins, measured P/ξ/ψ tables (gitignored) | —         |
@@ -86,17 +86,14 @@ and the MUSIC2 build).
 
 ## Run the full pipeline
 
-Two IC codes are supported, selected with `--ic-code` on the Python driver
-`run_pipeline.py` (preferred). The legacy bash `run_pipeline.sh` runs MUSIC only
-and is kept as a fallback.
+Two IC codes are supported, selected with `--ic-code` on the driver
+`run_pipeline.py`.
 
 ```bash
 python run_pipeline.py                                     # MUSIC (default): N=256, L=1000 Mpc/h, z=200
 python run_pipeline.py --ic-code monofonic                 # MUSIC2-monofonIC (adds PLT, 3LPT)
 python run_pipeline.py --ngrid 256 --lbox 512 --zstart 200 # 256³, L=512 Mpc/h, z=200
 python run_pipeline.py --ic-code monofonic --lpt-order 3   # explicit LPT order
-
-./run_pipeline.sh --ngrid 256 --lbox 256 --zstart 200      # legacy bash driver (MUSIC only)
 ```
 
 `music` and `monofonic` runs at the same N, z, L coexist — monofonIC outputs
@@ -153,7 +150,7 @@ alongside the input `pk_*.txt` and overlays them.  Pass several
   ψ(r) measured by `bin/compute_xi_cic` is already in (km/s)² — no
   a² rescaling.
 - MUSIC2 always writes `wnoise_NNNN.bin` and `input_class_parameters.ini`
-  to the CWD; `run_pipeline.sh` moves them into `data/` and `conf/`
+  to the CWD; `run_pipeline.py` moves them into `data/` and `conf/`
   automatically.
 - Always generate rbins per-IC with `make-rbins` (rmin = 2 × mean
   spacing, rmax = L/3).  Reusing rbins from a different box size or

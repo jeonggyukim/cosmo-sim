@@ -27,9 +27,6 @@ All outputs are keyed by STEM:
   music     : n{N}_z{z}_L{L}[_nofix][_s{seed}]
   monofonic : n{N}_z{z}_L{L}_mono[_nofix][_s{seed}]
 so MUSIC and monofonIC runs at the same N, z, L coexist without collision.
-
-Note: run_pipeline.sh is the legacy bash driver (MUSIC only); it is kept as a
-fallback while this Python driver is validated.
 """
 
 from __future__ import annotations

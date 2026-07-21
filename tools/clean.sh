@@ -50,9 +50,9 @@ if $ALL; then
     rm -rf music_build/
 
     echo
-    echo "Full clean done. Re-run ./run_pipeline.sh to regenerate everything."
+    echo "Full clean done. Re-run python run_pipeline.py to regenerate everything."
 else
     echo
-    echo "Clean done. Re-run ./run_pipeline.sh to regenerate outputs."
+    echo "Clean done. Re-run python run_pipeline.py to regenerate outputs."
     echo "Use './clean.sh --all' to also remove ICs, CLASS outputs, and MUSIC2 build."
 fi

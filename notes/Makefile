@@ -86,7 +86,7 @@ CLASS_BIN  := $(firstword $(wildcard $(REPO_ROOT)/music_build/_deps/class-build/
 CLASS_INI  := $(firstword $(wildcard $(REPO_ROOT)/conf/input_class_parameters_*.ini))
 
 ../data/class_pk_z200_pk.dat :
-	@test -n "$(CLASS_INI)" || { echo "ERROR: no conf/input_class_parameters_*.ini found; run ./run_pipeline.sh once to produce one." >&2; exit 1; }
+	@test -n "$(CLASS_INI)" || { echo "ERROR: no conf/input_class_parameters_*.ini found; run python run_pipeline.py once to produce one." >&2; exit 1; }
 	@test -x "$(CLASS_BIN)"  || { echo "ERROR: no CLASS binary found (looked in music_build/_deps/class-build/ and \$$PATH); run tools/build-music.sh or install CLASS." >&2; exit 1; }
 	TMP=$$(mktemp /tmp/class_pk_XXXXXX) && mv "$$TMP" "$$TMP.ini" && TMP="$$TMP.ini" && \
 	LC_ALL=C sed -e 's/^output =.*/output = mPk/' -e 's/^z_pk =.*/z_pk = 200/' \

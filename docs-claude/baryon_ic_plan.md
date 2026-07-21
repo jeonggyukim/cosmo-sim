@@ -34,7 +34,7 @@ Currently a placeholder.  To cover:
   `baryons = yes` and `baryons_density = separate` (MUSIC2) or the
   `monofonIC` equivalent.  Ensure the resulting CLASS `.ini` requests
   both $T_c$ and $T_b$ in the output.
-- **`run_pipeline.sh`**: handle PartType0 (gas) alongside PartType1
+- **`run_pipeline.py`**: handle PartType0 (gas) alongside PartType1
   (DM); set SWIFT IC metadata (ParticleIDs, InternalEnergy or entropy
   field, correct masses per species using
   $\Omega_c$ vs $\Omega_b$).

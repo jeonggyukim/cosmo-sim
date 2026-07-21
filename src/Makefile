@@ -13,7 +13,7 @@ BIN_DIR  := $(REPO_DIR)/bin
 # --- Corrfunc paths ---
 # Default: ../Corrfunc (sibling of the repo root). Override with:
 #   make CORRFUNCDIR=/path/to/Corrfunc
-# or via run_pipeline.sh --corrfunc-dir /path/to/Corrfunc
+# or via run_pipeline.py --corrfunc-dir /path/to/Corrfunc
 CORRFUNCDIR ?= $(realpath $(REPO_DIR)/../Corrfunc)
 CORRFUNC_INC := $(CORRFUNCDIR)/theory/xi $(CORRFUNCDIR)/utils
 CORRFUNC_LIB := $(CORRFUNCDIR)/theory/xi/libcountpairs_xi.a

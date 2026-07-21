@@ -39,7 +39,7 @@ After install, the following commands appear on `$PATH`:
 | `plot-ic`         | `icpipe.cli.plot_ic`         | overlay measured + CLASS theory on `pk_*`, `xi_*`, `vel_cic_*` |
 
 Each command also works as `python -m icpipe.cli.<name> ...`.
-`run_pipeline.sh` invokes these commands directly.
+`run_pipeline.py` invokes these commands directly.
 
 ## Library API
 

@@ -1,6 +1,6 @@
 # `scripts/analysis/` — ad-hoc IC inspection tools
 
-CLIs that are **not** part of `run_pipeline.sh`.  Each one is run by
+CLIs that are **not** part of `run_pipeline.py`.  Each one is run by
 hand to inspect or compare ICs already produced by the pipeline.
 
 For the pipeline-step CLIs (`compute-pk`, `make-rbins`, ...) see

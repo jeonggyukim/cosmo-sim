@@ -16,7 +16,7 @@ make -C src clean
 Defaults:
 - `CORRFUNCDIR` → `../Corrfunc` (sibling of repo root); cloned + built
   if missing.  Override with the make variable or
-  `run_pipeline.sh --corrfunc-dir`.
+  `run_pipeline.py --corrfunc-dir`.
 - macOS: clang + `-Xclang -fopenmp` + Homebrew `libomp` (keg-only).
   HDF5 and FFTW come from the regular `/opt/homebrew/{include,lib}`
   symlinks.
@@ -114,5 +114,5 @@ src/
 └── compute_xi_cic.c  # ~1000 lines, self-contained CIC + FFT estimator
 ```
 
-Binaries land in `../bin/` (gitignored).  `run_pipeline.sh` calls
+Binaries land in `../bin/` (gitignored).  `run_pipeline.py` calls
 `./bin/compute_xi` (step 7) and `./bin/compute_xi_cic --vel` (step 8).
