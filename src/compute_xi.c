@@ -95,6 +95,10 @@
 #include <math.h>
 #include <float.h>
 
+#ifndef M_PI
+#  define M_PI 3.14159265358979323846
+#endif
+
 #ifdef _OPENMP
 #  include <omp.h>
 #endif
@@ -141,6 +145,11 @@ typedef struct {
     char    vel_output[512]; /* output file for ψ(r); auto-derived if empty */
     int     use_fft;      /* 1 = FFT autocorrelation (default for xyz-periodic);
                              0 = direct lag-sum */
+    int     order;        /* mass-assignment order: NGP=1 CIC=2 TSC=3 PCS=4 */
+    int     compute_pk;   /* if set, also estimate and write P(k) */
+    char    pk_output[512]; /* output file for P(k); auto-derived if empty */
+    double  H0;           /* H0 [km/s/Mpc] for h = H0/100 (P(k) unit conversion) */
+    int     nkbins;       /* number of log k-bins for P(k) */
 } Opts;
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -303,62 +312,88 @@ static int read_velocities(const char *fname, int ptype, double **vels, long lon
  * used here.  For P(k) estimation this would require deconvolution, but
  * for ξ(r) at large r (rmin >> cell) the suppression is negligible.
  */
-typedef struct { long idx; double w; } CicW;
+/*
+ * mas_axis — per-axis B-spline mass-assignment weights for one particle.
+ *
+ * Given a particle at grid coordinate g = position/cell, fills the `order`
+ * (wrapped cell index, weight) pairs along one axis.  The interpolation order
+ * selects the scheme (Sefusatti et al. 2016): NGP=1, CIC=2, TSC=3, PCS=4.  The
+ * stencil spans `order` cells and the weights sum to 1.  These weight forms
+ * match icpipe's _axis_stencil so the C and Python estimators agree.
+ */
+static inline void mas_axis(double g, int order, int Ngrid,
+                            int idx[4], double w[4])
+{
+    if (order == 1) {                 /* NGP */
+        int c = (int)floor(g + 0.5);
+        idx[0] = ((c % Ngrid) + Ngrid) % Ngrid;
+        w[0]   = 1.0;
+    } else if (order == 2) {          /* CIC */
+        int base = (int)floor(g);
+        double dx = g - base;
+        double ww[2] = { 1.0 - dx, dx };
+        for (int m = 0; m < 2; m++) {
+            int c = base + m;
+            idx[m] = ((c % Ngrid) + Ngrid) % Ngrid;
+            w[m]   = ww[m];
+        }
+    } else if (order == 3) {          /* TSC, centred on the nearest grid point */
+        int n = (int)floor(g + 0.5);
+        for (int m = 0; m < 3; m++) {
+            int c = n + (m - 1);
+            double t = fabs(g - (double)c);
+            w[m]   = (t < 0.5) ? (0.75 - t*t) : (0.5 * (1.5 - t) * (1.5 - t));
+            idx[m] = ((c % Ngrid) + Ngrid) % Ngrid;
+        }
+    } else {                          /* PCS (order 4) */
+        int mm = (int)floor(g);
+        for (int m = 0; m < 4; m++) {
+            int c = mm + (m - 1);
+            double t = fabs(g - (double)c);
+            w[m]   = (t < 1.0) ? ((4.0 - 6.0*t*t + 3.0*t*t*t) / 6.0)
+                               : ((2.0 - t) * (2.0 - t) * (2.0 - t) / 6.0);
+            idx[m] = ((c % Ngrid) + Ngrid) % Ngrid;
+        }
+    }
+}
 
 /*
- * cic_weights — compute the 8 (linear_index, weight) pairs for one particle.
- *
- * Given a particle at (px_mpc, py_mpc, pz_mpc), fills out[0..7] with the
- * trilinear weights and flat indices into an Ngrid³ grid, with periodic wrap.
- * Both cic_assign and cic_vel_assign call this helper; the only difference
- * between the two is what they accumulate into at each of the 8 cells.
+ * mas_assign — deposit unit mass per particle onto an Ngrid³ grid using the
+ * order-p B-spline stencil.  gshift (in cell units) offsets every particle
+ * before assignment: pass 0 for the base grid and 0.5 for the interlaced
+ * (half-cell-shifted) grid.  After this call the grid holds raw particle
+ * counts (not overdensity).
  */
-static inline void cic_weights(double px_mpc, double py_mpc, double pz_mpc,
-                               double cell, int Ngrid, CicW out[8])
+static void mas_assign(const double *coords, long long npart,
+                       double boxsize, int Ngrid, int order, double gshift,
+                       double *grid)
 {
-    double px = px_mpc / cell, py = py_mpc / cell, pz = pz_mpc / cell;
-    int    i0 = (int)floor(px); double dx = px - floor(px);
-    int    j0 = (int)floor(py); double dy = py - floor(py);
-    int    k0 = (int)floor(pz); double dz = pz - floor(pz);
-    double tx = 1.0-dx, ty = 1.0-dy, tz = 1.0-dz;
-
-    long Ng = Ngrid, Ng2 = Ng * Ng;
-    int n = 0;
-    for (int di = 0; di < 2; di++) {
-        double wx = di ? dx : tx;
-        int    ix = ((i0+di) % Ngrid + Ngrid) % Ngrid;
-        for (int dj = 0; dj < 2; dj++) {
-            double wy = dj ? dy : ty;
-            int    iy = ((j0+dj) % Ngrid + Ngrid) % Ngrid;
-            for (int dk = 0; dk < 2; dk++) {
-                double wz = dk ? dz : tz;
-                int    iz = ((k0+dk) % Ngrid + Ngrid) % Ngrid;
-                out[n].idx = (long)ix * Ng2 + (long)iy * Ng + (long)iz;
-                out[n].w   = wx * wy * wz;
-                n++;
+    double cell = boxsize / Ngrid;
+    long   Ng = Ngrid, Ng2 = Ng * Ng;
+    for (long long p = 0; p < npart; p++) {
+        int ix[4], iy[4], iz[4];
+        double wx[4], wy[4], wz[4];
+        mas_axis(coords[p*3+0]/cell + gshift, order, Ngrid, ix, wx);
+        mas_axis(coords[p*3+1]/cell + gshift, order, Ngrid, iy, wy);
+        mas_axis(coords[p*3+2]/cell + gshift, order, Ngrid, iz, wz);
+        for (int a = 0; a < order; a++) {
+            long baseA = (long)ix[a] * Ng2;
+            for (int b = 0; b < order; b++) {
+                double wxy   = wx[a] * wy[b];
+                long   baseB = baseA + (long)iy[b] * Ng;
+                for (int c = 0; c < order; c++)
+                    grid[baseB + iz[c]] += wxy * wz[c];
             }
         }
     }
 }
 
-static void cic_assign(const double *coords, long long npart,
-                       double boxsize, int Ngrid, double *grid)
-{
-    double cell = boxsize / Ngrid;
-    CicW   w[8];
-    for (long long p = 0; p < npart; p++) {
-        cic_weights(coords[p*3+0], coords[p*3+1], coords[p*3+2],
-                    cell, Ngrid, w);
-        for (int n = 0; n < 8; n++) grid[w[n].idx] += w[n].w;
-    }
-}
-
 /*
- * cic_vel_assign — assign per-particle velocities to three CIC grids.
+ * mas_vel_assign — assign per-particle velocities to three grids.
  *
- * Uses mass-weighted (CIC-weighted) assignment: each particle's velocity
- * is distributed to the 8 surrounding cells with the same trilinear weights
- * as cic_assign.  The velocity grids therefore hold
+ * Uses mass-weighted assignment: each particle's velocity is distributed to
+ * the order³ surrounding cells with the same B-spline weights as mas_assign.
+ * The velocity grids therefore hold
  *
  *   vα_sum[cell] = Σ_p w_p * vα_p
  *
@@ -366,8 +401,9 @@ static void cic_assign(const double *coords, long long npart,
  *
  *   v_field[cell] = vα_sum[cell] / count[cell]
  *
- * The caller supplies the pre-built count grid (output of cic_assign before
- * normalisation) and receives three normalised velocity-field grids.
+ * The caller supplies the pre-built count grid (output of mas_assign before
+ * normalisation) and receives three normalised velocity-field grids.  The
+ * assignment order must match the one used to build count_grid.
  *
  * For cells with zero mass (empty cells — extremely rare in IC files), the
  * velocity is set to 0 (the linear-theory mean is zero, so this is unbiased).
@@ -378,32 +414,42 @@ static void cic_assign(const double *coords, long long npart,
  * conversion happens at IC read time.)  So ψ(r) = ⟨v·v'⟩ comes out in
  * (km/s)² directly and is comparable to linear theory ψ_pec.
  */
-static void cic_vel_assign(const double *coords, const double *vels,
-                           long long npart, double boxsize, int Ngrid,
+static void mas_vel_assign(const double *coords, const double *vels,
+                           long long npart, double boxsize, int Ngrid, int order,
                            const double *count_grid,
                            double *vx_field, double *vy_field, double *vz_field)
 {
     double cell = boxsize / Ngrid;
-    long   Ng3  = (long)Ngrid * Ngrid * Ngrid;
+    long   Ng = Ngrid, Ng2 = Ng * Ng;
+    long   Ng3 = (long)Ngrid * Ngrid * Ngrid;
 
     double *vx_sum = (double *)calloc((size_t)Ng3, sizeof(double));
     double *vy_sum = (double *)calloc((size_t)Ng3, sizeof(double));
     double *vz_sum = (double *)calloc((size_t)Ng3, sizeof(double));
     if (!vx_sum || !vy_sum || !vz_sum) {
-        fprintf(stderr, "OOM in cic_vel_assign\n"); exit(1);
+        fprintf(stderr, "OOM in mas_vel_assign\n"); exit(1);
     }
 
-    CicW w[8];
     for (long long p = 0; p < npart; p++) {
-        cic_weights(coords[p*3+0], coords[p*3+1], coords[p*3+2],
-                    cell, Ngrid, w);
+        int ix[4], iy[4], iz[4];
+        double wx[4], wy[4], wz[4];
+        mas_axis(coords[p*3+0]/cell, order, Ngrid, ix, wx);
+        mas_axis(coords[p*3+1]/cell, order, Ngrid, iy, wy);
+        mas_axis(coords[p*3+2]/cell, order, Ngrid, iz, wz);
         double vpx = vels[p*3+0], vpy = vels[p*3+1], vpz = vels[p*3+2];
-        for (int n = 0; n < 8; n++) {
-            double ww = w[n].w;
-            long   ii = w[n].idx;
-            vx_sum[ii] += ww * vpx;
-            vy_sum[ii] += ww * vpy;
-            vz_sum[ii] += ww * vpz;
+        for (int a = 0; a < order; a++) {
+            long baseA = (long)ix[a] * Ng2;
+            for (int b = 0; b < order; b++) {
+                double wxy   = wx[a] * wy[b];
+                long   baseB = baseA + (long)iy[b] * Ng;
+                for (int c = 0; c < order; c++) {
+                    long   ii = baseB + iz[c];
+                    double ww = wxy * wz[c];
+                    vx_sum[ii] += ww * vpx;
+                    vy_sum[ii] += ww * vpy;
+                    vz_sum[ii] += ww * vpz;
+                }
+            }
         }
     }
 
@@ -985,6 +1031,170 @@ static void accumulate_vel_pairs(const double *vx, const double *vy, const doubl
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ *  P(k) estimation  (consistent with icpipe.ICField.power("delta"))
+ *
+ *  Interlaced order-p mass assignment + squared-window deconvolution, matching
+ *  compute_pk.py so the C and Python density-P(k) estimators agree.  The same
+ *  |δ(k)|² that the ξ(r) autocorrelation forms internally is here spherically
+ *  binned in |k|, deconvolved, and written as a pk_*.txt table (same columns
+ *  and units as compute_pk.py).
+ *
+ *    P(k)   = ⟨ |δ_k|² ⟩_shell · V · h³ / N² / W²(k)        [(Mpc/h)³]
+ *    δ_k    = ½( F₁ + e^{iπ(nx+ny+nz)/Ng} F₂ ) − N·δ_{k,0}   (interlaced)
+ *    W²(k)  = ∏_a sinc(n_a/Ng)^{2·order}     (numpy sinc = sin(πx)/(πx))
+ *    P_shot = V / N · h³
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static const char *order_name(int order)
+{
+    switch (order) {
+        case 1:  return "ngp";
+        case 2:  return "cic";
+        case 3:  return "tsc";
+        default: return "pcs";
+    }
+}
+
+static inline double sinc_norm(double x)   /* numpy sinc: sin(πx)/(πx), =1 at 0 */
+{
+    if (x == 0.0) return 1.0;
+    double px = M_PI * x;
+    return sin(px) / px;
+}
+
+static void compute_and_write_pk(const double *coords, long long N_total,
+                                 double boxsize, int Ngrid, int order,
+                                 double h, int nkbins, double redshift,
+                                 int ptype, const char *input,
+                                 const char *assign_name, const char *pk_path)
+{
+    long Ng   = Ngrid;
+    long Ng3  = Ng * Ng * Ng;
+    long Nch  = Ng/2 + 1;
+    long Ncom = Ng * Ng * Nch;
+
+    double V      = boxsize * boxsize * boxsize;        /* Mpc³ */
+    double h3     = h * h * h;
+    double kf     = 2.0 * M_PI / boxsize;               /* Mpc⁻¹ */
+    double knyq_mpch  = (M_PI * Ngrid / boxsize) / h;   /* h/Mpc */
+    double kfund_mpch = 2.0 * M_PI / (boxsize * h);     /* h/Mpc */
+    double kmin   = kfund_mpch;
+    double kmax   = 0.9 * knyq_mpch;
+    double P_shot = (V / (double)N_total) * h3;         /* (Mpc/h)³ */
+
+    /* Two half-cell-shifted count grids for interlacing (Sefusatti+ 2016). */
+    double       *rho1 = (double *)fftw_malloc(sizeof(double)       * (size_t)Ng3);
+    double       *rho2 = (double *)fftw_malloc(sizeof(double)       * (size_t)Ng3);
+    fftw_complex *F1   = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * (size_t)Ncom);
+    fftw_complex *F2   = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * (size_t)Ncom);
+    if (!rho1 || !rho2 || !F1 || !F2) {
+        fprintf(stderr, "OOM in compute_and_write_pk\n"); exit(1);
+    }
+    for (long i = 0; i < Ng3; i++) { rho1[i] = 0.0; rho2[i] = 0.0; }
+
+    mas_assign(coords, N_total, boxsize, Ngrid, order, 0.0, rho1);
+    mas_assign(coords, N_total, boxsize, Ngrid, order, 0.5, rho2);
+
+    fftw_plan p1 = fftw_plan_dft_r2c_3d(Ngrid, Ngrid, Ngrid, rho1, F1, FFTW_ESTIMATE);
+    fftw_execute(p1); fftw_destroy_plan(p1);
+    fftw_plan p2 = fftw_plan_dft_r2c_3d(Ngrid, Ngrid, Ngrid, rho2, F2, FFTW_ESTIMATE);
+    fftw_execute(p2); fftw_destroy_plan(p2);
+    fftw_free(rho1); fftw_free(rho2);
+
+    /* Log-spaced |k| bin edges in h/Mpc (matches log_bin_edges). */
+    double *edges = (double *)malloc((size_t)(nkbins+1) * sizeof(double));
+    double llo = log10(kmin), lhi = log10(kmax);
+    for (int b = 0; b <= nkbins; b++)
+        edges[b] = pow(10.0, llo + (lhi - llo) * b / nkbins);
+
+    double *sum_k   = (double *)calloc((size_t)nkbins, sizeof(double));
+    double *sum_P   = (double *)calloc((size_t)nkbins, sizeof(double));
+    double *sum_P2  = (double *)calloc((size_t)nkbins, sizeof(double));
+    double *sum_Pnd = (double *)calloc((size_t)nkbins, sizeof(double));
+    long   *cnt     = (long   *)calloc((size_t)nkbins, sizeof(long));
+    if (!edges || !sum_k || !sum_P || !sum_P2 || !sum_Pnd || !cnt) {
+        fprintf(stderr, "OOM in compute_and_write_pk (bins)\n"); exit(1);
+    }
+
+    double invN2 = 1.0 / ((double)N_total * (double)N_total);
+
+    for (long i = 0; i < Ng; i++) {
+        int nx = (i < Ng/2) ? (int)i : (int)(i - Ng);
+        for (long j = 0; j < Ng; j++) {
+            int ny = (j < Ng/2) ? (int)j : (int)(j - Ng);
+            for (long kk = 0; kk < Nch; kk++) {
+                int  nz  = (int)kk;
+                long idx = (i * Ng + j) * Nch + kk;
+
+                /* Interlace combine: F = ½(F₁ + e^{iπ(nx+ny+nz)/Ng} F₂). */
+                double ang = M_PI * (double)(nx + ny + nz) / (double)Ng;
+                double cph = cos(ang), sph = sin(ang);
+                double f2r = F2[idx][0], f2i = F2[idx][1];
+                double re = 0.5 * (F1[idx][0] + (cph*f2r - sph*f2i));
+                double im = 0.5 * (F1[idx][1] + (sph*f2r + cph*f2i));
+                if (i == 0 && j == 0 && kk == 0) re -= (double)N_total;  /* DC subtract */
+
+                double mag2 = re*re + im*im;
+                double Pnd  = mag2 * V * h3 * invN2;      /* no deconvolution */
+
+                double W  = sinc_norm((double)nx/(double)Ng)
+                          * sinc_norm((double)ny/(double)Ng)
+                          * sinc_norm((double)nz/(double)Ng);
+                double W2 = 1.0;
+                for (int e = 0; e < 2*order; e++) W2 *= W;
+                if (i == 0 && j == 0 && kk == 0) W2 = 1.0;
+                double P = Pnd / W2;
+
+                double kmag = kf * sqrt((double)nx*nx + (double)ny*ny + (double)nz*nz) / h;
+                int    b    = find_bin(edges, nkbins, kmag);
+                if (b < 0) continue;      /* excludes k=0 and modes outside [kmin,kmax) */
+                sum_k[b]   += kmag;
+                sum_P[b]   += P;
+                sum_P2[b]  += P * P;
+                sum_Pnd[b] += Pnd;
+                cnt[b]++;
+            }
+        }
+    }
+    fftw_free(F1); fftw_free(F2);
+
+    FILE *fp = fopen(pk_path, "w");
+    if (!fp) {
+        fprintf(stderr, "Cannot open %s for writing\n", pk_path);
+        free(edges); free(sum_k); free(sum_P); free(sum_P2); free(sum_Pnd); free(cnt);
+        return;
+    }
+    fprintf(fp,
+        "# P(k) from %s   |  compute_xi.c --pk-output\n"
+        "# Method : interlaced order-%d mass assignment + W^2 deconvolution\n"
+        "#          (consistent with icpipe.ICField.power / compute_pk.py)\n"
+        "# BoxSize=%.4g Mpc/h  N=%lld  ngrid=%d\n"
+        "# Assignment: %s (order %d)   PartType: %d   z: %.6f\n"
+        "# P_shot(m=1) = %.4e (Mpc/h)^3  (NOT subtracted; shown separately)\n"
+        "# Columns: k[h/Mpc]  P_raw[(Mpc/h)^3]  P_shot_sub[(Mpc/h)^3]  "
+        "P_nodeconv[(Mpc/h)^3]  sigma_P  nmodes  fold_m\n",
+        input, order, boxsize * h, N_total, Ngrid,
+        assign_name, order, ptype, redshift, P_shot);
+
+    for (int b = 0; b < nkbins; b++) {
+        if (cnt[b] == 0) continue;                 /* drop empty bins */
+        double kc    = sum_k[b] / cnt[b];
+        double Pmean = sum_P[b] / cnt[b];
+        double Pnd   = sum_Pnd[b] / cnt[b];
+        double popvar = sum_P2[b] / cnt[b] - Pmean * Pmean;   /* ddof=0, as numpy .std() */
+        if (popvar < 0.0) popvar = 0.0;
+        double sigma = (cnt[b] > 1) ? sqrt(popvar / (double)cnt[b]) : 0.0;
+        double Pss   = Pmean - P_shot;
+        fprintf(fp, "%.6e %.6e %.6e %.6e %.6e %ld %d\n",
+                kc, Pmean, Pss, Pnd, sigma, cnt[b], 1);
+    }
+    fclose(fp);
+    printf("Saved → %s  (%d k-bins)\n", pk_path, nkbins);
+
+    free(edges); free(sum_k); free(sum_P); free(sum_P2); free(sum_Pnd); free(cnt);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
  *  Argument parsing
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -1011,6 +1221,12 @@ static void usage(const char *prog)
         "  --vel-output FILE  output file for ψ(r) (default: auto-derived from --output)\n"
         "  --no-fft           force direct O(N_lags × Ngrid³) lag sum instead of\n"
         "                     O(Ngrid³ log Ngrid) FFT (FFT is default when periodic=xyz)\n"
+        "  --assignment STR   mass assignment: ngp|cic|tsc|pcs (default pcs;\n"
+        "                     order 1/2/3/4 B-spline, Sefusatti+ 2016)\n"
+        "  --pk               also estimate P(k); auto-names pk_<stem>.txt from --output\n"
+        "  --pk-output FILE   also estimate P(k), writing to FILE\n"
+        "  --nkbins INT       number of log k-bins for P(k) (default 60)\n"
+        "  --H0 FLOAT         H0 [km/s/Mpc] for h=H0/100 in P(k) units (default 67.11)\n"
         "  --help\n"
         "\n"
         "  r and BoxSize are in Mpc (SWIFT IC units, not Mpc/h).\n"
@@ -1035,8 +1251,13 @@ static Opts parse_args(int argc, char **argv)
     o.nthreads    = 0;        /* 0 → use OMP_NUM_THREADS environment variable */
     o.compute_vel = 0;        /* default: density xi only */
     o.use_fft     = 1;        /* default: FFT path (falls back to direct if non-periodic) */
+    o.order       = 4;        /* default: PCS (matches compute_pk.py) */
+    o.compute_pk  = 0;        /* default: no P(k) output */
+    o.H0          = 67.11;    /* default h = 0.6711 (CV_22 cosmology) */
+    o.nkbins      = 60;       /* default: 60 log k-bins (matches compute_pk.py) */
     strcpy(o.output,     "xi_cic_out.txt");
     o.vel_output[0] = '\0';   /* empty: auto-derived from --output in main() */
+    o.pk_output[0]  = '\0';   /* empty: auto-derived from --output in main() */
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--help"))                      usage(argv[0]);
@@ -1055,6 +1276,18 @@ static Opts parse_args(int argc, char **argv)
         else if (!strcmp(argv[i], "--vel-output") && i+1<argc) strncpy(o.vel_output, argv[++i], 511);
         else if (!strcmp(argv[i], "--no-fft"))                o.use_fft     = 0;
         else if (!strcmp(argv[i], "--fft"))                   o.use_fft     = 1;
+        else if (!strcmp(argv[i], "--pk"))                    o.compute_pk  = 1;
+        else if (!strcmp(argv[i], "--pk-output") && i+1<argc) { strncpy(o.pk_output, argv[++i], 511); o.compute_pk = 1; }
+        else if (!strcmp(argv[i], "--H0")       && i+1<argc)  o.H0     = atof(argv[++i]);
+        else if (!strcmp(argv[i], "--nkbins")   && i+1<argc)  o.nkbins = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--assignment") && i+1<argc) {
+            i++;
+            if      (!strcmp(argv[i],"ngp")) o.order = 1;
+            else if (!strcmp(argv[i],"cic")) o.order = 2;
+            else if (!strcmp(argv[i],"tsc")) o.order = 3;
+            else if (!strcmp(argv[i],"pcs")) o.order = 4;
+            else { fprintf(stderr,"Unknown assignment: %s (use ngp|cic|tsc|pcs)\n", argv[i]); exit(1); }
+        }
         else if (!strcmp(argv[i], "--periodic") && i+1<argc) {
             i++;
             o.periodic = 0;
@@ -1155,13 +1388,13 @@ int main(int argc, char **argv)
            (double)N_total * 3 * sizeof(double) / (1024.0*1024.0*1024.0));
 
     /* ── Step 3: build CIC density grid ─────────────────────────────────── */
-    printf("Building CIC grid (%d^3 = %ld cells) ...\n",
-           Ngrid, (long)Ngrid*Ngrid*Ngrid);
+    printf("Building %s density grid (%d^3 = %ld cells) ...\n",
+           order_name(o.order), Ngrid, (long)Ngrid*Ngrid*Ngrid);
     long   Ngrid3 = (long)Ngrid * Ngrid * Ngrid;
     double *den   = (double *)calloc((size_t)Ngrid3, sizeof(double));
-    if (!den) { fprintf(stderr, "OOM for CIC grid\n"); return 1; }
+    if (!den) { fprintf(stderr, "OOM for density grid\n"); return 1; }
 
-    cic_assign(coords, N_total, boxsize, Ngrid, den);
+    mas_assign(coords, N_total, boxsize, Ngrid, o.order, 0.0, den);
 
     /*
      * Normalise: den[i] = count[i] / mean_count = 1 + δ[i].
@@ -1195,6 +1428,41 @@ int main(int argc, char **argv)
         if (den[i] > dmax) dmax = den[i];
     }
     printf("  mean=%.4f counts/cell, den in [%.4f, %.4f]\n", mean, dmin, dmax);
+
+    /* ── Optional: P(k) estimate (consistent with compute_pk.py) ──────────
+     *
+     * Independent of the ξ(r) autocorrelation: builds its own interlaced,
+     * deconvolved density power spectrum from the same particle coordinates.
+     * Runs while coords is still resident (before the velocity step frees it).
+     */
+    if (o.compute_pk) {
+        char pk_out_path[512];
+        if (o.pk_output[0] != '\0') {
+            strncpy(pk_out_path, o.pk_output, 511);
+            pk_out_path[511] = '\0';
+        } else {
+            /* Auto-derive: substitute "xi_cic" → "pk" in the xi output path. */
+            char *p = strstr(o.output, "xi_cic");
+            if (p) {
+                size_t prefix_len = (size_t)(p - o.output);
+                snprintf(pk_out_path, sizeof(pk_out_path), "%.*s%s%s",
+                         (int)prefix_len, o.output, "pk", p + strlen("xi_cic"));
+            } else {
+                char *dot = strrchr(o.output, '.');
+                if (dot)
+                    snprintf(pk_out_path, sizeof(pk_out_path), "%.*s_pk%s",
+                             (int)(dot - o.output), o.output, dot);
+                else
+                    snprintf(pk_out_path, sizeof(pk_out_path), "%s_pk", o.output);
+            }
+        }
+        printf("\n-- Power spectrum P(k) --\n");
+        printf("Estimating P(k): interlaced %s assignment, %d k-bins, h=%.4f ...\n",
+               order_name(o.order), o.nkbins, o.H0 / 100.0);
+        compute_and_write_pk(coords, N_total, boxsize, Ngrid, o.order,
+                             o.H0 / 100.0, o.nkbins, redshift, o.ptype,
+                             o.input, order_name(o.order), pk_out_path);
+    }
 
     /* coords still needed for velocity CIC assignment; free after that step */
     if (!o.compute_vel) {
@@ -1306,7 +1574,7 @@ int main(int argc, char **argv)
 
     fprintf(fp,
         "# Two-point correlation function  |  compute_xi.c\n"
-        "# Method  : CIC density grid autocorrelation (Landy-Szalay)\n"
+        "# Method  : %s density-grid autocorrelation (Landy-Szalay)\n"
         "#           Equivalent to Hankel transform of FFT P(k).\n"
         "# File    : %s\n"
         "# PartType: %d   N_particles: %lld\n"
@@ -1317,6 +1585,7 @@ int main(int argc, char **argv)
         "# Binning : %s\n"
         "# Note    : r in Mpc (SWIFT IC units, not Mpc/h)\n"
         "# Columns : r_avg  r_low  r_high  xi(r)  DD  DR  RR\n",
+        order_name(o.order),
         o.input, o.ptype, N_total,
         Ngrid, cell, mode_str, per_str,
         boxsize, redshift,
@@ -1382,7 +1651,7 @@ int main(int argc, char **argv)
             goto cleanup;
         }
 
-        cic_vel_assign(coords, vels, N_total, boxsize, Ngrid,
+        mas_vel_assign(coords, vels, N_total, boxsize, Ngrid, o.order,
                        count_raw, vx_f, vy_f, vz_f);
         free(vels); free(coords); free(count_raw);
         coords = NULL;
@@ -1466,7 +1735,7 @@ int main(int argc, char **argv)
         } else {
             fprintf(fv,
                 "# Velocity autocorrelation  ψ(r) = <v(x)·v(x+r)>  |  compute_xi.c\n"
-                "# Method  : CIC mass-weighted velocity field + lag autocorrelation\n"
+                "# Method  : %s mass-weighted velocity field + lag autocorrelation\n"
                 "#           ψ(r) = Σ_cells v(x)·v(x+r) / N_cell_pairs\n"
                 "# Linear theory: ψ(r) = [H(z)f(z)]^2/(2π^2) ∫ P(k) j0(kr) dk\n"
                 "#           where f ≈ Ω_m(z)^0.55 (Linder 2005)\n"
@@ -1479,6 +1748,7 @@ int main(int argc, char **argv)
                 "# Binning : %s\n"
                 "# Units   : r in Mpc, ψ in (km/s)^2\n"
                 "# Columns : r_avg  r_low  r_high  psi(r)\n",
+                order_name(o.order),
                 o.input, o.ptype, N_total,
                 Ngrid, cell, mode_str, per_str,
                 boxsize, redshift,
