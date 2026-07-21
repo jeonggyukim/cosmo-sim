@@ -11,9 +11,9 @@ Author: Claude (Anthropic), 2026-04-29.
 The pipeline already validates ICs in two ways:
 - **Density**: $P_\delta(k)$ via `scripts/compute_pk.py` (CIC + FFT + CIC
   window deconvolution) and $\xi(r)$ via `compute_xi` /
-  `compute_xi_cic`. Compared with linear theory in `plot_ic.py`.
+  `compute_xi_corrfunc`. Compared with linear theory in `plot_ic.py`.
 - **Velocity**: $\psi(r) = \langle \mathbf v(\mathbf x) \cdot
-  \mathbf v(\mathbf x+\mathbf r)\rangle$ via `compute_xi_cic --vel`
+  \mathbf v(\mathbf x+\mathbf r)\rangle$ via `compute_xi --vel`
   (CIC velocity grid auto-correlation). Compared with linear theory
   in `plot_ic.py`.
 
@@ -85,10 +85,10 @@ much smaller because ξ's integrand has $k^2$.
 
 - **(A) Standalone Python.** New `compute_pv.py` mirroring
   `compute_pk.py`; CIC velocity assignment done in NumPy.
-- **(B) C extension.** Modify `src/compute_xi_cic.c` to FFT its
+- **(B) C extension.** Modify `src/compute_xi.c` to FFT its
   internal CIC velocity grid and emit `pv_*.txt` directly. Requires
   linking FFTW into the C binary.
-- **(C) Hybrid.** Add a flag to `compute_xi_cic` to dump the CIC
+- **(C) Hybrid.** Add a flag to `compute_xi` to dump the CIC
   velocity grid as a binary file; `compute_pv.py` reads that or
   recomputes from the HDF5.
 

@@ -275,7 +275,7 @@ class ICPlotter:
 
         MUSIC2's SWIFT plugin writes the on-disk Velocities dataset in
         peculiar-velocity units (km/s), so the CIC correlation from
-        compute_xi_cic is already ψ_pec — no a-rescaling needed on the
+        compute_xi is already ψ_pec — no a-rescaling needed on the
         measurement side either.
 
         Parameters
@@ -373,7 +373,7 @@ class ICPlotter:
         Load CIC velocity correlation ψ(r) from vel_cic_*.txt.
 
         MUSIC2's SWIFT plugin writes Velocities in peculiar-velocity units
-        (km/s), so the raw correlation from compute_xi_cic is already
+        (km/s), so the raw correlation from compute_xi is already
         ψ_pec(r) in (km/s)². The `a` argument is kept for API compatibility
         but is unused.
         """

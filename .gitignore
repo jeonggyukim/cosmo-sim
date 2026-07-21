@@ -8,6 +8,9 @@ conf/input_class_parameters_*.ini
 # Generated MUSIC2 configs (reproducible via make_music_conf.py)
 conf/CV_22_MUSIC_n*.conf
 
+# Generated monofonIC configs (reproducible via make_monofonic_conf.py)
+conf/CV_22_monofonIC_n*.conf
+
 # MUSIC2 build output
 music_build/
 monofonic_build/

@@ -2,14 +2,16 @@
 
 Generate cosmological initial conditions with **MUSIC2** and validate them.
 The pipeline measures the density power spectrum **P(k)** (CIC + FFT), the
-two-point correlation **ξ(r)** (Corrfunc pair counting and a CIC-grid
-estimator), and the velocity correlation **ψ(r)**, then compares them against
-linear theory from **CLASS**.
+two-point correlation **ξ(r)** (CIC-grid FFT autocorrelation), and the velocity
+correlation **ψ(r)**, then compares them against linear theory from **CLASS**.
+An optional low-z Corrfunc pair-counting ξ(r) estimator is available as a
+cross-check but is not part of the default run.
 
 The reusable analysis code is the installable Python package **`icpipe`**
 (`ICField`, `LinearTheory`, `io`, and the pipeline-step CLIs). The end-to-end
-run is driven by `run-pipeline`; the C tools `compute_xi` / `compute_xi_cic`
-handle the pair-counting and CIC-grid measurements.
+run is driven by `run-pipeline`; the default C tool `compute_xi` measures ξ(r)
+and ψ(r) on a CIC grid (any z, needs only HDF5 + FFTW), while the optional
+`compute_xi_corrfunc` does low-z particle pair counting.
 
 ## Install
 
@@ -70,7 +72,7 @@ and the MUSIC2 build).
 
 | dir                 | purpose                                                  | sub-README |
 |---------------------|----------------------------------------------------------|-----------|
-| `src/`              | C sources + Makefile (`compute_xi`, `compute_xi_cic`)    | —         |
+| `src/`              | C sources + Makefile (`compute_xi`, `compute_xi_corrfunc`) | —       |
 | `bin/`              | compiled C binaries (gitignored)                         | —         |
 | `icpipe/`           | Python library: `ICField`, `LinearTheory`, `io`          | [`icpipe/README.md`](icpipe/README.md) |
 | `icpipe/cli/`       | pipeline-step console scripts                            | (in `icpipe/README.md`) |
@@ -106,15 +108,17 @@ tool for nested zoom ICs. The downstream validation is identical for both codes.
 Each step is skipped if its output already exists:
 
 1. Build MUSIC2 (clones source if absent — `tools/build-music.sh`)
-2. Build `compute_xi` / `compute_xi_cic` C binaries → `bin/`
+2. Build the `compute_xi` C binary (CIC-grid ξ/ψ; needs only HDF5 + FFTW, no Corrfunc) → `bin/`
 3. Generate MUSIC2 config from `conf/CV_22_MUSIC_template.conf`
 4. Run MUSIC2 → `data/ics_swift_*.hdf5` + `conf/input_class_parameters_*.ini`
 5. Run CLASS → `data/class_pk_z{z}_pk.dat`
-6. Generate Corrfunc radial bin file
-7. Measure ξ(r) with Corrfunc pair counting (skipped at z ≳ 10; shot-noise dominated)
-8. Measure ξ(r) and ψ(r) on a CIC grid (`bin/compute_xi_cic --vel`)
-9. Measure P(k) with CIC + FFT (`compute-pk`)
-10. Plot diagnostics (`plot-ic`) → `plots/pk_{stem}.png`
+6. Measure ξ(r) and ψ(r) on a CIC grid (`bin/compute_xi --vel`; works at any z)
+7. Measure P(k) with CIC + FFT (`compute-pk`)
+8. Plot diagnostics (`plot-ic`) → `plots/pk_{stem}.png`
+
+The optional Corrfunc pair-counting ξ(r) estimator (`compute_xi_corrfunc`, low z
+only) and its rbins file are no longer pipeline steps; see below to build and run
+them by hand.
 
 Clean up with `tools/clean.sh` (or `tools/clean.sh --all` to also wipe ICs / wnoise / MUSIC2 build).
 
@@ -129,8 +133,7 @@ make-music-conf -N 256 -z 200 -L 1024                          # writes conf/CV_
 ./music_build/MUSIC conf/CV_22_MUSIC_n256_z200_L1024.conf      # runs MUSIC2
 compute-pk data/ics_swift_n256_z200_L1024.hdf5 \
     -o data/pk_n256_z200_L1024.txt                             # CIC + FFT
-make-rbins --hdf5 data/ics_swift_n256_z200_L1024.hdf5          # Corrfunc bin edges
-./bin/compute_xi_cic --input data/ics_swift_n256_z200_L1024.hdf5 \
+./bin/compute_xi --input data/ics_swift_n256_z200_L1024.hdf5 \
     --nthreads 8 --output data/xi_cic_n256_z200_L1024.txt --vel
 plot-ic data/pk_n256_z200_L1024.txt \
     --theory data/class_pk_z0_pk.dat --theory-zref 0           # plots/pk_*.png
@@ -147,7 +150,7 @@ alongside the input `pk_*.txt` and overlays them.  Pass several
 - The on-disk `Velocities` dataset is the **peculiar velocity in km/s**
   (`v_pec = a·H·f·Ψ`).  SWIFT itself converts to its internal
   canonical-momentum variable `u = a·v_pec` only at IC read time.  So
-  ψ(r) measured by `bin/compute_xi_cic` is already in (km/s)² — no
+  ψ(r) measured by `bin/compute_xi` is already in (km/s)² — no
   a² rescaling.
 - MUSIC2 always writes `wnoise_NNNN.bin` and `input_class_parameters.ini`
   to the CWD; `run-pipeline` moves them into `data/` and `conf/`

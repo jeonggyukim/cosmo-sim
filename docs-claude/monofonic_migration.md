@@ -136,7 +136,7 @@ seed            = 12345
   - Validated end to end: both the MUSIC path and the monofonIC path run to a
     finished diagnostic plot. A monofonIC N=64, L=500, z=200 run built and ran
     with PLT on and LPT order 3 (confirmed in the SWIFT `ICs_parameters` header
-    and the run log), wrote SWIFT HDF5 that `compute-pk` / `compute_xi_cic` /
+    and the run log), wrote SWIFT HDF5 that `compute-pk` / `compute_xi` /
     `plot-ic` read correctly, and the CLASS-ini normalization + aux-file moves
     worked as designed.
 - **Pending (step 3 science + step 4 docs):**

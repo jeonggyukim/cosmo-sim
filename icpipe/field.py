@@ -243,7 +243,7 @@ class ICField:
     def velocity_k(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Fourier-space velocity per axis. Constructed by FFT of the
         real-space CIC velocity v(x) = momentum(x)/rho(x); empty cells get
-        v = 0. This matches the convention used by ``compute_xi_cic``.
+        v = 0. This matches the convention used by ``compute_xi``.
 
         Returns (vx_k, vy_k, vz_k) as rfftn-shaped arrays.
         """
