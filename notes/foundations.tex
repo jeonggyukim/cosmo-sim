@@ -1,0 +1,1354 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\graphicspath{{figures/}{figures/fft/}{figures/cosmo_ic/}}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{natbib}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tcolorbox}
+\tcbuselibrary{breakable,skins}
+
+% --- code listing style ---
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{teal},
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray}
+}
+
+\newcommand{\bk}{\mathbf{k}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\bn}{\mathbf{n}}
+\newcommand{\ba}{\mathbf{a}}
+\newcommand{\by}{\mathbf{y}}
+\newcommand{\bq}{\mathbf{q}}
+\newcommand{\br}{\mathbf{r}}
+\newcommand{\bz}{\mathbf{z}}
+\newcommand{\bu}{\mathbf{u}}
+\newcommand{\bff}{\mathbf{f}}
+\newcommand{\avg}[1]{\left\langle #1 \right\rangle}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{Statistical Foundations for Cosmological Fields:\\
+       Random Fields, Correlation Functions, Power Spectra,\\
+       and the Fourier Machinery that Links Them}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{tcolorbox}[colback=yellow!10!white, colframe=orange!75!black,
+                  title={\bfseries Disclaimer}]
+These notes were compiled by an AI assistant (Claude, Anthropic) and have
+\textbf{not been reviewed by a human domain expert}.  They may contain
+errors in derivations, physical reasoning, or numerical estimates.
+Cross-check key equations against the primary literature before use.
+\end{tcolorbox}
+\vspace{0.5em}
+
+\begin{tcolorbox}[colback=blue!5!white, colframe=blue!60!black,
+                  title={\bfseries What this note is for}]
+This is the ``chapter zero'' for the rest of the cosmology notes in this
+directory.  Before one can talk about the initial conditions of a
+simulated universe, one needs a language for describing a quantity ---
+the density --- that is different in every realisation and yet
+statistically predictable.  That language is the theory of \emph{random
+fields}, and its two central summary statistics are the
+\emph{correlation function} and the \emph{power spectrum}, which are two
+views of the same object connected by a \emph{Fourier transform}.  This
+note builds all of that from scratch, with full derivations and physical
+interpretation, assuming only calculus and a first course in
+probability.  Read it before \code{cosmo\_ic.tex} (cosmological initial
+conditions), \code{fft.tex} (the numerical Fourier transform), and
+\code{ic\_sampling.tex} (sampling methods).  Wherever a topic is
+developed more deeply in one of those notes, a pointer is given.
+\end{tcolorbox}
+
+\tableofcontents
+\newpage
+
+%======================================================================
+\section{Why cosmology needs a theory of random fields}
+\label{sec:why}
+
+\subsection{One universe, many possible universes}
+
+Look at a map of the galaxies, or of the temperature of the microwave
+background, or of the dark-matter density in a simulation.  What you see
+is a specific, bumpy, irregular pattern.  If you asked ``what is the
+density of matter at this exact point in space?'' the honest answer is
+that the theory does not predict it and never will.  The early universe
+laid down small fluctuations through a quantum-mechanical process during
+inflation, and those fluctuations are, as far as we can tell, drawn at
+random.  We live in one particular outcome of that random process.
+
+This is not a failure of the theory; it is the nature of the object.
+The right analogy is a rolled die or a noisy voltage on a wire.  You
+cannot predict the next roll or the exact voltage at the next instant,
+but you can predict the \emph{statistics}: the probability of each face,
+the average voltage, the size of the fluctuations, how the voltage now
+is related to the voltage a microsecond later.  Cosmology is in exactly
+this situation, with one extra twist that we will have to confront: we
+get to observe only \emph{one} roll of the cosmic die --- a single
+universe --- and yet we want to test statistical predictions.  Making
+that possible is the job of \emph{ergodicity} (\S\ref{sec:ergodic}).
+
+\subsection{The density contrast as the basic field}
+
+Let $\rho(\bx)$ be the mass density at comoving position $\bx$, and let
+$\bar\rho$ be its spatial average.  Absolute densities are awkward
+because the mean changes as the universe expands, so we work with the
+dimensionless \emph{density contrast}
+\begin{equation}
+  \delta(\bx) \;\equiv\; \frac{\rho(\bx) - \bar\rho}{\bar\rho}\,.
+  \label{eq:delta-def}
+\end{equation}
+By construction $\delta \ge -1$ (density cannot go negative), and its
+spatial average is zero: $\avg{\delta} = 0$.  Where matter has piled up,
+$\delta > 0$; in a void, $\delta < 0$.  In the early universe $|\delta|
+\ll 1$ everywhere, which is what makes the linear theory of the
+companion notes so powerful.
+
+A quantity like $\delta(\bx)$ --- a number attached to every point of
+space, whose value at each point is a random variable --- is called a
+\emph{random field}.  Everything in this note is a statement about how
+to describe such an object, how to compress it into a few meaningful
+functions, and how to build a computer realisation of one.
+
+The same formalism, essentially unchanged, describes the peculiar
+velocity field, the gravitational potential, the temperature of the
+microwave background on the sky, weak-lensing shear, and the pressure
+of a turbulent fluid.  Nothing below is special to cosmology except the
+choice of examples.
+
+%======================================================================
+\section{Ensembles, averages, and the symmetries we assume}
+\label{sec:ensemble}
+
+\subsection{The ensemble average}
+\label{sec:ensemble-avg}
+
+Imagine not one universe but an infinite collection of them, all
+generated by the same physical process with the same statistical rules,
+differing only in the particular random numbers that came up.  This
+imagined collection is the \emph{ensemble}.  The \emph{ensemble average}
+of a quantity, written $\avg{\,\cdot\,}$, is the average over all members
+of the ensemble at a \emph{fixed} spatial point.  For example
+$\avg{\delta(\bx)}$ means: fix the point $\bx$, look at its value of
+$\delta$ in every universe of the ensemble, and average those numbers.
+
+This is a theoretical construct --- we have only one universe --- but it
+is the correct object for stating predictions, because the physics
+(inflation, gravity) predicts the \emph{probability rules} of the
+ensemble, not the outcome in any one member.  All the statistics below
+(mean, correlation function, power spectrum) are ensemble averages.
+Section~\ref{sec:ergodic} explains how we nonetheless estimate them
+from our single realisation.
+
+\subsection{The mean and why we can set it to zero}
+
+The first statistic is the mean, $\avg{\delta(\bx)}$.  For the density
+contrast it is zero everywhere by the definition
+(\ref{eq:delta-def}).  More generally, whenever the mean is a known
+deterministic function we can subtract it and work with the
+fluctuation $\delta - \avg{\delta}$, which has zero mean.  So without
+loss of generality we take
+\begin{equation}
+  \avg{\delta(\bx)} = 0 \qquad \text{for all } \bx .
+\end{equation}
+A zero-mean field carries \emph{no} information in its first moment; all
+the structure is in the second moment and higher, which is where we go
+next.
+
+\subsection{Statistical homogeneity}
+\label{sec:homogeneity}
+
+The cosmological principle asserts that the universe has no special
+places: the statistical rules are the same everywhere.  Translated into
+the language of the ensemble, this is \emph{statistical homogeneity} ---
+the requirement that every ensemble average is unchanged if we shift all
+positions by a common displacement $\ba$:
+\begin{equation}
+  \avg{\delta(\bx_1)\,\delta(\bx_2)\cdots}
+  \;=\;
+  \avg{\delta(\bx_1+\ba)\,\delta(\bx_2+\ba)\cdots}
+  \qquad\text{for every }\ba .
+  \label{eq:homog}
+\end{equation}
+Note carefully what homogeneity does \emph{not} say.  It does not say
+$\delta$ is the same everywhere --- that would be a constant field with
+no structure.  It says the \emph{statistics} are the same everywhere:
+a void near here is as likely as a void of the same size near there.
+Any one realisation is still as bumpy as ever.
+
+The immediate consequence, applied to the two-point average, is that
+$\avg{\delta(\bx)\,\delta(\bx')}$ can depend only on the separation
+$\br = \bx' - \bx$, not on where the pair sits.  This is what makes the
+correlation function a function of one vector argument instead of two,
+and it is the single most-used assumption in this note.
+
+\subsection{Statistical isotropy}
+\label{sec:isotropy}
+
+A stronger symmetry is \emph{statistical isotropy}: no special
+directions either.  Formally, every ensemble average is invariant under
+a common rotation $R$ of all positions,
+\begin{equation}
+  \avg{\delta(R\bx_1)\,\delta(R\bx_2)\cdots}
+  = \avg{\delta(\bx_1)\,\delta(\bx_2)\cdots}.
+\end{equation}
+Combined with homogeneity, isotropy forces the two-point function to
+depend only on the \emph{magnitude} of the separation, $r = |\br|$, not
+its direction.  So under the two symmetries together the entire
+two-point content of the field is a single function of a single scalar,
+$\xi(r)$.  That enormous compression --- from ``a value at every pair of
+points'' to ``one curve'' --- is why these statistics are so useful.
+
+Isotropy can be broken in real observations (redshift-space distortions
+pick out the line of sight; a bulk flow picks out a direction), and then
+one keeps the direction dependence.  For the initial conditions we care
+about here, isotropy holds to excellent accuracy and we use it freely.
+
+\subsection{Ergodicity: measuring an ensemble from one realisation}
+\label{sec:ergodic}
+
+Here is the twist promised in \S\ref{sec:why}.  Every statistic defined
+so far is an ensemble average --- an average over universes we do not
+have.  We have one universe.  How can we possibly measure
+$\avg{\delta\,\delta}$?
+
+The rescue is \emph{ergodicity}: the assumption that widely separated
+regions of a single realisation are statistically independent, so that
+they behave like independent draws from the ensemble.  If that holds,
+then averaging a quantity over the volume of one large realisation gives
+the same answer as averaging over the ensemble at a point:
+\begin{equation}
+  \underbrace{\avg{\,\cdot\,}}_{\text{average over universes}}
+  \;=\;
+  \underbrace{\frac{1}{V}\int_V \mathrm d^d x\;(\,\cdot\,)}_{\text{average over one universe}}
+  \qquad (V \to \infty).
+  \label{eq:ergodic}
+\end{equation}
+Physically the condition is that the correlation function falls to zero
+at large separation (\S\ref{sec:xi-props}): once two patches are farther
+apart than the correlation length, they know nothing about each other
+and count as independent samples.  A box many correlation lengths across
+therefore contains many effectively-independent sub-volumes, and the
+spatial average over it converges to the ensemble average.  The residual
+error from having only a finite number of independent patches is
+\emph{cosmic variance}, and it is the fundamental noise floor on any
+measurement of $\xi$ or $P$ from a finite volume (\S\ref{sec:cosmicvar}).
+
+Every measured correlation function and power spectrum in cosmology ---
+and every one computed from a simulation box --- relies on
+Eq.~(\ref{eq:ergodic}).  Keep it in mind: it is the bridge between the
+theory (ensemble language) and the data (one box).
+
+%======================================================================
+\section{The two-point correlation function}
+\label{sec:xi}
+
+\subsection{Definition and physical meaning}
+\label{sec:xi-def}
+
+The \emph{two-point correlation function} is the ensemble average of the
+product of the field at two points.  Using homogeneity
+(\S\ref{sec:homogeneity}) to reduce it to a function of the separation
+$\br = \bx' - \bx$,
+\begin{equation}
+  \boxed{\;\xi(\br) \;\equiv\; \avg{\delta(\bx)\,\delta(\bx+\br)}\;}
+  \label{eq:xi-def-box}
+\end{equation}
+with the right-hand side independent of $\bx$.  Under isotropy it
+reduces further to $\xi(r)$ with $r = |\br|$.
+
+What does it mean?  Suppose you stand at a point where the density is
+above average ($\delta(\bx) > 0$).  The correlation function tells you
+whether a point a distance $r$ away tends to be above or below average
+too.  If $\xi(r) > 0$, the two points are \emph{positively correlated}:
+an overdensity here makes an overdensity there more likely --- matter
+clusters.  If $\xi(r) < 0$, they are anti-correlated: an overdensity
+here is compensated by an underdensity there.  If $\xi(r) = 0$, the two
+points are statistically independent.
+
+There is a clean interpretation in terms of counting pairs.  For a
+point process (galaxies, particles) of mean number density $\bar n$, the
+probability of finding a particle in a small volume $\mathrm dV_1$ and
+another in $\mathrm dV_2$ separated by $r$ is
+\begin{equation}
+  \mathrm dP_{12} = \bar n^2\,\bigl[1 + \xi(r)\bigr]\,\mathrm dV_1\,\mathrm dV_2 .
+  \label{eq:xi-pair}
+\end{equation}
+The ``1'' is what you would get if particles were sprinkled completely
+at random (a Poisson process); the $\xi(r)$ is the \emph{excess}
+probability of finding a pair at separation $r$ over and above random.
+This is why $\xi$ is often called the excess clustering: $\xi(r) = 0.5$
+means pairs at separation $r$ are $50\%$ more common than chance.
+
+\subsection{Basic properties}
+\label{sec:xi-props}
+
+Three properties follow directly from the definition
+(\ref{eq:xi-def-box}) and are worth committing to memory.
+
+\paragraph{(i) At zero separation, $\xi$ is the variance.}
+Setting $\br = 0$,
+\begin{equation}
+  \xi(0) = \avg{\delta(\bx)^2} = \sigma^2 ,
+  \label{eq:xi-zero}
+\end{equation}
+the variance of the field.  It measures the typical squared amplitude of
+the fluctuations: $\sigma = \sqrt{\xi(0)}$ is the root-mean-square
+density contrast.
+
+\paragraph{(ii) It is symmetric.}
+Because the two points enter symmetrically and the field is real,
+$\xi(\br) = \xi(-\br)$; under isotropy this is automatic since $\xi$
+depends only on $r$.
+
+\paragraph{(iii) It decays at large separation.}
+Distant points are physically unrelated, so $\xi(r) \to 0$ as $r \to
+\infty$.  The scale over which it decays is the \emph{correlation
+length}.  This decay is exactly the condition that makes ergodicity
+(\S\ref{sec:ergodic}) work: beyond the correlation length, patches are
+independent.
+
+\subsection{The correlation function is a covariance}
+\label{sec:xi-covariance}
+
+It pays to see $\xi$ through the lens of ordinary statistics.  For two
+random variables $X$ and $Y$ with zero mean, the \emph{covariance} is
+$\mathrm{Cov}(X, Y) = \avg{XY}$.  Comparing with
+Eq.~(\ref{eq:xi-def-box}), the correlation function is nothing but the
+covariance between the field values at two points:
+\begin{equation}
+  \xi(\bx - \bx') = \mathrm{Cov}\bigl(\delta(\bx),\,\delta(\bx')\bigr).
+\end{equation}
+If we discretise space into $N$ cells and stack the field values into a
+vector $\boldsymbol\delta = (\delta_1, \dots, \delta_N)^\top$, the full
+second-moment information is the \emph{covariance matrix}
+\begin{equation}
+  C_{ij} \;=\; \avg{\delta_i\,\delta_j} \;=\; \xi(\bx_i - \bx_j).
+  \label{eq:covmatrix}
+\end{equation}
+So ``the correlation function'' and ``the covariance matrix of the
+discretised field'' are the same object.  This viewpoint --- $\xi$ as a
+matrix --- is the key to two things later: it explains why the power
+spectrum is the natural diagonal basis (\S\ref{sec:cov-diag}), and it is
+the starting point for actually generating a field on a computer
+(\S\ref{sec:generate}).  Homogeneity, in this language, says that $C_{ij}$
+depends only on the offset $i - j$; a matrix with that property is called
+\emph{Toeplitz}, or, on a periodic grid, \emph{circulant}, and circulant
+matrices have a magical diagonalisation that we will exploit.
+
+%======================================================================
+\section{Interlude: the Fourier transform and its conventions}
+\label{sec:fourier}
+
+The power spectrum is the correlation function seen in Fourier space, so
+we need the Fourier transform first.  This section fixes conventions and
+states the few facts we use; the companion note \code{fft.tex} develops
+the numerical (discrete, fast) transform in full, and Appendix~A of
+\code{cosmo\_ic.tex} carries out the careful bookkeeping of factors that
+we here quote.
+
+\subsection{The continuous Fourier transform}
+\label{sec:cft}
+
+Any well-behaved function $f(\bx)$ on $\mathbb R^d$ can be written as a
+superposition of plane waves $e^{i\bk\cdot\bx}$.  We use the symmetric
+``physics'' convention, in which all the $2\pi$'s sit in the inverse
+transform:
+\begin{align}
+  \hat f(\bk) &= \int \mathrm d^d x\; f(\bx)\,e^{-i\bk\cdot\bx},
+  \label{eq:ft}\\
+  f(\bx) &= \int \frac{\mathrm d^d k}{(2\pi)^d}\; \hat f(\bk)\,e^{+i\bk\cdot\bx}.
+  \label{eq:ift}
+\end{align}
+The wavevector $\bk$ has units of inverse length; its magnitude $k =
+|\bk|$ is the wavenumber and $2\pi/k$ is the wavelength of that plane
+wave.  A large $k$ is a short-wavelength, small-scale feature; a small
+$k$ is a long-wavelength, large-scale feature.  This dictionary ---
+\emph{large $k$ means small scale} --- is worth internalising because
+cosmological intuition is usually phrased in terms of scales but the
+mathematics lives in $k$.
+
+The one identity we lean on repeatedly is the integral representation of
+the Dirac delta,
+\begin{equation}
+  \int \mathrm d^d x\; e^{-i\bq\cdot\bx} = (2\pi)^d\,\delta^D(\bq),
+  \label{eq:delta-rep}
+\end{equation}
+which is just Eqs.~(\ref{eq:ft})--(\ref{eq:ift}) applied to $f = 1$.  It
+says: integrate a pure plane wave over all space and you get zero unless
+the wave is the constant one ($\bq = 0$), in which case you get an
+(infinite) spike.  Distinct plane waves are orthogonal.
+
+\subsection{Fourier series in a finite box}
+\label{sec:fseries}
+
+Simulations and real surveys live in a finite volume, not on all of
+$\mathbb R^d$.  On a cubic box of side $L$ and volume $V = L^d$ with
+periodic boundaries, only wavevectors that fit an integer number of
+wavelengths in the box are allowed:
+\begin{equation}
+  \bk = \frac{2\pi}{L}\,\bn, \qquad \bn \in \mathbb Z^d .
+\end{equation}
+The smallest nonzero wavenumber is the \emph{fundamental mode}
+$k_{\rm fund} = 2\pi/L$: no fluctuation longer than the box can be
+represented.  The transform becomes a sum over these discrete modes,
+\begin{equation}
+  \delta(\bx) = \frac{1}{V}\sum_{\bk} \hat\delta_{\bk}\,e^{i\bk\cdot\bx},
+  \qquad
+  \hat\delta_{\bk} = \int_V \mathrm d^d x\; \delta(\bx)\,e^{-i\bk\cdot\bx},
+  \label{eq:fseries}
+\end{equation}
+and the continuum rule $\int \mathrm d^d k/(2\pi)^d \to V^{-1}\sum_\bk$
+converts between the two pictures.  The box turns the continuous Dirac
+delta of Eq.~(\ref{eq:delta-rep}) into a Kronecker delta,
+$\int_V \mathrm d^d x\, e^{-i(\bk-\bk')\cdot\bx} = V\,\delta^K_{\bk\bk'}$.
+
+\subsection{Reality forces Hermitian symmetry}
+\label{sec:hermitian}
+
+Our fields are real: $\delta(\bx)$ is a physical density contrast, not a
+complex number.  Take the complex conjugate of Eq.~(\ref{eq:ft}); since
+$\delta$ is real, $\delta^* = \delta$, and the only change on the
+right-hand side is $e^{-i\bk\cdot\bx} \to e^{+i\bk\cdot\bx}$, which is
+the transform evaluated at $-\bk$.  Hence
+\begin{equation}
+  \boxed{\;\hat\delta(-\bk) = \hat\delta^*(\bk)\;}
+  \label{eq:hermitian}
+\end{equation}
+the \emph{Hermitian symmetry} of a real field's transform.  It says the
+mode at $-\bk$ is not independent --- it is the complex conjugate of the
+mode at $+\bk$.  Only half of $k$-space carries independent information;
+the other half is determined.  This has a concrete consequence when we
+generate fields (\S\ref{sec:generate}): if you draw the Fourier
+coefficients by hand you must impose Eq.~(\ref{eq:hermitian}), whereas if
+you build the field from real-space white noise it comes out
+automatically.  A handful of special modes (the $\bk = 0$ mode, and the
+Nyquist modes on an even grid) are their own conjugates and must
+therefore be purely real; \code{fft.tex} \S\ref{sec:fourier} works
+through those corner cases.
+
+%======================================================================
+\section{The power spectrum}
+\label{sec:pk}
+
+\subsection{From the correlation of modes to $P(k)$}
+\label{sec:pk-derive}
+
+We now compute the two-point statistics in Fourier space and discover
+that homogeneity makes different modes uncorrelated.  Take two Fourier
+coefficients and average their product, using Eq.~(\ref{eq:ft}) for
+each:
+\begin{align}
+  \avg{\hat\delta(\bk)\,\hat\delta^*(\bk')}
+  &= \int \mathrm d^d x\,\mathrm d^d x'\;
+     \avg{\delta(\bx)\,\delta(\bx')}\;
+     e^{-i\bk\cdot\bx + i\bk'\cdot\bx'} \notag\\
+  &= \int \mathrm d^d x\,\mathrm d^d x'\;
+     \xi(\bx' - \bx)\;
+     e^{-i\bk\cdot\bx + i\bk'\cdot\bx'},
+  \label{eq:pk-step1}
+\end{align}
+where the second line used homogeneity to replace the correlation with
+$\xi$ of the separation.  Now change variables from $(\bx, \bx')$ to
+$(\bx, \br)$ with $\br = \bx' - \bx$ --- a pure shift, so the Jacobian is
+one and $\mathrm d^d x\,\mathrm d^d x' = \mathrm d^d x\,\mathrm d^d r$.
+The exponent becomes
+$-i\bk\cdot\bx + i\bk'\cdot(\bx + \br) = -i(\bk - \bk')\cdot\bx +
+i\bk'\cdot\br$, and the double integral factorises:
+\begin{align}
+  \avg{\hat\delta(\bk)\,\hat\delta^*(\bk')}
+  &= \underbrace{\int \mathrm d^d x\; e^{-i(\bk-\bk')\cdot\bx}}_{(2\pi)^d\,\delta^D(\bk-\bk')}
+     \;\;\underbrace{\int \mathrm d^d r\; \xi(\br)\,e^{i\bk'\cdot\br}}_{\text{a function of }\bk'} \notag\\
+  &= (2\pi)^d\,\delta^D(\bk - \bk')\;P(\bk),
+  \label{eq:pk-def}
+\end{align}
+where the first integral is the delta identity (\ref{eq:delta-rep}) and
+we \emph{defined} the quantity multiplying it as the power spectrum,
+\begin{equation}
+  \boxed{\;P(\bk) \;\equiv\; \int \mathrm d^d r\; \xi(\br)\,e^{-i\bk\cdot\br}\;}
+  \label{eq:wiener-khinchin}
+\end{equation}
+(the sign of the exponent flipped because the delta forced $\bk' = \bk$).
+Two results have dropped out at once.
+
+\paragraph{Result 1: distinct modes are uncorrelated.}
+The factor $\delta^D(\bk - \bk')$ in Eq.~(\ref{eq:pk-def}) means
+$\avg{\hat\delta(\bk)\,\hat\delta^*(\bk')} = 0$ unless $\bk = \bk'$.
+Homogeneity \emph{diagonalises} the field in Fourier space: different
+Fourier modes are statistically independent.  This is the deep reason
+Fourier space is the natural home for a homogeneous random field, and
+it is the wave-space echo of the circulant-matrix remark at the end of
+\S\ref{sec:xi-covariance}.
+
+\paragraph{Result 2: the power spectrum is the Fourier transform of the
+correlation function.}  Equation~(\ref{eq:wiener-khinchin}) is the
+\emph{Wiener--Khinchin theorem}: $P$ and $\xi$ are a Fourier-transform
+pair,
+\begin{equation}
+  P(\bk) = \int \mathrm d^d r\;\xi(\br)\,e^{-i\bk\cdot\br},
+  \qquad
+  \xi(\br) = \int \frac{\mathrm d^d k}{(2\pi)^d}\;P(\bk)\,e^{+i\bk\cdot\br}.
+  \label{eq:P-xi-pair}
+\end{equation}
+They are the same information in two languages.  The correlation
+function answers ``how related are two points a distance $r$ apart?'';
+the power spectrum answers ``how much fluctuation power is there on
+scale $2\pi/k$?''  Neither contains anything the other lacks; which you
+use is a matter of convenience, and often of which one the measurement
+apparatus hands you more directly.
+
+\paragraph{Three properties of $P(k)$.}  These follow immediately and are
+worth stating.  (i) \emph{$P$ is real.}  Because $\xi(\br)$ is real and
+even (\S\ref{sec:xi-props}), its transform
+$\int \xi(\br)\,e^{-i\bk\cdot\br}\,\mathrm d^d r$ has an imaginary part
+$\propto \int \xi(\br)\sin(\bk\cdot\br)\,\mathrm d^d r$ that integrates to
+zero by the oddness of the sine against the even $\xi$; only the cosine
+(real) part survives.  (ii) \emph{$P$ is even}, $P(-\bk) = P(\bk)$, for
+the same reason, and under isotropy it depends only on $k = |\bk|$.
+(iii) \emph{$P$ is non-negative}, $P(\bk) \ge 0$.  This is not obvious
+from Eq.~(\ref{eq:wiener-khinchin}) --- it is forced by the
+variance-per-mode form (\ref{eq:pk-var}) below, since a variance cannot
+be negative.  The non-negativity is a genuine constraint: not every even
+function is a legal correlation function; only those whose Fourier
+transform is everywhere non-negative are (this is \emph{Bochner's
+theorem}, the statement that $\xi$ must be a positive-definite function,
+equivalently that the covariance matrix of \S\ref{sec:xi-covariance} is
+positive-semidefinite).
+
+\subsection{The variance-per-mode form}
+\label{sec:pk-variance}
+
+On the finite box of \S\ref{sec:fseries} there is an even cleaner form,
+derived directly rather than through the continuum delta.  The box
+Fourier coefficient is $\hat\delta_\bk = \int_V \mathrm d^d x\,
+\delta(\bx)\,e^{-i\bk\cdot\bx}$, so its mean-square is
+\begin{align}
+  \avg{|\hat\delta_\bk|^2}
+  &= \int_V\!\!\int_V \mathrm d^d x\,\mathrm d^d x'\;
+     \avg{\delta(\bx)\,\delta(\bx')}\;e^{-i\bk\cdot(\bx-\bx')} \notag\\
+  &= \int_V \mathrm d^d x \int \mathrm d^d r\;\xi(\br)\,e^{-i\bk\cdot\br}
+   \;=\; V\,P(\bk),
+  \label{eq:pk-box-deriv}
+\end{align}
+where homogeneity again let the integrand depend only on
+$\br = \bx - \bx'$, the $\br$-integral is $P(\bk)$ by
+Eq.~(\ref{eq:wiener-khinchin}), and the leftover $\bx$-integral over the
+box contributes the volume $V$ (the integrand no longer depends on
+$\bx$).  Hence
+\begin{equation}
+  \boxed{\;P(\bk) = \frac{\avg{|\hat\delta_\bk|^2}}{V}\;}
+  \label{eq:pk-var}
+\end{equation}
+The power spectrum is (up to the volume) the \emph{variance of the
+Fourier amplitude of each mode}.  Modes with large $P(k)$ are the ones
+that fluctuate strongly from one realisation to the next; modes with
+small $P(k)$ are nearly quiet.  This is the form one actually measures:
+square the Fourier amplitudes of the box, divide by the volume, and
+average over modes of the same $|\bk|$ (\S\ref{sec:estimate-pk}).
+
+\subsection{Physical meaning: power per scale and the variance budget}
+\label{sec:pk-physical}
+
+Set $\br = 0$ in the inverse relation of Eq.~(\ref{eq:P-xi-pair}) and use
+$\xi(0) = \sigma^2$ from Eq.~(\ref{eq:xi-zero}):
+\begin{equation}
+  \sigma^2 = \xi(0) = \int \frac{\mathrm d^d k}{(2\pi)^d}\;P(\bk).
+  \label{eq:sigma-integral}
+\end{equation}
+The total variance of the field is the integral of the power spectrum
+over all modes.  Each mode contributes its little piece $P(\bk)\,\mathrm
+d^d k/(2\pi)^d$ to the total fluctuation budget --- hence the name
+``power spectrum'', in exact analogy with the power spectrum of a noisy
+electrical signal, where the total power is the integral of the spectral
+density over frequency.
+
+In three dimensions, under isotropy, do the angular part of the integral
+($\mathrm d^3 k = 4\pi k^2\,\mathrm d k$):
+\begin{equation}
+  \sigma^2 = \int_0^\infty \frac{4\pi k^2\,\mathrm d k}{(2\pi)^3}\,P(k)
+           = \int_0^\infty \frac{k^3 P(k)}{2\pi^2}\;\frac{\mathrm d k}{k}
+           = \int_0^\infty \Delta^2(k)\;\mathrm d\ln k,
+  \label{eq:dimensionless}
+\end{equation}
+which defines the \emph{dimensionless power spectrum}
+\begin{equation}
+  \boxed{\;\Delta^2(k) \equiv \frac{k^3 P(k)}{2\pi^2}\;}
+  \label{eq:Delta2}
+\end{equation}
+This combination is the variance contributed per logarithmic interval in
+$k$ --- per octave of scale.  It is the single most useful diagnostic in
+practice: if $\Delta^2(k) \approx 1$ at some $k$, then fluctuations on
+that scale are of order unity and linear theory is breaking down there;
+where $\Delta^2 \ll 1$ the field is still in the linear regime.  Plotting
+$\Delta^2(k)$ rather than $P(k)$ puts equal-sized scales on equal
+footing and makes the ``which scales have gone nonlinear'' question
+immediate.
+
+\subsection{Units and the $h$ bookkeeping}
+From Eq.~(\ref{eq:wiener-khinchin}), $P(k)$ has units of
+(length)$^d$ --- in 3D, volume.  Because $\xi$ is dimensionless for the
+density contrast, $P(k)$ carries the $\mathrm d^3 r$.  Cosmologists
+usually quote lengths in $h^{-1}\mathrm{Mpc}$, so $P(k)$ comes in
+$(h^{-1}\mathrm{Mpc})^3$ and $k$ in $h\,\mathrm{Mpc}^{-1}$.  The
+simulation code in this repository stores lengths in Mpc (no $h$); the
+conversion is spelled out in \code{CLAUDE.md} and Appendix~B of
+\code{cosmo\_ic.tex}.  Getting the factors of $h$ and $2\pi$ right is
+tedious but mechanical; the safe practice is to fix one convention (we
+use Eqs.~\ref{eq:ft}--\ref{eq:ift}) and carry it everywhere.
+
+%======================================================================
+\section{Covariance as the unifying object}
+\label{sec:covariance}
+
+We have now met three things that are secretly the same: the correlation
+function $\xi$, the covariance matrix $C$, and the power spectrum $P$.
+This short section makes the identification explicit, because it is the
+conceptual hinge of the whole subject and it is what makes field
+generation (\S\ref{sec:generate}) a two-line recipe.
+
+\subsection{The covariance matrix and its diagonalisation}
+\label{sec:cov-diag}
+
+Recall from \S\ref{sec:xi-covariance} that the discretised field has
+covariance matrix $C_{ij} = \xi(\bx_i - \bx_j)$, and that homogeneity
+makes $C$ circulant (entries depend only on the offset $i - j$, wrapped
+periodically).  The central fact about circulant matrices is:
+
+\begin{quote}
+\emph{Every circulant matrix is diagonalised by the discrete Fourier
+transform, and its eigenvalues are the Fourier transform of its first
+row.}
+\end{quote}
+
+The Fourier transform of the first row of $C$ --- that is, the Fourier
+transform of $\xi$ --- is exactly $P(k)$ by Wiener--Khinchin
+(\ref{eq:wiener-khinchin}).  So the power spectrum values are precisely
+the \emph{eigenvalues of the covariance matrix}, and the Fourier modes
+are its \emph{eigenvectors}:
+\begin{equation}
+  C\;\hat{\mathbf e}_\bk = P(\bk)\;\hat{\mathbf e}_\bk,
+  \qquad
+  (\hat{\mathbf e}_\bk)_j \propto e^{i\bk\cdot\bx_j}.
+\end{equation}
+This is Result~1 of \S\ref{sec:pk-derive} (modes are uncorrelated) stated
+as linear algebra: in the Fourier basis the covariance matrix is
+diagonal, with the power spectrum down the diagonal.
+
+\subsection{Why this is the whole game}
+
+The correlation function is the covariance in the position basis (a full
+matrix); the power spectrum is the covariance in the Fourier basis (a
+diagonal matrix).  ``Same operator, two bases.''  Everything that is
+awkward about $\xi$ --- it couples every point to every other point ---
+becomes trivial in the $P$ basis, where the modes decouple.  That is why:
+
+\begin{itemize}
+  \item \textbf{Theory} is usually written in $k$-space: the linear
+        evolution equations, mode by mode, are ordinary differential
+        equations with no coupling, because each Fourier mode evolves
+        independently at linear order.
+  \item \textbf{Field generation} is done in $k$-space: to build a field
+        with a given covariance you take the square root of the
+        covariance operator, and a diagonal matrix's square root is just
+        the elementwise square root $\sqrt{P(\bk)}$
+        (\S\ref{sec:generate}).
+  \item \textbf{Measurement} of $P$ is a mode-by-mode variance
+        (\S\ref{sec:estimate-pk}), needing no matrix inversion.
+\end{itemize}
+
+The rest of the note is really just consequences of this one
+diagonalisation.
+
+%======================================================================
+\section{Gaussian random fields}
+\label{sec:grf}
+
+So far we have used only the first two moments (mean and covariance).
+In general a random field has infinitely many independent statistics ---
+the three-point function, four-point function, and so on --- and the
+mean and covariance do not determine it.  \emph{Gaussian} random fields
+are the special, enormously important case where they \emph{do}.  This
+section explains why cosmological initial conditions are Gaussian to
+excellent approximation, what ``Gaussian field'' means precisely, and
+the theorem (Wick's) that makes the two-point function the whole story.
+
+\subsection{Why the initial conditions are Gaussian}
+\label{sec:grf-why}
+
+The one-point distribution of $\delta$ --- the histogram of density
+contrasts over all points --- is observed and predicted to be very
+close to a Gaussian (a bell curve) in the early universe.  There are two
+complementary reasons.
+
+First, a \emph{central-limit} argument.  The density at a point is the
+sum of contributions from a great many independent Fourier modes
+(\S\ref{sec:fseries}).  The central limit theorem says that a sum of many
+independent random contributions, none dominating, tends to a Gaussian
+regardless of the distribution of the individual pieces.  So even if each
+mode's amplitude were drawn from something non-Gaussian, their sum ---
+the field at a point --- is pushed toward Gaussian.
+
+Second, the \emph{physical origin}.  In the simplest models of inflation
+the primordial fluctuations are quantum fluctuations of a nearly free
+field, and a free field's ground-state fluctuations are exactly
+Gaussian.  Deviations (``primordial non-Gaussianity'', parametrised by
+$f_{\rm NL}$) are predicted to be tiny and have not been detected.  For
+the purpose of generating initial conditions we take the field to be
+Gaussian; \S\ref{sec:grf-fail} says a word about what changes if it is
+not.
+
+\subsection{What ``Gaussian random field'' means}
+\label{sec:grf-def}
+
+A zero-mean real field $\delta(\bx)$ is a \emph{Gaussian random field}
+(GRF) if any one of the following equivalent statements holds.  They are
+worth stating together because different ones are easiest to use in
+different derivations.
+
+\paragraph{Definition 1 (values at a finite set of points).}
+Pick any finite set of points $\bx_1, \dots, \bx_n$.  The $n$ field
+values $\bigl(\delta(\bx_1), \dots, \delta(\bx_n)\bigr)$ are jointly
+drawn from a multivariate Gaussian distribution,
+\begin{equation}
+  p(\bu) = \frac{1}{\sqrt{(2\pi)^n \det C}}\,
+           \exp\!\Bigl[-\tfrac12\,\bu^\top C^{-1}\,\bu\Bigr],
+  \qquad C_{ij} = \xi(\bx_i - \bx_j),
+  \label{eq:mvg}
+\end{equation}
+where $\bu = (u_1,\dots,u_n)^\top$ are the dummy values and $C$ is the
+covariance matrix of Eq.~(\ref{eq:covmatrix}).  Note what appears in the
+density: \emph{only} the covariance $C$.  The distribution has no other
+parameters.  This is the precise sense in which ``mean and covariance
+are everything'' --- for a Gaussian the density is literally built out
+of $C$ and nothing else.
+
+\paragraph{Definition 2 (every smoothing gives a Gaussian number).}
+For every deterministic weight function $f(\bx)$, the single number
+obtained by smoothing the field against it,
+$F = \int f(\bx)\,\delta(\bx)\,\mathrm d^d x$, is an ordinary
+one-dimensional Gaussian random variable.  (Definition~1 is the special
+case where $f$ is a sum of spikes at the chosen points.)  This version is
+convenient because it turns statements about the field into statements
+about scalar Gaussians.
+
+\paragraph{Definition 3 (the generating functional is Gaussian).}
+Define the object that packages all the correlators at once,
+\begin{equation}
+  Z[J] \equiv \avg{\exp\!\Bigl(i\!\int J(\bx)\,\delta(\bx)\,\mathrm d^d x\Bigr)}.
+  \label{eq:Z}
+\end{equation}
+For a GRF this equals
+\begin{equation}
+  Z[J] = \exp\!\Bigl[-\tfrac12\!\int\!\!\int J(\bx)\,\xi(\bx-\by)\,J(\by)\,
+          \mathrm d^d x\,\mathrm d^d y\Bigr].
+  \label{eq:Z-gauss}
+\end{equation}
+This is the field-theory generalisation of the elementary fact that a
+one-dimensional zero-mean Gaussian of variance $\sigma^2$ has
+characteristic function $\avg{e^{iJ\delta}} = e^{-\frac12 J^2\sigma^2}$.
+The exponent is \emph{quadratic} in the source $J$, and everything below
+follows from that.
+
+\subsection{Wick's theorem: two points really are everything}
+\label{sec:wick}
+
+Definition~3 has a spectacular consequence.  The correlators of the
+field are obtained by expanding $Z[J]$ in powers of $J$: the coefficient
+of $i^n J(\bx_1)\cdots J(\bx_n)$ (times combinatorial factors) is the
+$n$-point function $\avg{\delta(\bx_1)\cdots\delta(\bx_n)}$.  But the
+right-hand side of Eq.~(\ref{eq:Z-gauss}) is the exponential of something
+quadratic in $J$.  Expand it:
+\begin{equation}
+  Z[J] = 1 - \tfrac12\!\int\!\!\int J\,\xi\,J
+         + \tfrac{1}{2!}\Bigl(\!-\tfrac12\!\int\!\!\int J\,\xi\,J\Bigr)^2
+         - \cdots
+\end{equation}
+Every term is built entirely out of the two-point function $\xi$.
+Matching powers of $J$ gives \emph{Wick's theorem}:
+\begin{align}
+  &\avg{\delta_1\,\delta_2\cdots\delta_{2k+1}} = 0
+     &&\text{(odd number of fields),}
+     \label{eq:wick-odd}\\[4pt]
+  &\avg{\delta_1\,\delta_2\cdots\delta_{2k}}
+     = \sum_{\text{pairings}}\;\prod_{\text{pairs }(i,j)} \xi(\bx_i - \bx_j)
+     &&\text{(even number of fields),}
+     \label{eq:wick-even}
+\end{align}
+where the sum runs over all ways of partitioning the fields into pairs.
+The odd correlators vanish because a symmetric bell curve has no
+lopsidedness (odd powers of $J$ never appear on the right of
+Eq.~\ref{eq:Z-gauss}, whose exponent is even).  The even ones are sums
+of products of two-point functions.
+
+\paragraph{Extracting the four-point function explicitly.}  To see the
+pairing structure actually emerge from Eq.~(\ref{eq:Z-gauss}), match the
+$J^4$ terms on the two sides.  Abbreviate positions by integer labels and
+write $\int\!\!\int J\,\xi\,J = \sum_{a,b}\xi_{ab}J_aJ_b$.  The definition
+$Z[J] = \sum_n \frac{i^n}{n!}\sum \avg{\delta_1\cdots\delta_n}
+J_1\cdots J_n$ has $n=4$ term
+$\frac{1}{4!}\sum_{abcd}\avg{\delta_a\delta_b\delta_c\delta_d}
+J_aJ_bJ_cJ_d$.  On the Gaussian side, the only source of four powers of
+$J$ is the second term of the expanded exponential,
+\begin{equation}
+  \frac{1}{2!}\Bigl(-\tfrac12\sum_{a,b}\xi_{ab}J_aJ_b\Bigr)^{\!2}
+  = \frac{1}{8}\sum_{a,b,c,d}\xi_{ab}\,\xi_{cd}\,J_aJ_bJ_cJ_d .
+\end{equation}
+The product $J_aJ_bJ_cJ_d$ is symmetric under permuting the four labels,
+so only the symmetrised coefficient survives.  Of the $4! = 24$
+relabelings of $(a,b,c,d)$, exactly $8$ reproduce each of the three
+distinct pairings --- $2$ from swapping within the first pair, $2$ within
+the second, $2$ from exchanging the two pairs (using
+$\xi_{ab}=\xi_{ba}$) --- so
+$\sum_{\text{perms}}\xi_{ab}\xi_{cd}
+= 8(\xi_{ab}\xi_{cd}+\xi_{ac}\xi_{bd}+\xi_{ad}\xi_{bc})$.  Equating the
+symmetric $J^4$ coefficients, $\frac{1}{4!}\avg{\delta_a\delta_b\delta_c
+\delta_d} = \frac{1}{8}\cdot\frac{8}{24}
+(\xi_{ab}\xi_{cd}+\cdots)$, the factors of $24$ cancel and
+\begin{equation}
+  \avg{\delta_1\delta_2\delta_3\delta_4}
+  = \xi_{12}\,\xi_{34} + \xi_{13}\,\xi_{24} + \xi_{14}\,\xi_{23},
+  \label{eq:wick4}
+\end{equation}
+the three ways of pairing four objects.  The same bookkeeping at order
+$J^{2k}$ gives Eq.~(\ref{eq:wick-even}) with its
+$(2k)!/(2^k k!)$ pairings --- $15$ for the six-point function, and so on.
+
+\paragraph{The punchline.}  Every correlator of a Gaussian field is an
+explicit polynomial in $\xi$.  Nothing is independent of the two-point
+function.  Combined with Definition~3 (which says $Z[J]$, hence the
+entire probability distribution, is fixed once $\xi$ is known), this
+means:
+\begin{quote}
+\textbf{A Gaussian random field is completely specified by its mean and
+its two-point function (equivalently, its power spectrum).}
+\end{quote}
+This is why cosmologists spend so much effort measuring $P(k)$: for
+Gaussian initial conditions it is not just \emph{a} statistic, it is
+\emph{the} statistic --- knowing it is knowing the field's full
+distribution.  It is also what makes generating a realisation so cheap
+(\S\ref{sec:generate}): match the two-point function and, for free, you
+have matched everything.
+
+\subsection{Where Gaussianity fails}
+\label{sec:grf-fail}
+
+If the primordial field is not Gaussian --- for instance the local-model
+form
+\begin{equation}
+  \delta_{\rm NG}(\bx) = \delta_{\rm G}(\bx)
+       + f_{\rm NL}\bigl[\delta_{\rm G}^2(\bx) - \avg{\delta_{\rm G}^2}\bigr],
+  \label{eq:fnl}
+\end{equation}
+with $\delta_{\rm G}$ Gaussian --- then Eq.~(\ref{eq:Z-gauss}) no longer
+holds, the higher cumulants are nonzero, and $P(k)$ no longer determines
+the distribution.  The three-point function (bispectrum) becomes an
+independent observable, and a single ``draw white noise, colour by
+$\sqrt P$'' construction cannot produce the field.  Everything in the
+next section assumes Gaussianity; non-Gaussian generators bolt an extra
+nonlinear term like Eq.~(\ref{eq:fnl}) onto the Gaussian core.
+
+%======================================================================
+\section{Generating a Gaussian random field on a computer}
+\label{sec:generate}
+
+We now turn the theory into an algorithm.  The goal: produce a realisation
+$\delta(\bx)$ on a grid whose power spectrum is a prescribed $P(k)$.
+Because the field is Gaussian, matching $P(k)$ matches the full
+distribution (\S\ref{sec:wick}), so this single recipe is a complete
+construction of the initial conditions.
+
+\subsection{The idea: take the square root of the covariance}
+\label{sec:gen-idea}
+
+Start in the finite-dimensional picture of \S\ref{sec:xi-covariance}: we
+want a Gaussian vector $\boldsymbol\delta \in \mathbb R^N$ with a
+prescribed covariance $C = \avg{\boldsymbol\delta\,\boldsymbol\delta^\top}$.
+The trick is to start from the easiest possible Gaussian vector ---
+\emph{white noise} $\boldsymbol\mu$, with independent unit-variance
+components, $\avg{\boldsymbol\mu\,\boldsymbol\mu^\top} = I$ --- and
+transform it linearly.  If $C = LL^\top$ for some matrix $L$ (a ``square
+root'' of $C$), then
+\begin{equation}
+  \boldsymbol\delta = L\,\boldsymbol\mu
+  \quad\Longrightarrow\quad
+  \avg{\boldsymbol\delta\,\boldsymbol\delta^\top}
+     = L\,\avg{\boldsymbol\mu\,\boldsymbol\mu^\top}\,L^\top
+     = L\,I\,L^\top = LL^\top = C.
+  \label{eq:sqrt-cov}
+\end{equation}
+A linear map of a Gaussian is Gaussian (Definition~2), so
+$\boldsymbol\delta$ is a Gaussian vector with exactly the covariance we
+wanted.  The whole problem reduces to factoring $C$.
+
+For a general covariance the factorisation $L$ (Cholesky, or the
+symmetric square root from the eigendecomposition) costs $\mathcal
+O(N^3)$ --- hopeless for a field with $N = 256^3 \approx 10^7$ cells.
+But our $C$ is not general: it is circulant (\S\ref{sec:cov-diag}).  And
+we already know a circulant matrix's eigenbasis --- the Fourier basis ---
+and its eigenvalues --- the power spectrum.  Its square root is therefore
+trivial: in Fourier space $C$ is the diagonal matrix
+$\mathrm{diag}\,P(\bk)$, and its square root is
+$\mathrm{diag}\,\sqrt{P(\bk)}$.  Applying $L$ is then just:
+Fourier-transform, multiply each mode by $\sqrt{P(\bk)}$, transform back.
+Cost: $\mathcal O(N \log N)$, the cost of an FFT.  This is the payoff of
+the diagonalisation of \S\ref{sec:covariance}.
+
+\subsection{White noise and its flat spectrum}
+\label{sec:whitenoise}
+
+Unit-variance white noise $\mu(\bq)$ is the field of independent
+identically distributed $\mathcal N(0,1)$ values, one per cell, with
+\begin{equation}
+  \avg{\mu(\bq)} = 0,
+  \qquad
+  \avg{\mu(\bq)\,\mu(\bq')} = \delta^D(\bq - \bq')
+  \;\;\text{(continuum)},
+  \quad
+  \avg{\mu_\bn\,\mu_{\bn'}} = \delta^K_{\bn\bn'}
+  \;\;\text{(grid)}.
+  \label{eq:whitenoise}
+\end{equation}
+Its correlation function is a spike at zero separation and zero
+elsewhere: each cell knows nothing about its neighbours.  By
+Wiener--Khinchin (\ref{eq:wiener-khinchin}) the Fourier transform of a
+delta is a constant, so white noise has a \emph{flat} power spectrum,
+$P_\mu(k) = 1$ --- equal power on every scale.  That is the origin of the
+name (white light has equal power at every frequency).  White noise is
+the canonical Gaussian field: the identity covariance, the thing we
+colour.
+
+A fact we will need for normalisation: the (unnormalised) discrete
+Fourier transform of grid white noise has a known per-mode variance.
+With $\tilde\mu_\bk = \sum_\bn \mu_\bn e^{-i\bk\cdot\bx_\bn}$ over
+$N_{\rm tot}$ cells,
+\begin{align}
+  \avg{|\tilde\mu_\bk|^2}
+  &= \sum_{\bn,\bn'} \avg{\mu_\bn\,\mu_{\bn'}}\,
+     e^{-i\bk\cdot(\bx_\bn - \bx_{\bn'})}
+   = \sum_{\bn,\bn'} \delta^K_{\bn\bn'}\,
+     e^{-i\bk\cdot(\bx_\bn - \bx_{\bn'})}
+   = \sum_\bn 1 = N_{\rm tot}.
+  \label{eq:whitenoise-permode}
+\end{align}
+The Kronecker delta collapses the double sum to a single one; the result
+is independent of $\bk$, which is the Fourier-space statement of
+``white''.  This $N_{\rm tot}$ is the factor that has to be divided out
+when converting a raw FFT amplitude into a physically normalised power
+spectrum; \code{fft.tex} Appendix and \code{cosmo\_ic.tex} Appendix~A
+track exactly where it goes.
+
+\subsection{Colouring: the recipe}
+\label{sec:colouring}
+
+Putting \S\ref{sec:gen-idea} and \S\ref{sec:whitenoise} together gives
+the standard algorithm.  Two equivalent versions, differing only in
+whether the randomness is drawn in real space or Fourier space.
+
+\paragraph{Method A --- white noise in real space, then colour.}
+\begin{enumerate}
+  \item Draw a real white-noise field: $\mu_\bn \sim \mathcal N(0,1)$,
+        independently in every cell.
+  \item Forward-FFT to get $\tilde\mu_\bk$.
+  \item Colour: multiply each mode by $\sqrt{P(\bk)\,V}$, giving
+        $\tilde\delta_\bk = \sqrt{P(\bk)\,V}\,\tilde\mu_\bk$.  (Zero the
+        $\bk = 0$ mode to enforce exactly zero mean.)
+  \item Inverse-FFT; take the real part.
+\end{enumerate}
+Because the input $\mu$ was real, its transform is automatically
+Hermitian-symmetric (\S\ref{sec:hermitian}), and multiplying by the
+real-valued $\sqrt{P(\bk)\,V}$ preserves that symmetry, so the inverse
+transform is real with no hand-tuning.  This automatic reality is the
+practical advantage of Method~A, and it is why simulation codes use it.
+Checking the per-mode variance with
+Eq.~(\ref{eq:whitenoise-permode}) confirms the normalisation:
+$\avg{|\tilde\delta_\bk|^2} = P(\bk)\,V\,\avg{|\tilde\mu_\bk|^2}
+= P(\bk)\,V\,N_{\rm tot}$, which combines with the inverse-FFT and
+cell-size factors to reproduce Eq.~(\ref{eq:pk-var}); the careful factor
+accounting is Appendix~A of \code{cosmo\_ic.tex}.
+
+\paragraph{Method B --- draw the modes directly in Fourier space.}
+\begin{enumerate}
+  \item For each independent mode $\bk$, draw a complex Gaussian
+        amplitude $\tilde\delta_\bk = \sqrt{P(\bk)\,V/2}\,(u + iv)$ with
+        $u, v \sim \mathcal N(0,1)$ independent, so that
+        $\avg{|\tilde\delta_\bk|^2} = P(\bk)\,V$.
+  \item Impose Hermitian symmetry by hand:
+        $\tilde\delta_{-\bk} = \tilde\delta_\bk^*$.
+  \item For the self-conjugate modes ($\bk = 0$ and the Nyquist corners
+        on an even grid) draw a purely real amplitude.
+  \item Inverse-FFT to real space.
+\end{enumerate}
+Method~B needs more bookkeeping but lets you set individual modes by hand
+--- useful for ``fixed-and-paired'' variance-reduction
+\citep{AnguloPontzen2016} and for zoom initial conditions --- and it
+saves one FFT.  On a large box the two methods are statistically
+identical; they differ only in their treatment of the largest modes on a
+small box, where Method~A convolves $P$ with the box window and Method~B
+does not.  \code{ic\_sampling.tex} and \citet{Pen1997, Sirko2005} discuss
+that ``$P$-sampled versus $\xi$-sampled'' distinction, which can bias
+$\sigma_8$ in small boxes.
+
+\subsection{The statistics of a single Fourier amplitude}
+\label{sec:mode-stats}
+
+It is worth knowing the distribution --- not just the mean --- of a
+single mode's amplitude, because it is what one plots to check that a
+generated field is correctly normalised, and it explains the ragged
+look of a raw (unbinned) power-spectrum measurement.
+
+Fix a generic mode $\bk$ (not $\bk=0$, not a Nyquist self-conjugate
+corner).  From Method~B, $\tilde\delta_\bk = X + iY$ with $X$ and $Y$
+independent zero-mean Gaussians of equal variance $\sigma_k^2 =
+P(\bk)V/2$.  Two classic results follow purely from the geometry of a
+two-dimensional Gaussian.
+
+\paragraph{The amplitude is Rayleigh-distributed.}  Write
+$\tilde\delta_\bk$ as a point $(X, Y)$ in the complex plane, drawn from
+the isotropic 2D Gaussian
+\begin{equation}
+  p(X, Y)\,\mathrm dX\,\mathrm dY
+    = \frac{1}{2\pi\sigma_k^2}
+      \exp\!\Bigl(-\frac{X^2+Y^2}{2\sigma_k^2}\Bigr)\,\mathrm dX\,\mathrm dY.
+\end{equation}
+Change to polar coordinates $R = |\tilde\delta_\bk|$, $\theta =
+\arg\tilde\delta_\bk$, with $\mathrm dX\,\mathrm dY = R\,\mathrm
+dR\,\mathrm d\theta$.  The phase $\theta$ comes out uniform on
+$[0, 2\pi)$ and independent of $R$ (isotropy), and marginalising over it
+(the $\int_0^{2\pi}\mathrm d\theta = 2\pi$ cancels the $1/2\pi$
+prefactor) leaves
+\begin{equation}
+  p(R) = \frac{R}{\sigma_k^2}\,
+         \exp\!\Bigl(-\frac{R^2}{2\sigma_k^2}\Bigr), \qquad R \ge 0,
+  \label{eq:rayleigh}
+\end{equation}
+the \emph{Rayleigh distribution}.  The phase of each mode is completely
+random --- this is why a Gaussian field is sometimes said to have
+``random phases'' --- and the amplitude is Rayleigh.
+
+\paragraph{The power in a mode is exponentially distributed.}  Change
+variable once more to the mode power $U = R^2 = |\tilde\delta_\bk|^2$,
+with $\mathrm dU = 2R\,\mathrm dR$.  The factor $R$ in
+Eq.~(\ref{eq:rayleigh}) is exactly cancelled by the Jacobian, leaving a
+pure exponential:
+\begin{equation}
+  p(U) = \frac{1}{2\sigma_k^2}\,
+         \exp\!\Bigl(-\frac{U}{2\sigma_k^2}\Bigr), \qquad U \ge 0,
+  \label{eq:exponential}
+\end{equation}
+with mean $\avg{U} = 2\sigma_k^2 = P(\bk)V$, consistent with
+Eq.~(\ref{eq:pk-var}).  The exponential has a heavy tail: the most likely
+mode power is zero, the median is $\ln 2 \approx 0.69$ times the mean,
+and rare modes carry several times the mean.  A single realisation's
+$|\tilde\delta_\bk|^2$ therefore scatters wildly around $P(\bk)$ --- with
+$100\%$ relative fluctuation per mode --- which is why a power-spectrum
+estimate must average many modes to be useful (\S\ref{sec:estimate-pk}).
+Figure~\ref{fig:grf-exp} shows the three distributions --- the circular
+cloud of $(X, Y)$, the Rayleigh $R$, and the exponential $R^2$ ---
+measured from the FFT of real white noise.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{grf_exponential.pdf}
+\caption{Per-mode statistics of the FFT of real white noise on a
+$64\times64$ grid, over $20{,}000$ realisations at one generic mode
+(reproduced from \code{fft.tex}).
+\textbf{(a)} The complex amplitude $(X, Y) = (\mathrm{Re},\mathrm{Im})$
+is an isotropic 2D Gaussian --- random phase, Gaussian real and imaginary
+parts.
+\textbf{(b)} The modulus $R = |\tilde\delta_\bk|$ follows the Rayleigh
+distribution of Eq.~(\ref{eq:rayleigh}).
+\textbf{(c)} The mode power $R^2 = |\tilde\delta_\bk|^2$ is exponentially
+distributed (Eq.~\ref{eq:exponential}; note the log $y$-axis).  Red
+curves are the analytic predictions.  The wide exponential scatter is why
+a power-spectrum estimator must bin many modes.}
+\label{fig:grf-exp}
+\end{figure}
+
+\subsection{Worked example: a Gaussian-correlated field in 1D}
+\label{sec:grf-example}
+
+To make the recipe concrete, build a one-dimensional field with a chosen
+correlation length $\lambda$ and check by hand that every property comes
+out right.  Take the target correlation function to be a Gaussian bump,
+\begin{equation}
+  \xi(r) = A\,e^{-r^2/\lambda^2},
+  \label{eq:ex-xi}
+\end{equation}
+so that $A = \xi(0) = \avg{\delta^2}$ is the variance and $\lambda$ is
+the $1/e$ correlation length.  Its power spectrum is the Fourier
+transform (Wiener--Khinchin), a standard Gaussian integral:
+\begin{equation}
+  P(k) = \int_{-\infty}^{\infty}\!\mathrm dr\; A\,e^{-r^2/\lambda^2}\,
+         e^{-ikr}
+       = A\,\lambda\sqrt\pi\;e^{-k^2\lambda^2/4}.
+  \label{eq:ex-Pk}
+\end{equation}
+(A short check: transforming Eq.~(\ref{eq:ex-Pk}) back with the inverse
+of Eq.~(\ref{eq:P-xi-pair}) returns Eq.~(\ref{eq:ex-xi}), using
+$\int\mathrm dk\,e^{-ak^2}e^{ikr} = \sqrt{\pi/a}\,e^{-r^2/4a}$ with
+$a = \lambda^2/4$.)  A short-correlation-length field (small $\lambda$)
+has a broad power spectrum (power out to large $k$); a long-correlation
+field has power concentrated at small $k$ --- the reciprocal relationship
+between real-space width and Fourier-space width.
+
+\paragraph{Discrete recipe (Method A).}  On a periodic grid of $N$ cells
+of spacing $\Delta$:
+\begin{enumerate}
+  \item Draw $\mu_n \sim \mathcal N(0,1)$, $n = 0,\dots,N-1$.
+  \item FFT: $\tilde\mu_m = \sum_n \mu_n e^{-2\pi i mn/N}$.
+  \item Colour mode by mode: $\tilde\delta_m =
+        \sqrt{P(k_m)/(N\Delta)}\,\tilde\mu_m$, with $k_m = 2\pi m/(N\Delta)$.
+  \item Inverse-FFT: $\delta_n = N^{-1}\sum_m \tilde\delta_m e^{+2\pi i mn/N}$.
+\end{enumerate}
+Three properties can be verified by hand on a small grid (try $N = 8$,
+$\lambda = 2\Delta$):
+\begin{itemize}
+  \item[(a)] \textbf{Each $\delta_n$ is Gaussian}, because step~4 makes it
+        a fixed linear combination of the Gaussian $\mu$'s.
+  \item[(b)] \textbf{The variance is right}: summing
+        $\avg{|\tilde\delta_m|^2} = P(k_m)/\Delta$ over $m$ and dividing
+        by the inverse-FFT $N^2$ gives $\avg{\delta_n^2} = (N\Delta)^{-1}
+        \sum_m P(k_m) \to \int\mathrm dk\,P(k)/(2\pi) = A$ in the
+        continuum limit --- exactly $\xi(0)$.
+  \item[(c)] \textbf{The two-point function is right}: the same sum with
+        a phase gives $\avg{\delta_n\delta_{n+r}} \to A\,e^{-r^2\Delta^2/
+        \lambda^2} = \xi(r\Delta)$.
+\end{itemize}
+By Wick (\S\ref{sec:wick}), once (a) and (c) hold the \emph{entire}
+distribution of $\{\delta_n\}$ matches the target.  Matching the two
+lines of second-moment algebra has, for free, matched every higher
+correlator.  That is the whole content of Gaussianity, made arithmetic.
+
+%======================================================================
+\section{Measuring $\xi$ and $P$ from one realisation}
+\label{sec:estimate}
+
+The last piece is the inverse problem: given one box (a simulation
+snapshot or a galaxy survey), estimate its correlation function and power
+spectrum.  This is where ergodicity (\S\ref{sec:ergodic}) does its work
+--- we replace the unavailable ensemble average with an average over the
+box --- and where the finite size of the box sets the ultimate error.
+The estimator details specific to $N$-body simulations (mass assignment,
+window deconvolution, shot noise) live in Appendix~B of
+\code{cosmo\_ic.tex}; here we cover the ideas.
+
+\subsection{Estimating the power spectrum}
+\label{sec:estimate-pk}
+
+Equation~(\ref{eq:pk-var}) says $P(\bk) = \avg{|\hat\delta_\bk|^2}/V$.
+The ensemble average is unavailable, but under isotropy all modes with
+the same $|\bk|$ have the same $P$, so we \emph{average over the modes in
+a shell} $k \le |\bk| < k + \Delta k$ as a stand-in for the ensemble
+average:
+\begin{equation}
+  \hat P(k) = \frac{1}{V\,N_k}\sum_{\bk\,\in\,\text{shell}} |\hat\delta_\bk|^2,
+  \label{eq:pk-estimator}
+\end{equation}
+where $N_k$ is the number of modes in the shell.  Because each
+$|\hat\delta_\bk|^2$ is exponentially distributed
+(\S\ref{sec:mode-stats}) with $100\%$ scatter, averaging $N_k$ of them
+cuts the fractional error to $\sim 1/\sqrt{N_k}$.  Large-scale (small-$k$)
+shells contain few modes and are noisy; small-scale (large-$k$) shells
+contain many modes and are smooth.  The procedure in practice: assign the
+particles to a density grid, FFT, square, and bin in $|\bk|$.
+
+\subsection{Cosmic variance: the price of a finite box}
+\label{sec:cosmicvar}
+
+The number of independent modes in a shell of width $\Delta k$ is
+\begin{equation}
+  N_k \approx \frac{4\pi k^2\,\Delta k}{(2\pi/L)^3}
+            = \frac{V k^2\,\Delta k}{2\pi^2},
+\end{equation}
+because $k$-space is quantised in cells of size $(2\pi/L)^3$.  Larger box
+$\to$ finer $k$-spacing $\to$ more modes per shell $\to$ smaller error.
+On the largest scales (smallest $k$) there are only a handful of modes no
+matter how well you simulate, and the fractional error $\sim
+1/\sqrt{N_k}$ is irreducible.  This is \emph{cosmic variance}: the
+fundamental uncertainty from having sampled a finite piece of the random
+field.  It is the box-scale echo of the per-mode exponential scatter of
+\S\ref{sec:mode-stats}, and it is why large-scale measurements (in
+surveys and in simulations alike) are the hardest to pin down.
+
+\subsection{Estimating the correlation function}
+\label{sec:estimate-xi}
+
+Two routes, using the two faces of the same object.
+
+\paragraph{Direct pair counting.}  Straight from the definition
+(\ref{eq:xi-pair}): count the pairs of particles separated by $r$
+(within a bin), and compare to the number expected for a random
+distribution,
+\begin{equation}
+  \hat\xi(r) = \frac{DD(r)}{RR(r)} - 1,
+\end{equation}
+where $DD$ counts data--data pairs and $RR$ the pairs of a uniform random
+catalogue with the same geometry.  (Real surveys use the
+Landy--Szalay combination $(DD - 2DR + RR)/RR$, which cancels
+edge effects to leading order.)  Pair counting is $\mathcal O(N^2)$ but
+gives $\xi(r)$ directly at the separations of interest.  It is the right
+tool at low redshift where the clustering signal is large; at high
+redshift the signal in $\xi$ is minuscule and the power spectrum (or the
+grid estimator) is the better probe, as \code{CLAUDE.md} and the Corrfunc
+notes discuss.
+
+\paragraph{Via the FFT.}  Because $\xi$ and $P$ are a Fourier pair
+(\ref{eq:P-xi-pair}), a second route is to measure $P(k)$ by
+Eq.~(\ref{eq:pk-estimator}) and inverse-transform it.  This is $\mathcal
+O(N\log N)$ and gives $\xi$ at all separations at once, but it inherits
+the grid and window effects of the FFT.  Which route wins depends on the
+scales of interest and the number density; the two are consistent where
+they overlap.
+
+\subsection{Grid assignment and its window}
+\label{sec:cic}
+
+To FFT a set of particles you must first paint them onto a grid.  The
+common ``cloud-in-cell'' (CIC) scheme spreads each particle over its
+eight nearest cells, which is a convolution of the true field with a
+small assignment kernel.  Convolution in real space is multiplication in
+Fourier space, so the measured $\hat\delta_\bk$ is the true one times a
+\emph{window function} $W(\bk)$ that must be divided back out
+(``deconvolved'') before reading off $P(k)$.  The assignment also
+introduces \emph{shot noise} --- a flat $1/\bar n$ floor from the
+discreteness of the particles --- that must be subtracted, and
+\emph{aliasing} of power from above the grid Nyquist frequency.  These
+three corrections (window, shot noise, aliasing) are exactly the subject
+of Appendix~B of \code{cosmo\_ic.tex}; they are the difference between a
+raw FFT and a publishable power spectrum.  One cosmology-specific subtlety
+worth flagging: lattice initial conditions have \emph{sub-Poissonian}
+shot noise (the particles start on a regular grid, not at random
+positions), so the naive $1/\bar n$ subtraction is wrong at early times
+--- see the same appendix.
+
+%======================================================================
+\section{Summary and where to go next}
+\label{sec:summary}
+
+The logical spine of this note, in one paragraph.  A cosmological density
+field is a \emph{random field}: predictable only in its statistics, of
+which --- under homogeneity, isotropy, and (for measurement) ergodicity
+--- the leading one is the two-point function.  In real space that is the
+\emph{correlation function} $\xi(r)$, the excess clustering of pairs and
+equivalently the covariance of the field between two points.  In Fourier
+space, homogeneity makes the modes uncorrelated and the same information
+becomes the \emph{power spectrum} $P(k)$, the variance per mode; the two
+are a Fourier pair (Wiener--Khinchin) and are literally the covariance
+operator written in two bases.  For a \emph{Gaussian} field --- which
+inflation delivers and the central limit theorem reinforces --- Wick's
+theorem makes this two-point function the \emph{entire} story: mean plus
+$P(k)$ fixes the whole distribution.  That is what lets us both
+\emph{generate} a realisation (draw white noise, colour it by
+$\sqrt{P(k)}$ with an FFT --- the square root of the diagonalised
+covariance) and \emph{measure} $P(k)$ back from a single box (bin the
+squared Fourier amplitudes), with the finite box size setting an
+irreducible cosmic-variance floor.
+
+\medskip\noindent Where each thread continues in the other notes:
+\begin{itemize}
+  \item \textbf{The cosmological content} --- how $P(k)$ arises from
+        inflation and the transfer function, how the field is displaced
+        into particle positions (Zel'dovich, 2LPT), the physical
+        correlation and velocity statistics $\xi(r)$ and $\psi(r)$:
+        \code{cosmo\_ic.tex}.  Its Appendix~A does the careful Fourier
+        factor bookkeeping quoted here; its Appendix~B is the estimator
+        detail of \S\ref{sec:estimate}.
+  \item \textbf{The numerical Fourier transform} --- the discrete and
+        fast transforms, per-mode statistics, radix and parallel FFT
+        algorithms: \code{fft.tex}.  Figure~\ref{fig:grf-exp} is borrowed
+        from there.
+  \item \textbf{Sampling methods and finite-box biases} --- the
+        $P$-sampled versus $\xi$-sampled distinction of
+        \S\ref{sec:colouring}, box-window truncation: \code{ic\_sampling.tex}.
+  \item \textbf{The generator internals} --- how MUSIC2 realises the
+        $\delta = T\star\mu$ construction of \S\ref{sec:generate} on a
+        refinement hierarchy: \code{music2\_internals.tex}.
+\end{itemize}
+
+%======================================================================
+\section*{Further reading}
+\addcontentsline{toc}{section}{Further reading}
+
+Ordered roughly by increasing formality; a good first path is
+\citet{MoBoschWhite2010} \S4.3--4.4, then \citet{BBKS1986} Appendix~A,
+then \citet{Pen1997}.
+
+\begin{itemize}
+  \item \citet{MoBoschWhite2010}, \emph{Galaxy Formation and Evolution},
+        \S4.3--4.4: the cleanest textbook chapter on cosmological
+        Gaussian random fields --- definitions, correlation function,
+        power spectrum, peak statistics --- at exactly the level of this
+        note.
+  \item \citet{Peacock1999}, \emph{Cosmological Physics}, ch.~16: the
+        central-limit origin of the Gaussian one-point distribution and
+        the spectral $\delta = T\star\mu$ construction.
+  \item \citet{DodelsonSchmidt2020}, \emph{Modern Cosmology}, ch.~6--7:
+        connects the random-field formalism to the inflationary origin of
+        $P(k)$ and the transfer function.
+  \item \citet{BBKS1986} (Bardeen, Bond, Kaiser \& Szalay), Appendix~A:
+        a self-contained physicist's primer on multivariate Gaussians,
+        $n$-point functions, and Wick contractions.
+  \item \citet{vanKampen2007}, \emph{Stochastic Processes in Physics and
+        Chemistry}, ch.~3: the clearest account of Gaussian processes,
+        the characteristic functional (Definition~3), and why all
+        cumulants beyond the second vanish.
+  \item \citet{Pen1997}: the original FFT recipe for generating a
+        cosmological Gaussian random field --- the construction of
+        \S\ref{sec:generate}.  \citet{Sirko2005} analyses the finite-box
+        sampling biases of \S\ref{sec:colouring}.
+  \item \citet{AnguloPontzen2016}: the ``fixed-and-paired'' construction
+        that exploits the mode phase/amplitude freedom to suppress cosmic
+        variance.
+\end{itemize}
+
+%======================================================================
+\begin{thebibliography}{99}
+
+\bibitem[{Angulo~\& Pontzen(2016)}]{AnguloPontzen2016}
+Angulo, R.~E.\ \& Pontzen, A. 2016, MNRAS, 462, L1.
+
+\bibitem[{Bardeen et al.(1986)}]{BBKS1986}
+Bardeen, J.~M., Bond, J.~R., Kaiser, N., \& Szalay, A.~S. 1986,
+ApJ, 304, 15.
+
+\bibitem[{Dodelson~\& Schmidt(2020)}]{DodelsonSchmidt2020}
+Dodelson, S.\ \& Schmidt, F. 2020, ``Modern Cosmology'' 2nd ed.\
+(Academic Press).
+
+\bibitem[{Mo et al.(2010)}]{MoBoschWhite2010}
+Mo, H., van den Bosch, F., \& White, S. 2010, ``Galaxy Formation
+and Evolution'' (Cambridge University Press).
+
+\bibitem[{Peacock(1999)}]{Peacock1999}
+Peacock, J.~A. 1999, ``Cosmological Physics'' (Cambridge
+University Press).
+
+\bibitem[{Pen(1997)}]{Pen1997}
+Pen, U.-L. 1997, ApJS, 109, 1.
+
+\bibitem[{Sirko(2005)}]{Sirko2005}
+Sirko, E. 2005, ApJ, 634, 728.
+
+\bibitem[{van~Kampen(2007)}]{vanKampen2007}
+van Kampen, N.~G. 2007, ``Stochastic Processes in Physics and
+Chemistry'' 3rd ed.\ (North-Holland).
+
+\end{thebibliography}
+
+\end{document}

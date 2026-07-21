@@ -1,4 +1,4 @@
-NOTES  = ic_sampling cosmo_ic fft restriction_lpt music2_internals
+NOTES  = foundations ic_sampling cosmo_ic fft restriction_lpt music2_internals fdm dm_chemistry sidm
 PYTHON = conda run -n cosmo python
 
 # Absolute path to this Makefile's directory — pdflatex is always run from here
@@ -37,6 +37,7 @@ FIGURES = \
     figures/ic_sampling/tophat_window.pdf \
     figures/ic_sampling/pgrid_comparison.pdf \
     figures/cosmo_ic/pancake.pdf \
+    figures/cosmo_ic/shotnoise_order.pdf \
     figures/fft/dft_pairs.pdf figures/fft/cft_pairs.pdf \
     figures/fft/grf_exponential.pdf figures/fft/complex_modes.pdf \
     figures/restriction/restriction_density.pdf \
@@ -97,6 +98,9 @@ CLASS_INI  := $(firstword $(wildcard $(REPO_ROOT)/conf/input_class_parameters_*.
 
 figures/cosmo_ic/pancake.pdf : figures/cosmo_ic/plot_pancake.py
 	cd figures/cosmo_ic && $(PYTHON) plot_pancake.py
+
+figures/cosmo_ic/shotnoise_order.pdf : figures/cosmo_ic/plot_shotnoise_order.py
+	cd figures/cosmo_ic && $(PYTHON) plot_shotnoise_order.py
 
 figures/fft/dft_pairs.pdf : figures/fft/plot_dft_pairs.py
 	cd figures/fft && $(PYTHON) plot_dft_pairs.py

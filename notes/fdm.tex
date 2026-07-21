@@ -1,0 +1,1143 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{natbib}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{lineno}
+\linenumbers
+\tcbuselibrary{breakable,skins}
+\bibliographystyle{aasjournal}
+
+\newcommand{\bk}{\mathbf{k}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\bv}{\mathbf{v}}
+\newcommand{\Omm}{\Omega_m}
+\newcommand{\lambdadB}{\lambda_{\rm dB}}
+\newcommand{\mchi}{m_\chi}
+\newcommand{\eV}{\,\mathrm{eV}}
+\newcommand{\kpc}{\,\mathrm{kpc}}
+\newcommand{\Mpc}{\,\mathrm{Mpc}}
+\newcommand{\Msun}{\,M_\odot}
+\newcommand{\kms}{\,\mathrm{km\,s^{-1}}}
+\newcommand{\mtwtwo}{m_{22}}
+
+\title{Fuzzy Dark Matter and BECDM}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\begin{tcolorbox}[colback=yellow!10!white, colframe=orange!75!black,
+                  title={\bfseries Disclaimer}]
+These notes were compiled by an AI assistant (Claude, Anthropic) and have
+\textbf{not been reviewed by a human domain expert}.  They may contain
+errors in derivations, physical reasoning, or numerical estimates.
+Cross-check key equations against the primary literature before use.
+\end{tcolorbox}
+\vspace{0.5em}
+
+%----------------------------------------------------------------------
+\section{Introduction and motivation}
+\label{sec:intro}
+
+Standard cold dark matter (CDM) reproduces the CMB, large-scale
+galaxy clustering, and cluster dynamics at the few-percent level.
+Where it has been challenged is on sub-galactic scales:
+missing-satellites, too-big-to-fail, and cusp-vs-core (see
+\texttt{sidm.tex} for a detailed discussion).  One radical response is
+to blame the DM microphysics --- perhaps dark matter is not a heavy
+weakly-interacting particle but an \emph{ultralight bosonic field}
+whose de Broglie wavelength is of order kpc so that quantum
+uncertainty smooths out structure on those scales.  \citet{Hu2000}
+introduced this as \emph{fuzzy cold dark matter} (FCDM/FDM).
+
+Naming zoo (all the same physics):
+\begin{itemize}
+  \item \textbf{FDM/FCDM} --- \citet{Hu2000}, phenomenological
+        astrophysics.
+  \item \textbf{Ultralight axion(-like)} (ULA / ULDM) --- particle
+        physics language, especially string-theory motivated
+        \citep{Arvanitaki2010,Marsh2016}.
+  \item \textbf{BECDM} --- condensed-matter language, emphasises the
+        macroscopic-wavefunction / Bose--Einstein-condensate viewpoint
+        \citep{Mocz2017,Mocz2020}.
+  \item \textbf{SFDM / $\psi$DM / wave dark matter} --- generic
+        agnostic names \citep{Schive2014,Schive2014b}.
+\end{itemize}
+
+The characteristic mass scale is $m\sim 10^{-22}\eV$, chosen so that
+$\lambdadB\sim 1\,{\rm kpc}$ in a typical dwarf galaxy --- matching
+the size of observed cores.  The comprehensive review is
+\citet{Hui2017}; particle-physics side is \citet{Marsh2016}.
+
+%----------------------------------------------------------------------
+\section{Particle physics: ultralight scalars and misalignment}
+\label{sec:particle}
+
+\subsection{Scalar-field action and cosmological equation of motion}
+
+Take a real scalar field $\phi$ minimally coupled to gravity:
+%
+\begin{equation}
+  S = \int d^4x\,\sqrt{-g}\left[
+       -\tfrac{1}{2}g^{\mu\nu}\partial_\mu\phi\,\partial_\nu\phi
+       -\tfrac{1}{2}m^2\phi^2
+      \right],
+  \label{eq:scalar_action}
+\end{equation}
+%
+with self-interactions omitted at leading order.  The
+Euler--Lagrange equation is the Klein--Gordon equation
+$\Box\phi = m^2\phi$.  In a flat FRW background with metric
+determinant $\sqrt{-g} = a^3$, the covariant d'Alembertian gives
+%
+\begin{equation}
+  \ddot\phi + 3H\dot\phi + m^2\phi = 0.
+  \label{eq:KG_FRW}
+\end{equation}
+
+\subsection{Misalignment mechanism: cold-matter behaviour}
+
+Two regimes of Eq.~\eqref{eq:KG_FRW}:
+
+\paragraph{Overdamped ($H\gg m$).}  The friction term $3H\dot\phi$
+dominates.  Any initial value $\phi_i$ is held approximately constant
+(``frozen misalignment''), so $\rho_\phi\simeq V(\phi_i) = m^2\phi_i^2/2$
+is constant and $w = -1$; the field acts as a small cosmological
+constant.
+
+\paragraph{Oscillating ($H\ll m$).}  Substitute the WKB ansatz
+$\phi = A(t)\cos(mt+\theta)$ with $|\dot A/(mA)|\ll 1$.  To leading
+order in $\dot A/(mA)$,
+%
+\begin{equation}
+  \ddot\phi + 3H\dot\phi + m^2\phi
+    \approx -2m\dot A\sin(mt+\theta) - 3HmA\sin(mt+\theta) = 0,
+\end{equation}
+%
+which fixes $\dot A = -\tfrac{3}{2}HA$, i.e.\ $A\propto a^{-3/2}$.
+The averaged energy density and pressure are
+%
+\begin{equation}
+  \langle\rho_\phi\rangle = \tfrac{1}{2}m^2 A^2 \propto a^{-3},
+  \qquad
+  \langle p_\phi\rangle = 0
+  \qquad \Longrightarrow\qquad w = 0,
+\end{equation}
+%
+so the oscillating field redshifts as pressureless matter.
+
+The transition occurs at $H(a_{\rm osc})\sim m/3$.  For $m\sim
+10^{-22}\eV$ and a radiation-dominated era, this happens at
+%
+\begin{equation}
+  T_{\rm osc} \sim (m\,M_{\rm Pl})^{1/2}
+    \sim 500\eV,
+  \qquad z_{\rm osc}\sim 10^{6},
+\end{equation}
+%
+well before matter--radiation equality, so by $z=1000$ the field has
+been oscillating for a long time and is indistinguishable from CDM on
+super-de-Broglie scales.  Requiring today's abundance
+$\Omega_\phi h^2\sim 0.12$ gives an ``axion decay constant''
+$F_\phi\sim 10^{17}\,{\rm GeV}$ for the sweet-spot mass ---
+comparable to the GUT/string scale.
+
+\subsection{Where does $10^{-22}\eV$ come from?}
+
+The QCD axion (original Peccei--Quinn resolution of the strong-CP
+problem) has $m\sim 10^{-6}$--$10^{-3}\eV$, set by QCD instanton
+effects and $f_a$.  \emph{Ultralight} axion-like particles arise
+generically in string compactifications --- the string axiverse
+\citep{Arvanitaki2010}: many moduli acquire tiny masses from
+non-perturbative dynamics,
+%
+\begin{equation}
+  m \sim M_{\rm Pl}\,e^{-S_{\rm inst}},
+\end{equation}
+%
+with $S_{\rm inst}$ a large instanton action.  A small change in
+$S_{\rm inst}$ shifts $m$ by many orders of magnitude, so a plausible
+theoretical prior spans all of
+$10^{-33}\eV$--$10^{-3}\eV$.  Astrophysically, $m\sim 10^{-22}\eV$ is
+special because that is where $\lambdadB$ inside a dwarf galaxy
+matches the observed core size.
+
+\subsection{Bose occupation number}
+
+At $m\sim 10^{-22}\eV$ and local dark-matter density
+$\rho\sim 0.3\,{\rm GeV\,cm^{-3}}$, the number density is
+$n = \rho/m\sim 10^{93}\,{\rm Mpc^{-3}}$, and the number of quanta per
+de Broglie cell is $\sim 10^{96}$.  The field is highly degenerate and
+Bose-condensed on any astrophysical scale, so it can be treated as a
+classical complex scalar $\psi(\bx,t)$ whose $|\psi|^2$ is the DM
+density.  ``BECDM'' is not a metaphor.
+
+%----------------------------------------------------------------------
+\section{Non-relativistic reduction: Schr\"odinger--Poisson}
+\label{sec:sp}
+
+\subsection{Derivation from Klein--Gordon}
+
+Working in units $\hbar=c=1$ (restored below), consider the KG
+equation on the perturbed FRW metric
+$ds^2 = -(1+2\Phi)dt^2 + a^2(1-2\Phi)d\bx^2$
+with Newtonian potential $|\Phi|\ll 1$.  Two scale hierarchies apply:
+%
+\begin{equation}
+  |\dot\psi/\psi| \ll m,
+  \qquad
+  |\nabla\psi/\psi| \ll ma
+  \qquad\text{(non-relativistic, sub-Compton).}
+\end{equation}
+%
+Factor out the fast Compton oscillation with the ansatz
+%
+\begin{equation}
+  \phi(\bx,t) = \frac{1}{\sqrt{2m}}
+                \Bigl[\psi(\bx,t)\,e^{-imt} + \psi^*(\bx,t)\,e^{+imt}\Bigr],
+  \label{eq:WKB_ansatz}
+\end{equation}
+%
+promoting $\psi$ to a slowly varying complex envelope.  Substitute
+\eqref{eq:WKB_ansatz} into $\Box\phi = m^2\phi$; the $m^2\phi$ terms
+cancel the leading Compton-scale contribution, so what survives is
+%
+\begin{equation}
+  2im\dot\psi + 3imH\psi + a^{-2}\nabla^2\psi - 2m^2\Phi\psi = 0,
+\end{equation}
+%
+(neglecting $\ddot\psi$, $H^2\psi$, and $\Phi\dot\psi$).  Dividing by
+$2m$ and restoring $\hbar$ gives the \emph{Schr\"odinger equation in
+an expanding background}:
+%
+\begin{equation}
+  i\hbar\Bigl(\partial_t + \tfrac{3}{2}H\Bigr)\psi
+    = -\frac{\hbar^2}{2m\,a^2}\nabla^2\psi + m\Phi\psi.
+  \label{eq:schrod_FRW}
+\end{equation}
+%
+The Hubble drag $3H\psi/2$ is exactly what makes
+$\rho = m|\psi|^2$ redshift as $a^{-3}$.  On timescales much shorter
+than $H^{-1}$ we can drop $3H\psi/2$ and set $a=1$; the gravitational
+potential is sourced by
+%
+\begin{equation}
+  \nabla^2\Phi = 4\pi G\,\bigl(|\psi|^2 - \bar\rho\bigr).
+  \label{eq:poisson_fdm}
+\end{equation}
+%
+Equations \eqref{eq:schrod_FRW}--\eqref{eq:poisson_fdm} form the
+\emph{Schr\"odinger--Poisson} (SP) system.  In natural units,
+%
+\begin{equation}
+  i\hbar\,\partial_t\psi
+    = -\frac{\hbar^2}{2m}\nabla^2\psi + m\Phi\psi,
+  \qquad
+  \nabla^2\Phi = 4\pi G\,(|\psi|^2-\bar\rho).
+  \label{eq:SP}
+\end{equation}
+%
+Reference: \citet{Hu2000}, \citet{Marsh2016}, \citet{Hui2017}.
+
+\subsection{Madelung transform: hydrodynamic form}
+
+Write $\psi$ in polar form,
+%
+\begin{equation}
+  \psi(\bx,t) = \sqrt{\rho(\bx,t)/m}\;e^{iS(\bx,t)/\hbar},
+  \label{eq:madelung_def}
+\end{equation}
+%
+identifying the fluid velocity $\bv = \nabla S/m$.
+Substituting into \eqref{eq:SP} and separating real and imaginary
+parts yields two coupled equations.
+
+\paragraph{Imaginary part (continuity).}  Multiplying the imaginary
+part by $2\sqrt\rho/(\hbar m)$ gives
+%
+\begin{equation}
+  \partial_t\rho + \nabla\!\cdot(\rho\bv) = 0.
+  \label{eq:continuity_fdm}
+\end{equation}
+
+\paragraph{Real part (Bernoulli/Euler).}  The real part is
+%
+\begin{equation}
+  -\partial_t S = \frac{(\nabla S)^2}{2m} + m\Phi
+                  - \frac{\hbar^2}{2m}\frac{\nabla^2\sqrt\rho}{\sqrt\rho}.
+\end{equation}
+%
+Take one spatial gradient and use $\bv=\nabla S/m$:
+%
+\begin{equation}
+  \partial_t\bv + (\bv\cdot\nabla)\bv
+    = -\nabla\Phi - \nabla Q,
+  \label{eq:euler_fdm}
+\end{equation}
+%
+with the \emph{quantum potential}
+%
+\begin{equation}
+  Q(\bx,t) \equiv -\frac{\hbar^2}{2m^2}
+                  \frac{\nabla^2\sqrt\rho}{\sqrt\rho}.
+  \label{eq:Q_def}
+\end{equation}
+
+\paragraph{Physical content.}  Eqs.~\eqref{eq:continuity_fdm} and
+\eqref{eq:euler_fdm} are the continuity and Euler equations of a
+\emph{pressureless} self-gravitating fluid supplemented by a
+non-local, gradient-based ``pressure'' $Q$.  $Q$ is not a genuine
+thermodynamic pressure --- it depends on curvature of $\sqrt\rho$, not
+on $\rho$ locally --- but it acts like one on scales below the de
+Broglie length, opposing density gradients and preventing collapse.
+Set $\hbar\to 0$ and one recovers pressureless CDM.  The FDM
+``fuzziness'' is entirely $Q$.
+
+Note that $\bv=\nabla S/m$ implies $\nabla\times\bv=0$ identically:
+FDM velocity is irrotational.  Vorticity in FDM is
+\emph{quantised} --- it lives on defect lines where $|\psi|=0$
+(nodes/vortex tubes) where $S$ is multivalued.  This makes the
+Madelung representation break at vortex lines, an issue relevant for
+numerical implementation \citep{Mocz2017}.
+
+%----------------------------------------------------------------------
+\section{Linear theory: Jeans scale and quantum pressure}
+\label{sec:jeans}
+
+\subsection{Dispersion relation from Schr\"odinger--Poisson}
+
+Linearise \eqref{eq:SP} around a homogeneous background of density
+$\bar\rho$.  In a static (non-expanding) background, perturbations
+$\delta\rho \propto e^{i\bk\cdot\bx + \gamma t}$ satisfy
+%
+\begin{equation}
+  \gamma^2 = 4\pi G\bar\rho
+             - \left(\frac{\hbar k^2}{2m}\right)^{\!2}.
+  \label{eq:dispersion_fdm}
+\end{equation}
+%
+The first term is standard Jeans gravity; the second, quartic in $k$,
+is the quantum-pressure contribution inherited from
+$-\hbar^2\nabla^2/(2m)$ acting on the amplitude \citep{Hu2000,Hui2017}.
+
+\subsection{Jeans wavenumber}
+
+Setting $\gamma=0$ in \eqref{eq:dispersion_fdm} gives
+%
+\begin{equation}
+  k_J^4 = \frac{16\pi G m^2 \bar\rho}{\hbar^2}
+  \quad\Longrightarrow\quad
+  k_J = \left(\frac{16\pi G m^2\bar\rho}{\hbar^2}\right)^{\!1/4}.
+  \label{eq:kJ_def}
+\end{equation}
+%
+Modes with $k>k_J$ are quantum-pressure stabilised and oscillate;
+modes with $k<k_J$ are gravitationally unstable and grow.  The
+corresponding physical scale
+%
+\begin{equation}
+  r_J = \frac{2\pi}{k_J}
+      = \pi^{3/4}\,(G\bar\rho)^{-1/4}\,m^{-1/2},
+\end{equation}
+%
+is the \emph{geometric mean} of the gravitational dynamical scale
+$(G\bar\rho)^{-1/2}$ and the Compton scale $m^{-1}$.  In cosmological
+units \citep{Hu2000},
+%
+\begin{equation}
+  r_J = 55\,\mtwtwo^{-1/2}
+          (\rho/\bar\rho_b)^{-1/4}
+          (\Omm h^2)^{-1/4}\kpc,
+  \qquad \mtwtwo \equiv m/10^{-22}\eV.
+  \label{eq:rJ_kpc}
+\end{equation}
+
+\subsection{Uncertainty-principle interpretation}
+
+An intuitive derivation: for a mode fitting inside a self-gravitating
+region of density $\bar\rho$ and radius $r$, orbital velocity is
+$v\sim(G\bar\rho)^{1/2}r$, so orbital momentum is $p\sim mv$.  The
+de Broglie wavelength associated with $p$ is
+$\lambda_{\rm dB}\sim\hbar/(mv)\sim\hbar\,(G\bar\rho)^{-1/2}(mr)^{-1}$.
+Requiring $\lambda_{\rm dB}\sim r$ (mode ``fits'') gives
+%
+\begin{equation}
+  r^2 \sim \frac{\hbar}{m}(G\bar\rho)^{-1/2}
+  \;\Longrightarrow\;
+  r \sim \hbar^{1/2}\,m^{-1/2}\,(G\bar\rho)^{-1/4},
+\end{equation}
+%
+which is $r_J$ up to $O(1)$ factors.  So $r_J$ is the smallest scale
+on which a wave-DM mode can be gravitationally bound; below this
+scale Heisenberg uncertainty wins.
+
+\subsection{Transfer function}
+
+The cosmological transfer function is imprinted by the fact that the
+comoving Jeans wavenumber $k_{J,{\rm com}}(a)$ evolves only weakly
+during radiation and matter domination:
+$k_{J,{\rm com}}\propto a^{1/4}$.  As a result the linear power
+spectrum develops a \emph{sharp break} near $k_{J,{\rm eq}}$ (the
+comoving Jeans scale at matter--radiation equality) rather than the
+gradual $k^{-2}$ suppression of warm dark matter.  \citet{Hu2000} fit
+%
+\begin{equation}
+  T_F(k) \simeq \frac{\cos(x^3)}{1+x^8},
+  \qquad
+  x = 1.61\,\mtwtwo^{1/18}\,\frac{k}{k_{J,{\rm eq}}},
+  \label{eq:hbg_TF}
+\end{equation}
+%
+with
+%
+\begin{equation}
+  k_{J,{\rm eq}} \simeq 9\,\mtwtwo^{1/2}\,{\rm Mpc}^{-1}.
+\end{equation}
+%
+Half-power wavenumber:
+$k_{1/2}\simeq 4.5\,\mtwtwo^{4/9}\,{\rm Mpc}^{-1}$, at which the
+transfer function drops by a factor of 2 in amplitude.
+
+Once modes oscillate they never re-enter the growing branch, so the
+suppression is baked in --- $T_F$ is effectively redshift-independent
+below $k_{J,{\rm eq}}$ for the practical range $\mtwtwo\sim 1$
+\citep{Schive2014b}.  This justifies the widely-used practice of
+folding $T_F^2$ into the CDM $P(k)$ before running an $N$-body
+simulation.
+
+%----------------------------------------------------------------------
+\section{Soliton cores}
+\label{sec:soliton}
+
+\subsection{Stationary Schr\"odinger--Poisson and scaling symmetry}
+
+Look for stationary states of \eqref{eq:SP} of the form
+$\psi(\bx,t) = \chi(\bx)\,e^{-i\gamma m t/\hbar}$.  Then $\chi$
+satisfies the eigenvalue problem
+%
+\begin{equation}
+  -\frac{\hbar^2}{2m}\nabla^2\chi + m\Phi\chi = m\gamma\chi,
+  \qquad
+  \nabla^2\Phi = 4\pi G m|\chi|^2.
+  \label{eq:stationary_SP}
+\end{equation}
+%
+The system admits a one-parameter scaling symmetry.  Under
+$\lambda>0$,
+%
+\begin{equation}
+  r\to\lambda^{-1}r,
+  \quad
+  \chi\to\lambda^2\chi,
+  \quad
+  \Phi\to\lambda^2\Phi,
+  \quad
+  \gamma\to\lambda^2\gamma,
+  \quad
+  M \equiv m\!\int|\chi|^2\to\lambda M,
+  \label{eq:soliton_scaling}
+\end{equation}
+%
+\eqref{eq:stationary_SP} is invariant.  In particular a bound-state
+solution with mass $M$ has size $r\propto M^{-1}$, central density
+$\rho_c\propto M^4$, and central potential
+$|\Phi_c|\propto M^2$ \citep{Marsh2016,Hui2017}.
+
+\subsection{Ground-state (soliton) profile}
+
+The nodeless ground state of Eq.~\eqref{eq:stationary_SP} is called
+the ``soliton'' (analogue of a boson star).  Its numerical eigenvalue
+is $\gamma_1\simeq -0.69$ in scale-normalised units, and its density
+profile is well approximated by \citep{Schive2014}
+%
+\begin{equation}
+  \rho_{\rm sol}(r) \simeq
+  \frac{\rho_c}{\bigl[1 + 0.091\,(r/r_c)^2\bigr]^8},
+  \label{eq:soliton_fit}
+\end{equation}
+%
+where $r_c$ is the half-density radius.  Reinstating dimensional
+factors, the soliton core radius and central density obey
+%
+\begin{equation}
+  r_c \simeq \frac{3.925\,\hbar^2}{G M m^2},
+  \qquad
+  \rho_c \propto \Bigl(\frac{Gm^2}{\hbar^2}\Bigr)^{\!3} M^4.
+  \label{eq:soliton_scaling_dim}
+\end{equation}
+%
+Equivalently: $r_c M \propto (\hbar/m)^2$, so heavier solitons are
+smaller and denser --- opposite to CDM haloes.  A useful benchmark:
+$r_c \sim 22 (\rho_c/\rho_{\rm crit})^{-1/4} \mtwtwo^{-1/2}\kpc$
+\citep{Marsh2016}.
+
+\subsection{Quantum virial theorem}
+
+Compute the moment of inertia
+$I \equiv \tfrac{1}{2}m\int d^3r\,r^2|\psi|^2$ of a stationary
+Schr\"odinger--Poisson state.  Its second time derivative
+$\ddot I$ can be evaluated using the SP Hamiltonian
+$\hat H = -\hbar^2\nabla^2/(2m)+m\Phi$.  After manipulation
+\citep{Hui2017},
+%
+\begin{equation}
+  \ddot I = 2K + V + 2Q,
+\end{equation}
+%
+where
+%
+\begin{align*}
+  K &\equiv \frac{1}{2}\int d^3r\,\frac{\rho}{m}|\bv|^2
+    &&\text{(bulk kinetic)}, \\
+  V &\equiv -G\!\int d^3r\!\int d^3r'\,
+    \frac{\rho(\bx)\rho(\bx')}{|\bx-\bx'|}
+    &&\text{(gravitational PE)}, \\
+  Q &\equiv \frac{\hbar^2}{2m^2}\!\int d^3r\,|\nabla\sqrt\rho|^2
+    &&\text{(quantum kinetic energy)}.
+\end{align*}
+%
+For a stationary state, $\ddot I = 0$, so $2K + V + 2Q = 0$.  The
+soliton has $\bv=0$ everywhere (single-phase wavefunction), so $K=0$
+and $V=-2Q$: the soliton saturates the quantum virial bound
+$Q/|V| = 1/2$.
+
+\subsection{Soliton--halo relation}
+
+$N$-body/pseudo-spectral SP simulations \citep{Schive2014,Schive2014b}
+show that virialised FDM haloes host a central soliton \emph{plus} an
+NFW-like envelope.  \citet{Schive2014b} measured the empirical
+relation
+%
+\begin{equation}
+  M_{\rm sol} \simeq
+    2.6\times 10^{9}\Msun\,
+    \left(\frac{1+z}{1}\right)^{1/2}
+    \left(\frac{M_{\rm halo}}{10^{12}\Msun}\right)^{1/3}
+    \mtwtwo^{-1},
+  \label{eq:M_soliton_halo}
+\end{equation}
+%
+essentially: the soliton and its host halo share the same
+specific binding energy, $|E|/M_{\rm sol} \simeq |E|/M_{\rm halo}$.
+The scaling $M_{\rm sol}\propto M_{\rm halo}^{1/3}$ implies smaller
+haloes host \emph{proportionally larger} soliton fractions --- 100\%
+soliton in the tiniest dwarfs, negligible in clusters.
+
+\citet{Bar2018} pointed out that this relation, combined with the
+scaling \eqref{eq:soliton_scaling_dim}, forces a distinctive bump in
+the rotation curve at the soliton radius: the ratio of the maximum
+soliton circular velocity to the host halo's peak circular velocity is
+$\sim 1$ independent of halo mass and $m$.  This is a strong
+observational discriminant.
+
+%----------------------------------------------------------------------
+\section{Numerical methods}
+\label{sec:numerical}
+
+Two mainstream approaches to solving the SP system in cosmology.
+
+\subsection{Pseudo-spectral (split-step) $\psi$-solver}
+
+Split the time-evolution operator via Strang splitting:
+%
+\begin{equation}
+  \psi(t+\Delta t)
+    = e^{-iV\Delta t/(2\hbar)}\,
+      e^{-iT\Delta t/\hbar}\,
+      e^{-iV\Delta t/(2\hbar)}\,\psi(t),
+\end{equation}
+%
+where $T = -\hbar^2\nabla^2/(2m)$ (kinetic) and $V = m\Phi$
+(potential).  Apply $e^{-iT\Delta t/\hbar}$ in Fourier space (exact
+plane-wave rotation) and $e^{-iV\Delta t/(2\hbar)}$ in real space
+(pointwise multiplication).  Second-order accurate, unitary,
+manifestly $L^2$-conserving.  \citep{Schive2014,MaySpringel2021,Mocz2017,Mocz2020}.
+
+Time step constraints: two conditions must both be satisfied,
+%
+\begin{align}
+  \Delta t &\lesssim \frac{2\pi\hbar}{m\,\max|\Phi|}
+    &&\text{(phase advance, potential step)}, \\
+  \Delta t &\lesssim \frac{4}{3\pi}\,\frac{m\,\Delta x^2}{\hbar}
+    &&\text{(Nyquist kinetic step)}.
+\end{align}
+%
+The kinetic constraint forces $\Delta t\propto \Delta x^2 \cdot m$
+--- very restrictive at high spatial resolution and small $m$.
+
+\citet{MaySpringel2021} implement this in AREPO on runs up to
+$8640^3$ grid cells in a $10\Mpc/h$ box for $m=2\times 10^{-23}\eV$,
+resolving the de Broglie scale in Milky Way-mass haloes.
+Interference-driven granular substructure and central solitons are
+recovered.
+
+\subsection{Madelung / SPH-fluid ($\rho$-solver)}
+
+Solve Eqs.~\eqref{eq:continuity_fdm}--\eqref{eq:euler_fdm} treating
+$-\nabla Q$ as an extra body force in an SPH or moving-mesh
+hydrodynamic solver.  \citet{Mocz2017} implement this in AREPO.
+Advantages: reuse existing hydro machinery, coarser grids acceptable
+(only $\nabla^2\sqrt\rho$ needs resolution).  Disadvantage: the
+Madelung representation breaks at vortex lines where $\rho\to 0$;
+these must be treated specially with a hybrid ``switch to $\psi$''
+prescription \citep{Mocz2020}.
+
+\citet{NoriBaldi2018} take an intermediate path: modify GADGET-3's
+SPH to include a fully consistent quantum-pressure tensor derived
+from the SP moments, yielding AX-GADGET, with cosmological scaling to
+$\sim 512^3$ particles for $m\gtrsim 10^{-22}\eV$.
+
+\subsection{Practical scaling}
+
+Simulation cost scales as $t_{\rm sim}\propto \Delta x^{-4}$ (spatial
+plus temporal) --- prohibitive at high resolution.  For present-day
+compute, the practical range is
+$m\gtrsim 3\times 10^{-23}\eV$ in $\sim 10\Mpc/h$ boxes at kpc-scale
+resolution.  Massive parallel-GPU pseudo-spectral (GAMER
+\citep{Schive2014}, AREPO \citep{MaySpringel2021}) or hybrid Madelung
+codes are pushing the frontier.
+
+%----------------------------------------------------------------------
+\section{Astrophysical signatures}
+\label{sec:signatures}
+
+\subsection{Halo mass function cutoff}
+
+The transfer-function cutoff at $k_{J,{\rm eq}}$
+(Eq.~\ref{eq:hbg_TF}) suppresses the halo mass function below the
+half-mode mass
+%
+\begin{equation}
+  M_{1/2} \simeq 3.8\times 10^{10}\,\mtwtwo^{-4/3}\Msun.
+\end{equation}
+%
+For $\mtwtwo\sim 1$ this is close to the missing-satellite scale ---
+motivating $10^{-22}\eV$ as ``the fix''.
+
+\subsection{Soliton cores}
+
+Every FDM halo hosts a central soliton whose mass follows
+Eq.~\eqref{eq:M_soliton_halo}.  For a dwarf spheroidal
+($M_{\rm halo}\sim 10^9\Msun$, $\mtwtwo\sim 1$), the soliton has
+$M_{\rm sol}\sim 3\times 10^7\Msun$ and $r_c\sim 200\,{\rm pc}$ ---
+converting a CDM cusp into a flat core without invoking baryonic
+feedback \citep{Schive2014}.
+
+\subsection{Granular substructure and dynamical heating}
+
+Outside the soliton, the halo is a random superposition of many
+excited modes.  Interference produces order-unity density
+fluctuations on the de Broglie scale, with coherence time
+$\tau_{\rm dB}\sim(mv^2)^{-1}\hbar$.  These granules act as
+``quasiparticles'' of effective mass
+$m_{\rm eff}\sim\rho(\lambdadB/2)^3$, driving two-body relaxation of
+embedded objects (star clusters, subhaloes) with timescale
+\citep{Hui2017}
+%
+\begin{equation}
+  t_{\rm relax}
+   \sim 10^{10}\,{\rm yr}\,
+     \left(\frac{v}{100\kms}\right)^{\!2}
+     \left(\frac{r}{5\kpc}\right)^{\!4}
+     \mtwtwo^{3}\,f_{\rm relax}^{-1}.
+\end{equation}
+%
+The same relaxation drives \emph{gravitational cooling}: kinetic
+energy from the halo envelope is transferred inward, growing the
+central soliton at the expense of the outer halo
+\citep{Mocz2017,Mocz2020}.
+
+\subsection{Tunneling floor on subhalo survival}
+
+The soliton wavefunction has exponentially decaying tails at any
+finite energy, so a subhalo of soliton mass $M$ in a host of mean
+density $\bar\rho_{\rm host}$ can tunnel outside its tidal radius over
+time.  Requiring survival for $\gtrsim 10$ orbits sets a minimum
+subhalo central density $\rho_c\gtrsim 60\bar\rho_{\rm host}$, hence a
+minimum surviving mass \citep{Hui2017}
+%
+\begin{equation}
+  M \gtrsim 6.7\times 10^{8}\Msun\,
+    \left(\frac{\mathcal{M}}{10^{11}\Msun}\right)^{1/4}
+    \left(\frac{10\kpc}{a}\right)^{3/4}
+    \mtwtwo^{-3/2}.
+\end{equation}
+
+%----------------------------------------------------------------------
+\section{Observational constraints}
+\label{sec:constraints}
+
+Bounds on the ULA mass, ordered by tightening decade.  For the
+``canonical FDM'' interpretation --- all of dark matter is a single
+ultralight species --- the current bounds are:
+
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+Probe & Bound $m$ [eV] & Reference \\
+\midrule
+CMB linear (Planck)         & $\gtrsim 10^{-24}$
+   & \citet{Marsh2016} (weak) \\
+Cosmic dawn / 21-cm         & $\gtrsim 10^{-22}$
+   & (model-dependent) \\
+UV luminosity function $z\!\sim\!4$--$10$
+                            & $\gtrsim 1.2\times 10^{-22}$
+   & \citet{Schive2014b} (2$\sigma$) \\
+Milky Way subhalo counts    & $\gtrsim 3\times 10^{-21}$
+   & (astrophysical) \\
+Lyman-$\alpha$ forest       & $\gtrsim 2\times 10^{-20}$
+   & \citet{Rogers2021} \\
+Ultra-faint dwarf sizes + kinematics
+                            & $\gtrsim 3\times 10^{-19}$
+   & \citet{Dalal2022} \\
+\bottomrule
+\end{tabularx}
+
+\paragraph{Reading the table.}  Ly$\alpha$ (\citealt{Rogers2021})
+rules $m<2\times 10^{-20}\eV$ from small-scale $P(k)$ suppression;
+UFD kinematics (\citealt{Dalal2022}) push $m$ up by another
+$1.5$ dex from the required soliton-core sizes in Segue 1, Draco,
+etc.  Both, taken at face value, exclude the ``sweet spot''
+$m\sim 10^{-22}\eV$ by 2--3 orders of magnitude.
+
+\paragraph{Escape hatches.}  (i) FDM as a \emph{subdominant} DM
+fraction $f_{\rm FDM}\lesssim 0.1$ --- the dominant CDM continues to
+form structure normally, FDM only supplies large-scale features.
+(ii) A distribution of masses (string axiverse) rather than a single
+$m$: the cutoff is smeared and the strongest bound applies only to
+the fraction at that mass.  (iii) Attractive self-interactions
+($\lambda\phi^4$ with $\lambda>0$) modify the soliton profile,
+altering the UFD prediction \citep{Mocz2023}.
+
+%----------------------------------------------------------------------
+\section{Summary and open directions}
+\label{sec:summary}
+
+Fuzzy dark matter is the same particle-physics idea (ultralight
+bosonic field populated by misalignment) viewed either as
+(i) a linear-theory cosmological cutoff at
+$k_{J,{\rm eq}}\sim 9\,\mtwtwo^{1/2}\,{\rm Mpc}^{-1}$, or (ii) a
+non-linear condensate obeying Schr\"odinger--Poisson with
+quantum-pressure cores and interference substructure.  Both pictures
+are the same equations, viewed under two different microscopes.
+
+The core mass scale $m\sim 10^{-22}\eV$ was chosen historically to
+resolve small-scale CDM problems.  Ly$\alpha$ and dwarf-galaxy
+kinematics have since pushed the allowed mass up by $\sim 3$ decades,
+so the original ``fuzzy sweet spot'' is now viable only as a
+subdominant fraction or with attractive self-interactions.  Where FDM
+remains most alive:
+%
+\begin{itemize}
+  \item As a probe of the string axiverse at masses too small for
+        laboratory searches.
+  \item As a $\lesssim 10\%$ ultralight component with distinctive
+        interference signatures on small scales.
+  \item As a numerical framework (Schr\"odinger--Poisson) for
+        regularising cold-matter simulations regardless of the
+        underlying microphysics.
+\end{itemize}
+
+%======================================================================
+\appendix
+
+\section{Reading the scalar-field action: a QFT primer}
+\label{app:qft_primer}
+
+The starting point of \S\ref{sec:particle} is Eq.~\eqref{eq:scalar_action}:
+%
+\begin{equation}
+  S = \int d^4x\,\sqrt{-g}\left[
+       -\tfrac{1}{2}\,g^{\mu\nu}\,\partial_\mu\phi\,\partial_\nu\phi
+       -\tfrac{1}{2}\,m^2\phi^2
+      \right].
+  \tag{Eq.~\ref{eq:scalar_action}}
+\end{equation}
+%
+This appendix unpacks every symbol for readers from adjacent fields
+where scalar-field actions are not routine.  Nothing below is
+FDM-specific --- it is the standard QFT boilerplate that underlies
+all the physics of a fundamental scalar field.
+
+\subsection{The principle of least action}
+\label{app:least_action}
+
+\paragraph{Mechanics.}  Given a Lagrangian $L(q,\dot q,t)$ for a
+system with a single generalised coordinate $q(t)$, the action is
+%
+\begin{equation}
+  S[q] = \int_{t_1}^{t_2}\! L(q(t),\dot q(t), t)\,dt.
+  \label{eq:action_mech}
+\end{equation}
+%
+The physical trajectory is the one that makes $S$ stationary
+under variations $q(t)\to q(t) + \delta q(t)$ with fixed endpoints
+$\delta q(t_1) = \delta q(t_2) = 0$.
+
+\emph{Derivation of Euler--Lagrange in one line.}  Compute
+$\delta S$ by chain rule:
+%
+\begin{equation}
+  \delta S
+    = \int_{t_1}^{t_2}\!
+        \left[
+          \frac{\partial L}{\partial q}\,\delta q
+          + \frac{\partial L}{\partial\dot q}\,\delta\dot q
+        \right] dt.
+\end{equation}
+%
+Use $\delta\dot q = \frac{d}{dt}\delta q$ (variations and time
+derivative commute).  Integrate the second term by parts:
+%
+\begin{equation}
+  \int_{t_1}^{t_2}\!\frac{\partial L}{\partial\dot q}\,
+    \frac{d(\delta q)}{dt}\,dt
+   = \underbrace{\left[\frac{\partial L}{\partial\dot q}\,\delta q\right]_{t_1}^{t_2}}_{=0\;\text{by BCs}}
+     - \int_{t_1}^{t_2}\!\frac{d}{dt}\!\left(\frac{\partial L}{\partial\dot q}\right)\,\delta q\,dt.
+\end{equation}
+%
+The boundary term drops.  So
+%
+\begin{equation}
+  \delta S = \int_{t_1}^{t_2}\!
+     \left[
+       \frac{\partial L}{\partial q}
+       - \frac{d}{dt}\!\frac{\partial L}{\partial\dot q}
+     \right]\delta q\,dt.
+\end{equation}
+%
+Requiring $\delta S = 0$ for arbitrary $\delta q(t)$ forces the
+bracketed quantity to vanish pointwise (variational lemma),
+giving the \textbf{Euler--Lagrange equation}
+%
+\begin{equation}
+  \frac{d}{dt}\!\frac{\partial L}{\partial\dot q}
+    - \frac{\partial L}{\partial q} = 0.
+  \label{eq:EL_mech}
+\end{equation}
+%
+Sanity check: $L = \tfrac{1}{2}m\dot q^2 - V(q)$ gives
+$\partial L/\partial\dot q = m\dot q$, $\partial L/\partial q =
+-V'(q)$, so \eqref{eq:EL_mech} becomes $m\ddot q = -V'(q)$ --- Newton's
+second law.
+
+\paragraph{Generalisation to fields.}  Replace the finite set of
+generalised coordinates $\{q_i(t)\}$ by a field
+$\phi(\bx, t)$ defined at every spacetime point.  Instead of one
+value per time, the ``coordinate'' is an infinite-dimensional
+configuration --- one value per spatial point.  Split the Lagrangian
+$L$ into a spatial integral of a local \emph{Lagrangian density}
+$\mathcal L$:
+%
+\begin{equation}
+  L(t) = \int d^3\bx\,\mathcal L\bigl(\phi(\bx,t),\,
+                                        \partial_\mu\phi(\bx,t)\bigr),
+  \qquad
+  S[\phi]
+    = \int dt\,L(t)
+    = \int d^4x\,\mathcal L.
+  \label{eq:action_field}
+\end{equation}
+%
+The density $\mathcal L$ depends on $\phi$ and its first derivatives
+(both time and space), lumped into $\partial_\mu\phi$ for brevity.
+$d^4x = dt\,d^3\bx$ is the flat-space spacetime volume element; on a
+curved background one inserts $\sqrt{-g}$ (\S\ref{app:metric}).
+
+\emph{Derivation of field-theory Euler--Lagrange.}  Under a variation
+$\phi(x)\to\phi(x)+\delta\phi(x)$ with $\delta\phi$ vanishing on the
+spacetime boundary,
+%
+\begin{equation}
+  \delta S
+    = \int d^4x\,\left[
+      \frac{\partial\mathcal L}{\partial\phi}\,\delta\phi
+      + \frac{\partial\mathcal L}{\partial(\partial_\mu\phi)}\,
+        \delta(\partial_\mu\phi)
+    \right].
+\end{equation}
+%
+Because variation and derivative commute, $\delta(\partial_\mu\phi) =
+\partial_\mu(\delta\phi)$.  Integrate the second term by parts (4D
+divergence theorem):
+%
+\begin{equation}
+  \int d^4x\,\frac{\partial\mathcal L}{\partial(\partial_\mu\phi)}\,
+    \partial_\mu(\delta\phi)
+   = \underbrace{\int_{\partial\Omega}\!
+     dS_\mu\,\frac{\partial\mathcal L}{\partial(\partial_\mu\phi)}\,\delta\phi}_{=0\;\text{by BCs}}
+     - \int d^4x\,\partial_\mu\!
+       \left[\frac{\partial\mathcal L}{\partial(\partial_\mu\phi)}\right]\,\delta\phi.
+\end{equation}
+%
+So
+%
+\begin{equation}
+  \delta S = \int d^4x\,
+     \left[
+       \frac{\partial\mathcal L}{\partial\phi}
+       - \partial_\mu\!\frac{\partial\mathcal L}{\partial(\partial_\mu\phi)}
+     \right]\delta\phi.
+\end{equation}
+%
+Requiring $\delta S = 0$ for arbitrary $\delta\phi(x)$ gives the
+\textbf{field-theory Euler--Lagrange equation}
+%
+\begin{equation}
+  \partial_\mu\!\frac{\partial\mathcal L}{\partial(\partial_\mu\phi)}
+    - \frac{\partial\mathcal L}{\partial\phi} = 0.
+  \label{eq:field_EL}
+\end{equation}
+%
+This is directly analogous to \eqref{eq:EL_mech}, but with a
+spacetime divergence $\partial_\mu(\cdots)$ instead of the mechanics
+time derivative $\frac{d}{dt}(\cdots)$, and with functional
+derivative $\partial\mathcal L/\partial\phi$ instead of ordinary
+$\partial L/\partial q$.
+
+\emph{Sanity check: free scalar.}  With
+$\mathcal L = -\tfrac{1}{2}\eta^{\mu\nu}\partial_\mu\phi\partial_\nu\phi
+- \tfrac{1}{2}m^2\phi^2$ (Minkowski signature $(-,+,+,+)$),
+%
+\begin{align}
+  \frac{\partial\mathcal L}{\partial\phi} &= -m^2\phi, \\
+  \frac{\partial\mathcal L}{\partial(\partial_\mu\phi)}
+    &= -\eta^{\mu\nu}\partial_\nu\phi
+    = -\partial^\mu\phi.
+\end{align}
+%
+Substituting into \eqref{eq:field_EL}:
+%
+\begin{equation}
+  \partial_\mu(-\partial^\mu\phi) - (-m^2\phi) = 0
+  \;\Longrightarrow\;
+  -\Box\phi + m^2\phi = 0
+  \;\Longrightarrow\;
+  \Box\phi = m^2\phi,
+\end{equation}
+%
+the Klein--Gordon equation.  On a curved metric, the analog
+manipulation (using $\sqrt{-g}$) gives the covariant Klein--Gordon
+equation \eqref{eq:KG_covariant}.
+
+\subsection{Index notation and Einstein summation}
+\label{app:index}
+
+In relativistic physics, spacetime points have four coordinates:
+$x^\mu = (t, \mathbf x) = (x^0, x^1, x^2, x^3)$, with $\mu\in\{0,1,2,3\}$
+running over time (index 0) and three spatial directions.  Repeated
+indices are automatically summed --- \emph{Einstein summation
+convention}:
+%
+\begin{equation}
+  A^\mu B_\mu \equiv \sum_{\mu=0}^{3}\,A^\mu B_\mu.
+\end{equation}
+%
+Two flavours of index:
+%
+\begin{itemize}
+  \item \textbf{Contravariant} $A^\mu$ (index up): components of a
+        vector, e.g.\ $x^\mu$, $p^\mu$.
+  \item \textbf{Covariant} $A_\mu$ (index down): components of a
+        covector (1-form).
+\end{itemize}
+%
+The metric tensor $g_{\mu\nu}$ raises and lowers indices:
+$A_\mu = g_{\mu\nu} A^\nu$, $A^\mu = g^{\mu\nu} A_\nu$, with
+$g^{\mu\nu}$ the inverse metric ($g^{\mu\alpha}g_{\alpha\nu} =
+\delta^\mu_\nu$).  Contracted upper--lower pairs like
+$g^{\mu\nu}\partial_\mu\phi\partial_\nu\phi$ are Lorentz scalars ---
+invariant under coordinate transformations.
+
+The partial derivative operator is
+%
+\begin{equation}
+  \partial_\mu \equiv \frac{\partial}{\partial x^\mu}
+    = \left(\frac{\partial}{\partial t},\,\nabla\right),
+\end{equation}
+%
+and $\partial^\mu = g^{\mu\nu}\partial_\nu$ raises its index.
+
+\subsection{The metric $g_{\mu\nu}$ and $\sqrt{-g}$}
+\label{app:metric}
+
+The metric tensor $g_{\mu\nu}(x)$ encodes the geometry of spacetime.
+It defines the invariant interval between neighbouring points:
+%
+\begin{equation}
+  ds^2 = g_{\mu\nu}\,dx^\mu\,dx^\nu.
+\end{equation}
+%
+In flat (Minkowski) spacetime with signature $(-,+,+,+)$:
+%
+\begin{equation}
+  g_{\mu\nu} = \eta_{\mu\nu} = \mathrm{diag}(-1, +1, +1, +1),
+  \qquad
+  ds^2 = -dt^2 + d\mathbf x^2.
+\end{equation}
+%
+On the flat FRW background used in cosmology,
+$g_{\mu\nu} = \mathrm{diag}(-1, a^2, a^2, a^2)$ with $a(t)$ the scale
+factor.  Comoving spatial derivatives inherit a factor $a^{-2}$ when
+converted to physical derivatives.
+
+The quantity $\sqrt{-g} \equiv \sqrt{-\det(g_{\mu\nu})}$ is the
+\emph{invariant volume element} Jacobian.  In Minkowski
+$\sqrt{-g} = 1$; in FRW $\sqrt{-g} = a^3$.  Its role in the action is
+to make $d^4x\,\sqrt{-g}$ a coordinate-invariant volume element ---
+if you change coordinates, $\sqrt{-g}$ transforms to compensate for
+the change in $d^4x$, keeping the physical volume the same.
+
+\subsection{Scalar field $\phi$ and Lorentz invariance}
+\label{app:scalar}
+
+A \emph{scalar field} $\phi(x)$ takes a single real value at every
+spacetime point.  Under Lorentz transformations $x\to x'$, a scalar
+transforms trivially: $\phi'(x') = \phi(x)$.  This is the simplest
+possible relativistic field (contrast: vector field, spinor field,
+tensor field).
+
+The gradient $\partial_\mu\phi$ is a covector (1-form).  Its
+Lorentz-invariant square is
+%
+\begin{equation}
+  g^{\mu\nu}\,\partial_\mu\phi\,\partial_\nu\phi
+    = -(\partial_t\phi)^2 + (\nabla\phi)^2/a^2
+  \qquad \text{(FRW, signature $-,+,+,+$)}.
+\end{equation}
+%
+This is the \emph{kinetic term} for the field --- it plays the role
+of $\dot q^2$ in mechanics, but relativistically it mixes time and
+space derivatives with the appropriate signs.
+
+\subsection{Anatomy of Eq.~\eqref{eq:scalar_action}}
+\label{app:action_anatomy}
+
+Now put the pieces together:
+%
+\begin{equation*}
+  \underbrace{\int d^4x}_{\text{spacetime integral}}
+  \;
+  \underbrace{\sqrt{-g}}_{\text{invariant Jacobian}}
+  \;\Bigl[
+  \underbrace{-\tfrac{1}{2}g^{\mu\nu}\partial_\mu\phi\,\partial_\nu\phi}_{\text{kinetic term}}
+  \;
+  \underbrace{-\tfrac{1}{2}m^2\phi^2}_{\text{mass / potential term}}
+  \Bigr].
+\end{equation*}
+%
+Reading it in words:
+%
+\begin{itemize}
+  \item $\int d^4x$: sum contributions over all spacetime.
+  \item $\sqrt{-g}$: absorb coordinate-choice-dependent volume factors
+        so the result is a coordinate-invariant number.
+  \item $-\tfrac{1}{2}g^{\mu\nu}\partial_\mu\phi\,\partial_\nu\phi$:
+        kinetic energy density.  Positive when $\phi$ varies with
+        time or space; the overall minus sign combined with the
+        $g^{00}=-1$ signature makes the time-derivative term have
+        the right sign to be a canonical kinetic energy
+        $\tfrac{1}{2}\dot\phi^2$ (after the sign contract with
+        $g^{00}$).
+  \item $-\tfrac{1}{2}m^2\phi^2$: mass / potential term.  This is
+        the harmonic-oscillator potential $V(\phi) = \tfrac{1}{2}m^2\phi^2$
+        that gives the field a rest-mass energy.
+\end{itemize}
+
+Applying the field-theory Euler--Lagrange equation \eqref{eq:field_EL}
+to this Lagrangian density on a general metric gives the covariant
+Klein--Gordon equation
+%
+\begin{equation}
+  \Box\phi \equiv \frac{1}{\sqrt{-g}}\partial_\mu\!\bigl(\sqrt{-g}\,g^{\mu\nu}\partial_\nu\phi\bigr)
+    = m^2\phi.
+  \label{eq:KG_covariant}
+\end{equation}
+%
+On flat spacetime this reduces to $(\Box\phi) = -\partial_t^2\phi +
+\nabla^2\phi = m^2\phi$; on FRW with $\sqrt{-g}=a^3$ and $g^{00}=-1$,
+$g^{ii}=a^{-2}$, one gets
+%
+\begin{equation}
+  \ddot\phi + 3H\dot\phi - \frac{1}{a^2}\nabla^2\phi + m^2\phi = 0.
+\end{equation}
+%
+Dropping the spatial-gradient term (for a homogeneous background)
+reproduces Eq.~\eqref{eq:KG_FRW}.
+
+\subsection{Why the sign and factor conventions}
+\label{app:conventions}
+
+Two conventions worth flagging because they can trip up readers
+importing formulas from different references:
+%
+\begin{itemize}
+  \item \textbf{Metric signature.}  ``Mostly plus'' $(-,+,+,+)$ is
+        used by most GR and cosmology references (Wald, Weinberg,
+        MTW).  Particle physics often uses $(+,-,-,-)$ (Peskin \&
+        Schroeder).  The kinetic term flips sign between the two,
+        so you'll see either $-\tfrac{1}{2}g^{\mu\nu}\partial_\mu\phi\partial_\nu\phi$
+        or $+\tfrac{1}{2}g^{\mu\nu}\partial_\mu\phi\partial_\nu\phi$ ---
+        both mean the same thing in the respective convention.
+  \item \textbf{Factor of 2 in kinetic and mass terms.}
+        The $\tfrac{1}{2}$ prefactors are conventional and get you
+        canonical normalisation of $\phi$ in the equations of motion.
+        Non-canonically normalised fields differ by a rescaling
+        $\phi\to c\phi$ absorbed into effective mass or coupling.
+\end{itemize}
+
+\subsection{Minimally-coupled vs.\ non-minimally-coupled}
+\label{app:minimal}
+
+Equation \eqref{eq:scalar_action} is the action for a
+\emph{minimally coupled} scalar field: it interacts with gravity
+only through $\sqrt{-g}$ and $g^{\mu\nu}$, i.e.\ through the metric
+in the standard combinations.  A \emph{non-minimally-coupled} scalar
+would add a term like $\tfrac{1}{2}\xi R\phi^2$, where $R$ is the
+Ricci scalar (a curvature invariant).  FDM as usually formulated is
+minimally coupled --- the field just senses the geometry, without
+directly coupling to curvature.  Non-minimally-coupled scalars
+appear in inflation (Higgs inflation, generalised Galileons) but
+not in the FDM literature.
+
+\subsection{Summary}
+\label{app:qft_summary}
+
+Every piece of Eq.~\eqref{eq:scalar_action} has a mechanical analogue:
+%
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Mechanics                          & Field theory \\
+\midrule
+Coordinate $q(t)$                  & Field $\phi(\mathbf x, t)$ \\
+Velocity $\dot q$                  & Gradient $\partial_\mu\phi$ \\
+Kinetic energy $\tfrac{1}{2}m\dot q^2$ & Kinetic density
+                                     $-\tfrac{1}{2}g^{\mu\nu}\partial_\mu\phi\partial_\nu\phi$ \\
+Potential $V(q)$                   & Potential density $V(\phi)=\tfrac{1}{2}m^2\phi^2$ \\
+Lagrangian $L = T - V$             & Lagrangian density $\mathcal L$ \\
+Action $S=\int L\,dt$              & Action $S = \int d^4x\,\sqrt{-g}\,\mathcal L$ \\
+Newton's law from $\delta S=0$     & Klein--Gordon from $\delta S=0$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Everything else in \S\ref{sec:particle} follows from applying this
+action variationally on the FRW background, then taking the
+non-relativistic limit.
+
+\bibliography{references}
+
+\end{document}

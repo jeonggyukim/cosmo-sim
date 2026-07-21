@@ -1,0 +1,1337 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{natbib}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{lineno}
+\linenumbers
+\tcbuselibrary{breakable,skins}
+\bibliographystyle{aasjournal}
+
+\newcommand{\cmg}{\,\mathrm{cm^2\,g^{-1}}}
+\newcommand{\kms}{\,\mathrm{km\,s^{-1}}}
+\newcommand{\Msun}{\,M_\odot}
+\newcommand{\smx}{\sigma/m_\chi}
+\newcommand{\sigmam}{\sigma/m}
+\newcommand{\vrel}{v_{\rm rel}}
+\newcommand{\Kn}{\mathrm{Kn}}
+\newcommand{\mfp}{\lambda_{\rm mfp}}
+
+\title{Self-Interacting Dark Matter}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\begin{tcolorbox}[colback=yellow!10!white, colframe=orange!75!black,
+                  title={\bfseries Disclaimer}]
+These notes were compiled by an AI assistant (Claude, Anthropic) and have
+\textbf{not been reviewed by a human domain expert}.  They may contain
+errors in derivations, physical reasoning, or numerical estimates.
+Cross-check key equations against the primary literature before use.
+\end{tcolorbox}
+\vspace{0.5em}
+
+%----------------------------------------------------------------------
+\section{Motivation}
+\label{sec:motivation}
+
+Cold dark matter (CDM) treats DM as a collisionless species, and this
+description reproduces cosmological structure at the few-percent level
+on scales above $\sim\!1\,{\rm Mpc}$.  On sub-galactic scales three
+tensions historically motivated the SIDM proposal, all mediated by the
+central density structure of DM halos:
+
+\begin{itemize}
+  \item \textbf{Core--cusp.}  Rotation curves and stellar velocity
+        dispersions in low-surface-brightness galaxies and dwarf
+        spheroidals prefer approximately constant-density inner
+        profiles, while CDM $N$-body simulations produce $\rho\propto
+        r^{-1}$ NFW cusps.
+  \item \textbf{Too-big-to-fail.}  The most massive Milky Way
+        subhaloes predicted by CDM are too concentrated at their
+        centres to host the observed classical dwarfs.
+  \item \textbf{Diversity of rotation curves.}  Nearby dwarfs of
+        similar circular velocity show a wider spread of inner slopes
+        than CDM sims produce.
+\end{itemize}
+
+\citet{SpergelSteinhardt2000} proposed resolving these tensions by
+giving dark matter an elastic self-interaction with cross section per
+unit mass $\smx$ of order $1\cmg$: large enough to matter in dense
+environments (galactic cores) and negligible on cosmological scales.
+The corresponding mean free path is $1\,{\rm kpc}\lesssim
+\mfp\lesssim 1\,{\rm Mpc}$ at the solar-neighbourhood density
+$\rho\simeq 0.4\,{\rm GeV\,cm^{-3}}$, requiring
+\citep{SpergelSteinhardt2000}
+%
+\begin{equation}
+  0.45\cmg \le \smx \le 450\cmg,
+  \qquad
+  1\,{\rm MeV} \le m_\chi \le 10\,{\rm GeV}
+\end{equation}
+%
+in the original paper's ``elastic, non-dissipative, non-annihilating''
+setup.  Twenty-five years of $N$-body simulation, dwarf-galaxy
+kinematics, and cluster observations have collapsed this window from
+three decades to a factor of $\sim\!10$, and have made clear that a
+single constant $\smx$ across all scales is disfavoured.  What
+survives is a \emph{velocity-dependent} $\sigma(v)$, running from
+$\sim\!100\cmg$ on dwarf scales to $\sim\!0.1\cmg$ on cluster scales
+--- naturally realised by a light-mediator Yukawa dark force
+\citep{Kaplinghat2016,TulinYu2018}.
+
+The modern picture (\S\ref{sec:regimes}--\ref{sec:constraints}) has
+also shifted: the phenomenologically important process is not just
+\emph{core formation} (heat conduction outward flattens the cusp) but
+also \emph{core collapse} (gravothermal catastrophe drives the centre
+into a runaway compact state).  Both branches are now recognised as
+essential to explaining the observed diversity of subhaloes
+\citep{Zeng2022,Nadler2023}, and possibly to seeding the observed
+$z\gtrsim 7$ supermassive black holes
+\citep{Pollack2015,Feng2021}.
+
+%----------------------------------------------------------------------
+\section{Physics of the self-interaction}
+\label{sec:physics}
+
+\subsection{Cross section, mean free path, scattering rate}
+
+For an elastic cross section $\sigma$ and DM particle mass $m_\chi$,
+the local mean free path in a halo of density $\rho$ is
+%
+\begin{equation}
+  \mfp = \frac{m_\chi}{\rho\,\sigma} = \frac{1}{\rho\,\smx},
+\end{equation}
+%
+and the corresponding scattering rate per particle is
+%
+\begin{equation}
+  R_{\rm scat} = \rho\,\smx\,v_{\rm rel}
+    \approx 0.1\,{\rm Gyr}^{-1}
+      \left(\frac{\rho}{0.1\,M_\odot\,{\rm pc}^{-3}}\right)
+      \left(\frac{\vrel}{50\kms}\right)
+      \left(\frac{\smx}{1\cmg}\right).
+  \label{eq:Rscat}
+\end{equation}
+%
+Normalisation \eqref{eq:Rscat} makes the astrophysical target
+explicit: for typical dwarf-halo densities and virial velocities,
+$\smx \sim 1\cmg$ delivers order-one scatterings per particle per
+Hubble time --- enough to redistribute energy in the core, negligible
+for the outer halo.  Standard WIMP self-scattering rates are
+$\smx \sim 10^{-38}\,{\rm cm^2\,GeV^{-1}}$, some $14$ orders of magnitude
+below the astrophysical target \citep{TulinYu2018}, so SIDM is
+manifestly \emph{not} a WIMP.
+
+Units conversion:
+$1\cmg = 1.78\times 10^{-24}\,{\rm cm^2\,GeV^{-1}}$.  In particle-physics
+Born-limit terms, a Yukawa mediator of mass $m_\phi$ coupled to DM
+with strength $\alpha'$ gives
+%
+\begin{equation}
+  \smx \simeq \frac{4\pi\alpha'^2 m_\chi}{m_\phi^4}
+    \approx 1\cmg
+      \left(\frac{\alpha'}{0.01}\right)^{\!2}
+      \left(\frac{m_\chi}{10\,{\rm GeV}}\right)
+      \left(\frac{m_\phi}{40\,{\rm MeV}}\right)^{\!-4}.
+  \label{eq:Yukawa_Born}
+\end{equation}
+%
+Electromagnetic-strength dark coupling ($\alpha' \sim 10^{-2}$) with a
+sub-GeV mediator produces the astrophysical target; the DM particle
+itself does not need to be strongly coupled.
+
+\subsection{Two regimes: cored and core-collapsed}
+\label{sec:regimes}
+
+Whether a halo is in the ``dilute'' or ``dense'' regime depends on how
+the accumulated scattering count $R_{\rm scat}\, t_{\rm age}$ compares
+with unity in its centre.  A convenient dimensionless proxy is the
+Knudsen number
+%
+\begin{equation}
+  \Kn \equiv \frac{\mfp}{H},
+  \qquad
+  H \equiv \sqrt{\frac{v^2}{4\pi G\rho}},
+\end{equation}
+%
+where $H$ is the gravitational scale height.  $\Kn\gg 1$ is the
+long-mean-free-path (LMFP) regime, appropriate for the outer halo and
+the cored phase.  $\Kn\ll 1$ is the short-mean-free-path (SMFP)
+regime, appropriate for the collapsing centre.
+
+\paragraph{Core-forming (LMFP) regime.}  When scatterings deliver
+\emph{outward} heat conduction from the denser centre, the inner
+density profile is flattened into an approximately isothermal core.
+The core radius $r_c$ is where $\mfp\sim r_c$; typical values are
+$r_c \sim 1$--$3\,{\rm kpc}$ for dwarf-scale $\smx \sim 1\cmg$
+\citep{Rocha2013}.  A stable equilibrium is reached in
+$\sim 1$--$10\,{\rm Gyr}$, well before core collapse.
+
+\paragraph{Core-collapsed (SMFP) regime.}  When the accumulated
+scattering count in the centre exceeds unity, the core becomes a
+tightly self-coupled fluid.  \emph{Gravothermal catastrophe} sets in:
+the negative heat capacity of a self-gravitating system means outward
+conduction of heat cools the centre --- but the centre then contracts,
+heating up further, so the process runs away
+\citep{Balberg2002}.  The central density rises without bound, the
+inner profile transitions from a flat core through the LMFP
+self-similar $\rho\propto r^{-2.19}$ solution and into a smaller,
+denser SMFP inner core.  Fluid-model calculations give a universal
+collapse time
+%
+\begin{equation}
+  t_{\rm coll} \simeq 290\,t_r
+  \qquad\text{(LMFP self-similar, hard-sphere)}
+  \qquad\text{\citep{Balberg2002}}
+  \label{eq:tcoll_290}
+\end{equation}
+%
+or with more modern calibration
+$t_{\rm coll} \simeq 382\,t_r$ \citep{Meshveliani2023}
+or
+$t_{\rm coll} \simeq 456\,t_r$ \citep{Pollack2015},
+where the SIDM relaxation time is
+%
+\begin{equation}
+  t_r = \frac{1}{a\,\rho\,\sigma\,v},
+  \qquad
+  a = \sqrt{16/\pi}\simeq 2.26,
+  \label{eq:tr_def}
+\end{equation}
+%
+for hard-sphere scattering with Maxwellian velocities.  For typical
+dwarf conditions ($\rho\sim 10^{-24}\,{\rm g\,cm^{-3}}$, $v\sim
+10^7\,{\rm cm\,s^{-1}}$, $\sigma\sim 1\cmg$), $t_r\sim 1.4\,{\rm Gyr}$
+so $t_{\rm coll}\gtrsim 10\,t_{\rm Hubble}$ --- present-day dwarf cores
+are safe from collapse at $\smx\sim 1\cmg$
+\citep{Balberg2002}.  Collapse can be forced within a Hubble time only
+by cranking $\smx$ into the tens or hundreds of $\cmg$
+\citep{Correa2021,Meshveliani2023}, or by shortening $t_r$ via baryon
+compression (\S\ref{sec:baryons}) or tidal stripping.
+
+\citet{Zeng2022} calibrated the LMFP fluid prediction against
+$N$-body sims and reported the empirical scaling
+%
+\begin{equation}
+  t_{\rm coll} \simeq 3.58\times 10^{8}\,{\rm Gyr}
+    \left(\frac{\smx}{\cmg}\right)^{-0.74}
+    \left(\frac{M_{200m}}{M_\odot}\right)^{-0.24}
+    c_{200m}^{-2.67},
+  \label{eq:zeng_tcoll}
+\end{equation}
+%
+shallower in $\smx$ and $c$ than the fluid prediction
+$t_c\propto\smx^{-1}c^{-7/2}$, reflecting numerical effects that the
+fluid model does not capture.
+
+\subsection{Velocity dependence and the Yukawa dark force}
+\label{sec:vdep}
+
+Data across scales require a velocity-dependent $\sigma(v)$
+\citep{Kaplinghat2016,TulinYu2018}.  In the Born limit, a Yukawa
+mediator gives a Rutherford-like differential cross section commonly
+parameterised as
+%
+\begin{equation}
+  \frac{d\sigma}{d\cos\theta}
+    = \frac{\sigma_0\,w^4}{2\bigl[w^2 + v^2\sin^2(\theta/2)\bigr]^2},
+  \label{eq:rutherford_sidm}
+\end{equation}
+%
+with $\sigma_0$ the low-velocity amplitude and $w$ the transition
+velocity above which the cross section drops as $v^{-4}$.
+For $\alpha'\sim 0.01$, $m_\chi\sim 10\,{\rm GeV}$, $m_\phi\sim
+40\,{\rm MeV}$ one recovers $\smx\sim 1\cmg$ on galactic scales while
+falling well below cluster bounds
+\citep{Kaplinghat2016,TulinYu2018}.  Modern cosmological-scale
+zoom-in suites use benchmark ``Group SIDM'' or ``MW SIDM'' models with
+$\sigma_0/m = 147\cmg$ and $w = 24$ or $120\kms$
+\citep{Nadler2023,Palubski2025}, chosen so that $\sigma_{\rm eff}/m$
+reaches $\gtrsim 100\cmg$ on dwarf scales (driving core collapse in
+concentrated subhaloes) while dropping below $1\cmg$ on cluster
+scales.
+
+For pipeline calibration it is useful to define a viscosity-weighted
+Maxwellian-averaged effective cross section
+%
+\begin{equation}
+  \sigma_{\rm eff}
+    = \frac{2\!\int v^2\,dv\,d\cos\theta\;
+      \frac{d\sigma}{d\cos\theta}\sin^2\theta\,v^5\,
+      e^{-v^2/(4\nu_{\rm eff}^2)}}
+      {\int v^2\,dv\,d\cos\theta\;
+      \sin^2\theta\,v^5\,e^{-v^2/(4\nu_{\rm eff}^2)}},
+  \qquad
+  \nu_{\rm eff}\simeq 0.64\,V_{\rm max},
+  \label{eq:sigma_eff}
+\end{equation}
+%
+which collapses the angular and velocity distributions into one number
+per halo \citep{Nadler2023}.
+
+%----------------------------------------------------------------------
+\section{Gravothermal fluid framework}
+\label{sec:fluid}
+
+The workhorse semi-analytic model for isolated SIDM halos is the
+gravothermal conducting-fluid formalism of
+\citet{Balberg2002}, adapted from stellar-dynamical globular-cluster
+theory.  For readers unfamiliar with the kinetic-theory chain
+Boltzmann $\to$ moments $\to$ Chapman--Enskog closure $\to$
+Navier--Stokes, Appendix~\ref{app:kinetic} gives the derivation from
+scratch.  What follows uses those results without proof.
+
+For a spherical halo with 1D velocity dispersion $\nu$ and
+luminosity $L$, one solves
+%
+\begin{align}
+  \frac{\partial M}{\partial r} &= 4\pi r^2\rho,
+  \label{eq:balberg_mass}\\
+  \frac{\partial(\rho\nu^2)}{\partial r} &= -\frac{GM\rho}{r^2},
+  \label{eq:balberg_hse}\\
+  \frac{\partial L}{\partial r} &= -4\pi r^2\rho\nu^2
+    \left(\frac{\partial}{\partial t}\right)_{\!M}\!\ln\frac{\nu^3}{\rho},
+  \label{eq:balberg_energy}\\
+  \frac{L}{4\pi r^2}
+   &= -\frac{3}{2}ab\,\nu\sigma
+      \left[a\sigma^2 + \frac{4\pi G b}{C\rho\nu^2}\right]^{-1}
+      \frac{\partial\nu^2}{\partial r},
+  \label{eq:balberg_flux}
+\end{align}
+%
+where $a = \sqrt{16/\pi}$, $b = 25\sqrt{\pi}/32 \simeq 1.0$ from
+Chapman--Enskog, and $C$ is an order-unity interpolation constant
+calibrated against $N$-body: $C \simeq 0.75$
+\citep{Balberg2002,Pollack2015} or $C \simeq 0.42$ from a recent
+velocity-dependent-SIDM $N$-body match \citep{Meshveliani2023}.
+Equation~\eqref{eq:balberg_flux} interpolates between the SMFP and LMFP
+conductivities:
+%
+\begin{equation}
+  \kappa_{\rm SMFP} \simeq 2.1\,\nu k_B/\sigma,
+  \qquad
+  \kappa_{\rm LMFP} \simeq 0.27\,C\rho\nu^3\sigma k_B/(Gm^2),
+\end{equation}
+%
+and reduces to Fickian conduction $L \propto \kappa\,dT/dr$ in each
+limit.  Integrating
+\eqref{eq:balberg_mass}--\eqref{eq:balberg_flux} on a Lagrangian mass
+grid produces the characteristic ``core forms then collapses'' history
+of an isolated SIDM halo, ending in a singular state.
+
+\paragraph{Limits of the fluid model.}  The fluid model is an
+adiabatic transport approximation --- it assumes local thermodynamic
+equilibrium and isotropic velocity dispersion.  \citet{Gurian2025Core}
+performed the first direct simulation Monte Carlo (DSMC) calculation
+of gravothermal collapse (code KiSS-SIDM, publicly at
+\url{https://gitlab.com/Socob/KiSS-SIDM}) and showed that
+the intermediate-MFP region just outside the collapsing core stays
+persistently out of LTE: the radial velocity dispersion develops
+non-Maxwellian tails from ``boil-off'' particles, and the fluid
+model's temperature-weighted entropy production $\hat Q$ turns positive
+--- an unambiguous signal of failure.  The local
+$d\log M_{\rm core}/d\log\langle v^2\rangle$ exponent differs from the
+fluid value by an order of magnitude in the SMFP regime, so the seed
+mass at relativistic instability could be substantially larger than
+fluid extrapolations predict.  Most of the halo's lifetime is still
+LMFP-dominated, so collapse-time corrections are $\sim 30\%$ --- but
+current SIDM $N$-body codes already disagree at that level, and DSMC is
+now the reference calibration point \citep{Gurian2025Core}.
+
+%----------------------------------------------------------------------
+\section{Halo phenomenology}
+\label{sec:halo}
+
+\subsection{Isothermal core and the isothermal-Jeans model}
+
+Inside the cored phase, the SIDM equilibrium is well described by an
+isothermal Jeans model:
+%
+\begin{equation}
+  \sigma_0^2\,\nabla^2\ln\rho = -4\pi G(\rho+\rho_b),
+  \label{eq:isothermal_jeans}
+\end{equation}
+%
+with $\sigma_0$ the constant 1D velocity dispersion, $\rho_b$ the
+baryon density, and the outer profile matched onto an NFW envelope at
+the radius $r_1$ where the accumulated scattering count equals unity:
+%
+\begin{equation}
+  \frac{\langle\sigma v\rangle}{m}\,\rho(r_1)\,t_{\rm age} \simeq 1.
+  \label{eq:r1_def}
+\end{equation}
+%
+\citet{Kaplinghat2016} fit this two-parameter model
+(inner $\rho_0$, $\sigma_0$; NFW parameters $\rho_s, r_s$ outside) to
+12 dwarf+LSB rotation curves and 6 relaxed clusters, spanning
+$\vrel$ from $\sim 30\kms$ to $\sim 1500\kms$.  The result:
+%
+\begin{align}
+  \smx &\simeq 1.9^{+0.6}_{-0.4}\cmg
+        & \text{(galaxies, }\vrel \sim 30\text{--}200\kms\text{)},
+   \\
+  \smx &= 0.10^{+0.03}_{-0.02}\cmg
+        & \text{(clusters, }\vrel \sim 1500\kms\text{)}.
+\end{align}
+%
+The two values differ by more than an order of magnitude, ruling out
+constant $\smx$.  Fit to the Yukawa cross section
+\eqref{eq:rutherford_sidm} (with $\alpha' = \alpha_{\rm EM}$) gives
+$m_\chi = 15^{+5}_{-3}\,{\rm GeV}$ and $m_\phi = 17\pm 4\,{\rm MeV}$
+\citep{Kaplinghat2016}.
+
+\subsection{Baryonic backreaction}
+\label{sec:baryons}
+
+For DM-only ($\sigma$-only) simulations, \citet{Rocha2013} found the
+SIDM core radius scales as a fixed fraction of the underlying NFW
+scale radius:
+%
+\begin{equation}
+  r_b/r_s \simeq 0.71\quad\text{for }\smx = 1\cmg,
+  \qquad
+  r_b/r_s \simeq 0.20\quad\text{for }\smx = 0.1\cmg,
+\end{equation}
+%
+across four decades in halo mass.  Values of $\smx = 1\cmg$ overshoot
+cluster core densities by an order of magnitude, while
+$\smx = 0.1\cmg$ (velocity-independent!) matches from dwarfs to
+clusters --- an existence proof for a workable constant-$\sigma$ pipeline
+\citep{Rocha2013}.
+
+Baryons dramatically alter this picture in baryon-dominated galaxies.
+\citet{Kaplinghat2014} solved the isothermal-Jeans equation
+\eqref{eq:isothermal_jeans} for the Milky Way (Hernquist bulge plus
+disc) and found the SIDM core radius shrinks to
+%
+\begin{equation}
+  r_c \simeq 0.3\,{\rm kpc}
+    \left(\frac{r_0}{2.7\,{\rm kpc}}\right)
+    \left(\frac{\sigma_0}{150\kms}\right)^{\!2}
+    \left(\frac{183\kms}{V_B(r_0)}\right)^{\!2},
+  \label{eq:MW_core}
+\end{equation}
+%
+with central density $\rho_0 \sim 14$--$80\,{\rm GeV\,cm^{-3}}$ (with
+and without adiabatic contraction).  Both are more than an order of
+magnitude denser/smaller than the DM-only prediction --- baryons pull
+the SIDM core inward, and the SIDM density tracks the deeper
+baryonic potential rather than sitting in a large, dilute core.
+Consequences: (i) SIDM indirect-detection signals from the Galactic
+Centre are \emph{not} suppressed; (ii) cluster/Bullet bounds should be
+loosened; (iii) the SIDM density inherits the non-spherical baryonic
+isopotential shape.
+
+Independent confirmation from full FIRE-2 hydrodynamic zoom-ins of
+four $M_{\rm halo}\sim 10^{10}\Msun$ dwarfs \citep{Robles2017}: for
+$\smx=1\cmg$, SIDM density profiles are \emph{robust to baryonic
+feedback} at $M_\star < 3\times 10^6\Msun$ (SIDM-DMO and SIDM-Hydro
+essentially agree), whereas CDM cores form only for
+$M_\star > 3\times 10^6\Msun$ via strong stellar feedback.
+Consequence: ultra-faint dwarfs with $M_\star \lesssim 3\times
+10^6\Msun$ are the cleanest observational discriminator ---
+feedback-free enough that CDM stays cuspy and SIDM predictions are
+firm.
+
+\subsection{Subhalo core collapse and the diversity problem}
+\label{sec:subhalos}
+
+The Milky Way subhalo population appears to require \emph{both}
+core-formed and core-collapsed objects.  \citet{Correa2021} fits nine
+bright MW dSphs individually and finds each of them must currently be
+in a gravothermal collapse phase, with the required $\smx$ ranging
+%
+\begin{equation}
+  \smx \simeq 20\text{--}30\cmg \text{ (Draco)}
+    \quad \text{ to } \quad
+  \smx \simeq 90\text{--}150\cmg \text{ (LeoII, Sextans)},
+\end{equation}
+%
+increasing at lower orbital pericentre (lower in-core $\vrel$).  A
+single Yukawa model ($m_\chi = 0.648\,{\rm GeV}$, $m_\phi =
+0.636\,{\rm MeV}$, $\alpha_\chi = 0.01$) simultaneously fits all nine
+plus extrapolates below cluster bounds.  Tidal stripping accelerates
+gravothermal collapse by factor $\sim 10$; without it, none of the
+dSphs would have collapsed by $z=0$.
+
+\citet{Zeng2022} tempered this picture with detailed subhalo sims and
+found that constant $\smx$ makes cosmological subhaloes essentially
+unable to core-collapse: the critical initial concentration for a
+$10^{10.5}\Msun$ subhalo to collapse in 10 Gyr is
+$c\gtrsim 40\text{--}60$, well above the cosmological median $c\sim
+24$.  This is because host-subhalo evaporation and tidal heating fight
+the internal collapse.  Constant-$\sigma$ SIDM is therefore
+disfavoured for producing the observed compact-substructure population
+--- velocity dependence is required.
+
+\citet{Nadler2023} settled this with the first cosmological zoom-in
+of \emph{strong} velocity-dependent SIDM on a group-scale
+($10^{13}\Msun$) host, using the ``Group SIDM'' benchmark
+$\sigma_0/m = 147.1\cmg$, $w = 120\kms$.  Both extremes of the
+observed subhalo population emerge from the \emph{same} model: (i) a
+core-collapsed subhalo matching the dense strong-lens perturber in
+SDSSJ0946+1006 (inner projected mass $2\times 10^9\Msun$ within 1 kpc,
+$\gtrsim 3\sigma$ denser than CDM), and (ii) core-expanded
+isolated haloes matching gas-rich UDG rotation curves.  The effective
+cross section spans $\sigma_{\rm eff}/m \sim 2\text{--}100\cmg$ over
+the relevant $V_{\rm max}$ range while remaining $\lesssim 1\cmg$ at
+cluster scales.
+
+The \citet{Palubski2025} SIDM Concerto public data release
+extends this to 14 zoom hosts from LMC to low-mass cluster scale.  The
+core-collapsed-fraction distribution peaks where the cross section
+transitions from $v^{-4}$ (high velocity) to $v^0$ (low velocity):
+$V_{\rm max}\sim 30\kms$ for isolated haloes, $\sim 60\kms$ for
+subhaloes.  Cluster-scale hosts show no core-collapsed subhaloes,
+consistent with $\smx\lesssim 0.1$--$1\cmg$ cluster bounds.
+
+%----------------------------------------------------------------------
+\section{Numerical methods}
+\label{sec:numerical}
+
+\subsection{Particle-based Monte Carlo}
+
+The Rocha--Peter--Bullock--Kaplinghat scheme \citep{Rocha2013}, now
+standard in GADGET, GIZMO, and Arepo, evaluates a pair-wise scattering
+probability
+%
+\begin{equation}
+  P_{ij} = \rho_{ij}\,|\mathbf{v}_i - \mathbf{v}_j|\,\smx\,\Delta t,
+  \qquad
+  \rho_{ij}
+    = m_p\!\int d^3r\,W(|\mathbf{r}-\mathbf{r}_i|,h)
+                    W(|\mathbf{r}-\mathbf{r}_j|,h),
+  \label{eq:Pij}
+\end{equation}
+%
+with $W$ a cubic-spline kernel and $h\gtrsim 0.2\times$ mean particle
+spacing.  Pairs with $P_{ij}$ times a random draw over threshold scatter
+elastically in the centre-of-mass frame (uniform on the sphere for
+isotropic $\sigma$; drawn from
+Eq.~\eqref{eq:rutherford_sidm} for Yukawa).  Momentum and energy are
+conserved per pair.
+
+The main numerical challenge is the timestep: at high central density
+during collapse, $P_{ij}$ grows and the SIDM timestep must shrink
+below the gravitational one, dominating cost.  Modern implementations
+attempt to save on cost via adaptive timesteps and quiet mesh
+refinement, but pure $N$-body sims have historically stopped at
+$\rho_{\rm cen}\sim 10^3\rho_s$ \citep{Palubski2025}, well before the
+relativistic instability.
+
+\subsection{Fluid / gravothermal semi-analytic}
+
+Fast, spherically symmetric, cheap: solve
+Eqs.~\eqref{eq:balberg_mass}--\eqref{eq:balberg_flux} on a Lagrangian
+mass grid.  Codes: SoulICE (Essig+2019), gravothermal.jl (Pollack+2015
+lineage), \texttt{RecfastJulia}-style pipelines.  Limitations:
+spherical only, LTE assumed, breaks at IMFP boundary
+\citep{Gurian2025Core}.
+
+\subsection{Direct simulation Monte Carlo (KiSS-SIDM)}
+
+\citet{Gurian2025Core} present the first spherically-symmetric DSMC
+kinetic solver for SIDM, using the ``no-time-counter'' scattering
+scheme (Bird 1994) on an adaptive Eulerian radial grid with cells kept
+below the local mean free path and Jeans length.  With $2\times 10^6$
+tracer particles, KiSS-SIDM conserves total energy to
+$|\Delta E/E| < 2\times 10^{-4}$ and reproduces Chapman--Enskog SMFP
+conductivity within 2\%.  The full fiducial run --- an NFW halo with
+$\smx\!\cdot\!\rho_s r_s = 0.32$ --- reaches central density
+$\rho_c/\rho_s \sim 10^5$ in $\sim 30$ minutes on a laptop.  The main
+scientific output is the identification of persistent LTE breakdown
+in the IMFP region.
+
+\subsection{Hybrid particle+fluid (SHH)}
+
+\citet{Schon2025} introduce the SHH (SIDM Hydro Hybrid) method: couple
+the standard $N$-body SIDM scattering algorithm to smoothed particle
+hydrodynamics through a density-dependent bridging function
+%
+\begin{equation}
+  h(\rho) = \left[1 + (\rho_{\rm SHH}/\rho)^{n_{\rm SHH}}\right]^{-1},
+  \label{eq:SHH_h}
+\end{equation}
+%
+with the momentum update
+%
+\begin{equation}
+  \frac{du_i}{dt}
+    = h(\rho)\,{\rm Kick}_{\rm hydro}
+    + \bigl(1-h(\rho)\bigr)\,{\rm Kick}_{\rm SIDM}
+    - \partial_i\Phi.
+  \label{eq:SHH_momentum}
+\end{equation}
+%
+The threshold $\rho_{\rm SHH}$ is calibrated so that hydro takes over
+at $\Kn_{\rm sim}\lesssim 10^{-3}$.  In an isolated $1.15\times
+10^9\Msun$ halo with $\smx = 50\cmg$, SHH reaches central density
+$\rho_c\sim 10^{4-5}\rho_s$ --- two orders of magnitude beyond
+pure-SIDM at fixed particle count, and in less wall time because the
+runaway SIDM timestep shrinkage is replaced by cheap hydro pressure
+kicks.  The implementation is ideal-fluid only at present; viscosity
+and thermal conduction (Chapman--Enskog non-ideal terms) are on the
+roadmap.
+
+\subsection{Data release: SIDM Concerto}
+
+\citet{Palubski2025} released a public library of 14 cosmological
+zoom-in sims covering LMC ($10^{11}\Msun$), Milky Way
+($10^{12}\Msun$), group ($10^{13}\Msun$), and low-mass cluster
+($10^{14}\Msun$) hosts, in CDM and three velocity-dependent SIDM
+variants (GroupSIDM, GroupSIDM-70, MilkyWaySIDM).  Each host has
+$\sim 2\times 10^7$ particles;
+$m_p$ and softening are 6.3$\times 10^3\Msun$, 40 pc/$h$ (LMC) to
+$2.7\times 10^7\Msun$, 600 pc/$h$ (cluster).  Data DOI:
+\texttt{10.5281/zenodo.14933624}.
+
+%----------------------------------------------------------------------
+\section{Observational constraints}
+\label{sec:constraints}
+
+Assembled bounds and preferences from recent literature (numbers from
+\citealt{Kaplinghat2016,TulinYu2018,Nadler2023,Palubski2025}):
+
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+Probe & $\vrel\;[\kms]$ & $\smx\;[\cmg]$ \\
+\midrule
+Bullet cluster (mass/light offset)          & 4000
+   & $\lesssim 0.7$ \\
+Bullet cluster (subcluster survival)        & 2000
+   & $\lesssim 1.25$ (68\% CL) \\
+Ensemble merging clusters                   & 900
+   & $\lesssim 0.47$ (95\% CL) \\
+Cluster halo shape / ellipticity            & 1300
+   & $\lesssim 1$ \citep{TulinYu2018} \\
+Cluster core density (relaxed)              & 1500
+   & $= 0.10^{+0.03}_{-0.02}$ \citep{Kaplinghat2016} \\
+Group core (Nadler+2023 host)               & 800
+   & $\sigma_{\rm eff}/m \lesssim 1$ \\
+Galaxy rotation curves (dwarfs, LSBs)       & 30--200
+   & $= 1.9^{+0.6}_{-0.4}$ \citep{Kaplinghat2016} \\
+MW dSph diversity (core-collapse)           & 20--60
+   & $\sigma_{\rm eff}/m \sim 20$--$150$ \citep{Correa2021} \\
+SDSSJ0946+1006 strong-lens perturber        & $\sim 100$
+   & $\sigma_{\rm eff}/m \sim 25$ \citep{Nadler2023} \\
+UDG cored rotation curves                   & $\sim 30$--$40$
+   & $\sigma_{\rm eff}/m \sim 30$--$100$ \citep{Nadler2023} \\
+GD-1 dense substructure                     & $<10$
+   & $\sigma_{\rm eff}/m \sim 100$ (needed) \\
+\bottomrule
+\end{tabularx}
+
+The picture: a mildly-Yukawa cross section running from
+$\sim\!100\cmg$ at $\vrel\lesssim 10\kms$ to $\sim\!0.1\cmg$ at
+$\vrel\sim 1000\kms$ fits all data.  The corresponding
+particle-physics benchmark is a dark force with a $\sim 10$-MeV
+mediator; \citet{Kaplinghat2016} gives $m_\chi\sim 15\,{\rm GeV}$,
+$m_\phi\sim 17\,{\rm MeV}$; \citet{Correa2021} prefers a sub-GeV DM
+scenario with $m_\chi = 0.65\,{\rm GeV}$ and $m_\phi = 0.64\,{\rm
+MeV}$.  Both remain consistent with the observational bounds table
+above.
+
+The old $\smx\lesssim 0.02\cmg$ bound from cluster shape
+\citep{MiraldaEscude2000} has been revisited and superseded ---
+lensing observations project through the still-triaxial outer halo,
+so the small-projected-radius ellipticity does not directly measure
+inner shape and the correct bound is $\smx\lesssim 1\cmg$
+\citep{TulinYu2018}.  This is why the modern viable window is much
+wider than early SIDM discussions suggested.
+
+%----------------------------------------------------------------------
+\section{Connections}
+\label{sec:connections}
+
+\subsection{SMBH seeding via gravothermal collapse}
+
+An SIDM halo that undergoes gravothermal core collapse produces a
+compact remnant whose mass depends on halo formation redshift and
+$\smx$.  The seed's mass at the relativistic instability trigger
+(central 3D velocity dispersion $\sim 0.57c$) is a substantial
+fraction of the collapsing core mass.
+
+\paragraph{Ultra-strong (uSIDM) sub-component.}
+\citet{Pollack2015} propose that a fraction $f\lesssim 0.1$ of the
+dark matter has an ``ultra-strong'' cross section $\sigma\gg 1\cmg$
+so that $\sigma f\sim 1\cmg$.  The uSIDM component gravothermally
+collapses to
+$M_{\rm BH} = 0.025\,f\,M_\Delta/[\ln(1+c)-c/(1+c)]$ within
+$455.65$ central relaxation times.  For $M_\Delta = 10^{12}\Msun$,
+$c=9$, $z_{\rm vir}=15$, the allowed window is
+$\sigma f \in [0.34, 0.43]\cmg$, giving a seed of mass sufficient
+to grow into the observed $2\times 10^9\Msun$ SMBH of ULAS J1120+0641
+at $z=7.085$ under Eddington accretion.
+
+\paragraph{SIDM $+$ baryons.}  \citet{Feng2021} extend this to the
+regular SIDM cross section by including a static protogalaxy baryon
+potential (fit to Wise+2008 sim).  Baryons shorten the gravothermal
+collapse time by factor $\sim 100$, so $\smx\sim 1$--$10\cmg$
+(the same value that fits galaxy-scale SIDM observations) produces the
+seed for J1205-0000 ($M_{\rm BH} = 2\times 10^9\Msun$, $z=6.7$) in
+$\sim 68$ Myr at $z\sim 7.4$.
+
+\paragraph{Intermediate-mass BHs in dSphs.}  \citet{Meshveliani2023}
+build a semi-analytic model that predicts IMBH seeds of $0.1$--$1000
+\Msun$ in the currently-collapsing MW satellites, following an
+$M_{\rm BH}$--$M_{\rm halo}$ relation with the same slope as
+extrapolated SMBH-halo scalings but $\sim 2$ dex lower normalisation.
+The velocity-dependent ``vd100'' model
+($v_{\rm max} = 25\kms$, $\sigma_T^{\rm max} = 60\cmg$) is required to
+avoid contradiction with $M_\star\lesssim 3\times 10^4\Msun$ upper
+limits on IMBHs in Fornax and Ursa Minor.  Leo I's inferred central
+$\sim 3\times 10^6\Msun$ BH remains inconsistent with gravothermal-only
+seeding.
+
+\subsection{Atomic dark matter}
+
+See \texttt{dm\_chemistry.tex}.  Atomic DM is a \emph{dissipative}
+sector (radiative cooling via dark bremsstrahlung, recombination, and
+molecular lines); SIDM is \emph{elastic} (no energy sink other than
+gravothermal conduction).  Both soften cores, but by different
+mechanisms.  At high densities atomic DM cools and forms compact
+objects, while SIDM heats its centre via gravothermal collapse.
+Hybrid atomic+SIDM scenarios are physically possible but underexplored.
+
+\subsection{Fuzzy dark matter}
+
+See \texttt{fdm.tex}.  Both FDM and SIDM soften small-scale
+structure.  FDM produces a solitonic ground-state core inside every
+halo, whose size scales as $r_c\propto 1/(m_\chi^2 M_c)$; SIDM
+produces a thermal-equilibrium isothermal core whose radius depends
+on local density and $\smx$.  Observational discriminators include
+FDM interference-driven granular substructure (absent in SIDM) and
+SIDM gravothermal core-collapsed subhaloes (absent in FDM).
+
+%----------------------------------------------------------------------
+\section{Summary}
+\label{sec:summary}
+
+SIDM is the minimal collisional extension of CDM.  Its
+one-parameter-family cross section $\sigma(v)$ modulates a competition
+between two regimes: outward heat conduction (core-forming, dominant
+at early times and in dilute haloes) and gravothermal catastrophe
+(core-collapsing, dominant at late times and in tidally stripped
+subhaloes).  Observationally, a velocity-dependent Yukawa cross
+section with $\smx\sim 2\cmg$ on dwarf scales and $\lesssim 0.1\cmg$
+on cluster scales is preferred over CDM by rotation curves, dwarf
+kinematics, and the diversity of low-mass halo properties.  Baryons
+substantially compress inner SIDM cores in baryon-dominated galaxies
+\citep{Kaplinghat2014,Robles2017}, an effect that is now known to be
+essential for producing SMBH seeds \citep{Feng2021}.
+
+Recent numerical work \citep{Gurian2025Core,Schon2025} has focused on
+following core collapse into regimes where the fluid approximation
+fails, requiring DSMC (KiSS-SIDM) and hybrid particle+fluid (SHH)
+methods.  Public simulation compilations \citep{Palubski2025} now
+make statistical inference on $\sigma(v)$ from observed substructure
+tractable.  The open frontier is joining velocity-dependent SIDM to
+baryon feedback, dust-lane hydrodynamics, and the observed
+diversity of the Milky Way subhalo population.
+
+%======================================================================
+\appendix
+
+\section{Kinetic-Theory Foundation}
+\label{app:kinetic}
+
+The gravothermal fluid framework of \S\ref{sec:fluid} sits at the end
+of a long derivation chain: Hamiltonian $N$-body $\to$ Liouville
+equation $\to$ BBGKY hierarchy $\to$ Boltzmann equation (with closure)
+$\to$ fluid (moment) equations $\to$ Navier--Stokes (Chapman--Enskog
+closure).  This appendix walks through that chain in enough detail
+that the SIDM gravothermal equations
+\eqref{eq:balberg_mass}--\eqref{eq:balberg_flux} appear as a specific
+application, and the failure mode identified by
+\citet{Gurian2025Core} can be located in a specific step.  Presentation
+follows the pedagogical order of van den Bosch's ASTR 501 lecture notes
+(\emph{Dynamics of Astrophysical Many-Body Systems}).
+
+\subsection{Hamiltonian $N$-body and Liouville's theorem}
+\label{app:liouville}
+
+A system of $N$ interacting particles has microstate
+$\vec\Gamma = (\vec q_1,\ldots,\vec q_N,\vec p_1,\ldots,\vec p_N)$ in
+$6N$-dimensional $\Gamma$-space.  Hamiltonian dynamics evolves
+$\vec\Gamma(t)$ via $\dot{\vec q}_i = \partial\mathcal H/\partial\vec
+p_i$, $\dot{\vec p}_i = -\partial\mathcal H/\partial\vec q_i$.  The
+$N$-body distribution function $f^{(N)}(\vec\Gamma,t)$ describes an
+ensemble of microstates.  Probability conservation gives the
+\emph{Liouville equation}
+%
+\begin{equation}
+  \frac{\partial f^{(N)}}{\partial t} + \{f^{(N)},\mathcal H\} = 0,
+  \quad\text{or equivalently}\quad
+  \frac{df^{(N)}}{dt} = 0,
+  \label{eq:liouville}
+\end{equation}
+%
+where the \emph{Poisson bracket} of two phase-space functions $A$,
+$B$ is
+%
+\begin{equation}
+  \{A,B\} \equiv \sum_{i=1}^{N}\!\left(
+      \frac{\partial A}{\partial\vec q_i}\!\cdot\!\frac{\partial B}{\partial\vec p_i}
+    - \frac{\partial A}{\partial\vec p_i}\!\cdot\!\frac{\partial B}{\partial\vec q_i}
+    \right).
+  \label{eq:poisson_bracket}
+\end{equation}
+%
+Substituting Hamilton's equations gives
+$\{f^{(N)},\mathcal H\} = \sum_i\bigl(\dot{\vec q}_i\!\cdot\!\partial_{\vec q_i}
++ \dot{\vec p}_i\!\cdot\!\partial_{\vec p_i}\bigr) f^{(N)}$, i.e.\ the
+total advective derivative along the Hamiltonian flow --- which is
+what makes \eqref{eq:liouville} equivalent to $df^{(N)}/dt = 0$.
+That is: the phase-space flow is incompressible, so a comoving
+volume element in $\Gamma$-space keeps constant volume.  This is
+Liouville's theorem.
+
+\subsection{From Liouville to Boltzmann: the BBGKY hierarchy}
+\label{app:bbgky}
+
+The $6N$-dimensional $f^{(N)}$ is unusable in practice.  Define the
+reduced $k$-particle distribution function
+%
+\begin{equation}
+  f^{(k)}(\vec w_1,\ldots,\vec w_k, t)
+    \equiv \frac{N!}{(N-k)!}\!\int\!\prod_{i=k+1}^{N} d^6\vec w_i\,
+           f^{(N)}(\vec w_1,\ldots,\vec w_N,t),
+\end{equation}
+%
+where $\vec w_i \equiv (\vec q_i,\vec p_i)$.  Taking the time
+derivative of $f^{(k)}$ and using \eqref{eq:liouville} with the
+Hamiltonian split into single-particle + two-body interaction
+$U(|\vec q_i - \vec q_j|)$ yields the \emph{BBGKY hierarchy}
+(Bogoliubov--Born--Green--Kirkwood--Yvon):
+%
+\begin{equation}
+  \frac{\partial f^{(k)}}{\partial t} = \{\mathcal H^{(k)}, f^{(k)}\}
+   + \sum_{i=1}^{k}\!\int\! d^3\vec q_{k+1}\,d^3\vec p_{k+1}\;
+     \frac{\partial U(|\vec q_i - \vec q_{k+1}|)}{\partial \vec q_i}
+     \cdot\frac{\partial f^{(k+1)}}{\partial\vec p_i}.
+  \label{eq:bbgky}
+\end{equation}
+%
+The evolution of $f^{(k)}$ depends on $f^{(k+1)}$: an unclosed
+hierarchy of $N$ coupled equations.  Nothing has been assumed except
+Hamiltonian dynamics.
+
+\paragraph{Mayer cluster expansion.}  Introduce correlation functions
+via
+%
+\begin{align}
+  f^{(2)}(1,2) &= f(1)f(2) + g(1,2), \\
+  f^{(3)}(1,2,3) &= f(1)f(2)f(3) + f(1)g(2,3) + \text{perm.} + h(1,2,3).
+\end{align}
+%
+$g(1,2)$ measures two-body correlations; $h$ measures three-body
+irreducible correlations.  Uncorrelated particles have
+$g = h = 0$.
+
+\paragraph{Closure: molecular chaos (Stosszahlansatz).}  For a
+\emph{dilute gas with short-range} two-body interactions (potential
+$U$ has support only in a small collision volume $r_{\rm coll}$), one
+closes \eqref{eq:bbgky} by assuming velocities entering a collision are
+uncorrelated, $f^{(2)}(\vec x,\vec x,\vec p_1,\vec p_2) = f^{(1)}(\vec
+x,\vec p_1)\,f^{(1)}(\vec x,\vec p_2)$ (identity of positions since
+the interaction is localized).  The $k=1$ equation of \eqref{eq:bbgky}
+then closes on itself as the \emph{Boltzmann equation}
+%
+\begin{equation}
+  \frac{df}{dt}
+   \equiv \frac{\partial f}{\partial t}
+        + \vec v\cdot\nabla_{\!\vec x} f
+        - \nabla\Phi\cdot\nabla_{\!\vec v} f
+   = I[f],
+  \label{eq:boltzmann}
+\end{equation}
+%
+with (elastic, two-body) collision integral
+%
+\begin{equation}
+  I[f] = \!\int\! d^3\vec p_2\,d^3\vec p_1'\,d^3\vec p_2'\;
+    \omega(\vec p_1',\vec p_2'|\vec p_1,\vec p_2)
+    \bigl[f(\vec p_1')f(\vec p_2') - f(\vec p_1)f(\vec p_2)\bigr].
+  \label{eq:collision_integral}
+\end{equation}
+%
+Here $\omega$ is the differential cross section, $f\equiv f^{(1)}$
+throughout, and the two terms describe replenishing (gain) and
+depleting (loss) collisions.  Molecular chaos secretly introduces an
+arrow of time --- the Loschmidt paradox --- but works empirically.
+
+\paragraph{Closure: uncorrelated momenta (Vlasov--Poisson).}  For
+gravitational $N$-body, interactions are long-range and no
+$r_{\rm coll}$ exists.  The closure that works instead is stronger
+than molecular chaos: assume momenta at all pairs are uncorrelated,
+$g(1,2) = 0$ everywhere.  The two-body interaction integral in
+\eqref{eq:bbgky} then combines with the streaming term to give the
+mean-field potential $\Phi(\vec x)$ sourced by $\rho = m\!\int f\,d^3\vec
+p$ via Poisson.  Equation \eqref{eq:boltzmann} reduces to the
+\emph{collisionless Boltzmann equation} (CBE, or Vlasov--Poisson):
+%
+\begin{equation}
+  \frac{\partial f}{\partial t}
+    + \vec v\cdot\nabla_{\!\vec x} f
+    - \nabla\Phi\cdot\nabla_{\!\vec v} f = 0,
+  \qquad \nabla^2\Phi = 4\pi G\!\int m f\,d^3\vec v.
+  \label{eq:cbe}
+\end{equation}
+%
+This governs pure CDM $N$-body simulations.  In a collisionless
+system, $g(1,2) = 0$ is preserved exactly.  \emph{SIDM sits between
+these two closures}: elastic short-range scattering \emph{plus}
+gravitational Poisson.  The Boltzmann equation
+\eqref{eq:boltzmann}--\eqref{eq:collision_integral} with $\Phi$
+determined by Poisson is the master equation for SIDM in
+phase-space.
+
+\subsection{Moment equations of the Boltzmann equation}
+\label{app:moments}
+
+Take a scalar function $Q(\vec v)$ and integrate the Boltzmann
+equation multiplied by $Q$ over velocity space.  Define
+%
+\begin{equation}
+  \langle Q\rangle(\vec x, t) \equiv \frac{1}{n(\vec x,t)}\!\int Q(\vec v) f\,d^3\vec v,
+  \qquad
+  n = \!\int f\,d^3\vec v.
+\end{equation}
+%
+For $Q$ a \emph{collisional invariant} --- conserved by every
+collision, i.e.\ $Q(\vec p_1) + Q(\vec p_2) = Q(\vec p_1') + Q(\vec
+p_2')$ --- one can show $\int Q\,I[f]\,d^3\vec v = 0$.  The three
+collisional invariants for elastic scattering are
+$Q\in\{1,m\vec v,\tfrac{1}{2}mv^2\}$: particle number, momentum,
+energy.  Their moment equations coincide with the collisionless
+moment equations \emph{despite} the microscopic collisions being
+present --- collisionality only shows up in higher moments and in the
+stress tensor.
+
+Standard manipulations (integration by parts in $\vec v$-space with
+$f\to 0$ at infinity, and the divergence trick for the
+$\vec v\cdot\nabla f$ streaming term) yield the master moment equation
+%
+\begin{equation}
+  \frac{\partial}{\partial t}(n\langle Q\rangle)
+   + \frac{\partial}{\partial x_i}
+     \bigl[n\langle Q\,v_i\rangle\bigr]
+   + \frac{\partial\Phi}{\partial x_i}
+     n\Bigl\langle\frac{\partial Q}{\partial v_i}\Bigr\rangle = 0.
+  \label{eq:master_moment}
+\end{equation}
+
+\paragraph{$Q=m$: continuity.}
+$\partial_t\rho + \partial_i(\rho u_i) = 0$
+with $\rho = mn$ and macroscopic velocity $u_i = \langle v_i\rangle$.
+
+\paragraph{$Q=mv_j$: momentum.}  Split microscopic velocity
+$\vec v = \vec u + \vec w$ into macroscopic streaming $\vec u$ and
+random peculiar $\vec w$ (so $\langle\vec w\rangle = 0$).  Then
+$\rho\langle v_i v_j\rangle = \rho u_i u_j + \rho\langle w_i w_j\rangle$.
+Introducing the \emph{stress tensor}
+%
+\begin{equation}
+  \sigma_{ij} \equiv -\rho\langle w_i w_j\rangle,
+  \label{eq:stress_general}
+\end{equation}
+%
+\eqref{eq:master_moment} for $Q=mv_j$ reads
+%
+\begin{equation}
+  \frac{\partial u_j}{\partial t} + u_i\partial_i u_j
+    = \frac{1}{\rho}\partial_i\sigma_{ij} - \partial_j\Phi.
+  \label{eq:momentum_equation}
+\end{equation}
+%
+The stress tensor is where microscopic physics lives.
+
+\paragraph{$Q=\tfrac{1}{2}mv^2$: energy.}  Define specific internal
+energy $\varepsilon = \tfrac{1}{2}\langle w^2\rangle$.  The energy
+equation reads
+%
+\begin{equation}
+  \rho\frac{d\varepsilon}{dt}
+   = -P\,\partial_k u_k + \mathcal V - \partial_k F_{{\rm cond},k},
+  \label{eq:energy_equation}
+\end{equation}
+%
+with viscous dissipation rate $\mathcal V$ and conductive heat flux
+$\vec F_{\rm cond}$.
+
+\subsection{The Chapman--Enskog closure}
+\label{app:CE}
+
+Equations \eqref{eq:momentum_equation}--\eqref{eq:energy_equation}
+are unclosed: $\sigma_{ij}$, $\mathcal V$, and $F_{\rm cond}$ all
+depend on higher moments of $f$.  The Chapman--Enskog procedure is a
+perturbation expansion in the \emph{Knudsen number}
+%
+\begin{equation}
+  \mathrm{Kn} \equiv \frac{\lambda_{\rm mfp}}{L_{\rm macro}},
+\end{equation}
+%
+where $L_{\rm macro}$ is the shortest gradient length in the fluid
+variables.  Small Kn = fluid regime; large Kn = free-streaming
+(collisionless) regime.
+
+\paragraph{Zeroth order.}  Locally set $I[f] = 0$, forcing $f =
+f^{\rm MB}$ a local Maxwell--Boltzmann distribution with parameters
+$\rho(\vec x,t)$, $\vec u(\vec x,t)$, $T(\vec x,t)$:
+%
+\begin{equation}
+  f^{\rm MB}(\vec v)
+   = \frac{n}{(2\pi m k_B T)^{3/2}}\,
+     \exp\!\left[-\frac{|\vec v-\vec u|^2\,m}{2k_B T}\right].
+  \label{eq:maxwellian}
+\end{equation}
+%
+At this order $\sigma_{ij}^{(0)} = -P\,\delta_{ij}$ with
+$P = n k_B T$ (ideal gas law): \emph{Euler} equations, no viscosity,
+no conduction.
+
+\paragraph{First order.}  Expand $f = f^{\rm MB}\,(1 + \phi_1 + \cdots)$
+with $\phi_1 \propto \mathrm{Kn}$.  Substituting into the Boltzmann
+equation and linearising the collision integral around
+$f^{\rm MB}$ gives a linear integral equation for $\phi_1$ whose
+solution reveals
+%
+\begin{equation}
+  \sigma_{ij} = -P\,\delta_{ij}
+    + \mu\!\left(\partial_i u_j + \partial_j u_i
+                - \tfrac{2}{3}\delta_{ij}\partial_k u_k\right)
+    + \eta\,\delta_{ij}\partial_k u_k,
+  \label{eq:navier_stokes_stress}
+\end{equation}
+%
+%
+\begin{equation}
+  \vec F_{\rm cond} = -\kappa\,\nabla T.
+  \label{eq:fourier_law}
+\end{equation}
+%
+The three transport coefficients $\mu$ (shear viscosity),
+$\eta$ (bulk viscosity), and $\kappa$ (thermal conductivity) are
+computed as integrals of collision kernels over Maxwellian velocity
+distributions.  For elastic \emph{hard-sphere} scattering with total
+cross section $\sigma$ and particle mass $m$
+(Chapman--Enskog result, see any kinetic-theory textbook):
+%
+\begin{align}
+  \mu &= \frac{5}{16}\,\frac{1}{\sigma}\sqrt{\frac{m k_B T}{\pi}},
+    &&\text{(shear viscosity)},\\
+  \kappa &= \frac{75\,k_B}{64\,\sigma}
+             \sqrt{\frac{k_B T}{\pi m}},
+    &&\text{(thermal conductivity)}.
+  \label{eq:CE_transport}
+\end{align}
+%
+Neither depends on $n$: at higher density, more particles carry the
+flux but each carries less because $\lambda_{\rm mfp}$ shrinks.  Bulk
+viscosity $\eta = 0$ for a monatomic gas.
+
+Substituting \eqref{eq:navier_stokes_stress}--\eqref{eq:fourier_law}
+into \eqref{eq:momentum_equation} and \eqref{eq:energy_equation}
+yields the \emph{Navier--Stokes equations}: the standard collisional
+fluid model.  Zero transport coefficients recovers Euler.
+
+\paragraph{Higher orders (Burnett, super-Burnett).}  Expanding to
+$\mathrm{Kn}^2$ adds gradient-of-gradient terms with typically
+non-physical (backwards-in-time) solutions.  In practice one stops at
+Navier--Stokes.
+
+\subsection{Thermal conduction: from mean free path to Chapman--Enskog}
+\label{app:conduction}
+
+Thermal conduction is the heat-flux channel that drives the
+gravothermal catastrophe (\S\ref{sec:regimes}), so it deserves a
+dedicated derivation.  Two approaches, matched at the end.
+
+\subsubsection{Elementary mean-free-path estimate}
+
+Consider a gas with a small temperature gradient $dT/dz$ along the
+$z$-axis, no bulk flow.  A particle at height $z$ typically had its
+last collision at height $z - \lambda_{\rm mfp}\cos\theta_v$, where
+$\theta_v$ is the angle between its velocity and $\hat z$.  It carries
+the average energy of that location:
+$\bar\varepsilon = \tfrac{3}{2}k_B T(z - \lambda_{\rm mfp}\cos\theta_v)$.
+The net upward heat flux is the difference between upward-moving and
+downward-moving particles integrated over the Maxwellian:
+%
+\begin{equation}
+  F_z \;=\; -n\,\langle v_z\bigl(\bar\varepsilon(z-\lambda_{\rm mfp}\cos\theta_v)
+        -\bar\varepsilon(z)\bigr)\rangle
+    \;\simeq\; -n\,\langle v_z^2\rangle\,\lambda_{\rm mfp}\,
+        \frac{3k_B}{2}\,\frac{dT}{dz}.
+\end{equation}
+%
+Using $\langle v_z^2\rangle = k_B T/m$ and
+$\lambda_{\rm mfp} = 1/(n\sigma)$ gives
+%
+\begin{equation}
+  F_z = -\kappa_{\rm mfp}\frac{dT}{dz},
+  \qquad
+  \kappa_{\rm mfp}
+    = \tfrac{3}{2}\,\frac{k_B}{\sigma}\sqrt{\frac{k_B T}{m}}
+    \sim n\,c_v\,\bar v\,\lambda_{\rm mfp}.
+  \label{eq:kappa_mfp}
+\end{equation}
+%
+Compact form: $\kappa \sim n c_v \bar v\lambda_{\rm mfp}$, with $c_v$
+the specific heat per particle, $\bar v$ the thermal speed,
+$\lambda_{\rm mfp}$ the mean free path.  The factor of $n$ in
+$n\lambda_{\rm mfp} = 1/\sigma$ cancels: increase $n$ and each
+particle carries less flux per collision, exactly compensating.
+Consequence: $\kappa$ is independent of density.
+
+\subsubsection{Full Chapman--Enskog calculation}
+
+The mean-free-path estimate misses order-unity numerical constants
+that come from the Maxwellian velocity distribution and from the
+velocity dependence of the mean free path itself (fast particles have
+shorter $\lambda_{\rm mfp}$).  The full Chapman--Enskog result
+requires solving a linear integral equation for the first-order
+correction $\phi_1$ to the local Maxwellian.
+
+\paragraph{Setup.}  Expand
+$f = f^{\rm MB}\bigl(1 + \phi_1(\vec c) + \cdots\bigr)$
+with $\vec c \equiv \vec v - \vec u$ the peculiar velocity.  Choose
+the ansatz relevant for thermal conduction (no bulk flow gradient):
+%
+\begin{equation}
+  \phi_1(\vec c) = -\vec A(\vec c)\cdot\nabla\ln T,
+\end{equation}
+%
+so $\phi_1$ is linear in $\nabla T$ and vanishes in equilibrium.
+Substitute into the linearised Boltzmann equation.  The streaming
+side gives, after some algebra,
+%
+\begin{equation}
+  f^{\rm MB}\!\left(\frac{mc^2}{2 k_B T} - \tfrac{5}{2}\right)\vec c\cdot\nabla\ln T,
+  \label{eq:CE_source}
+\end{equation}
+%
+which must be balanced by the linearised collision integral acting on
+$\vec A$.
+
+\paragraph{Sonine expansion.}  The angular structure of \eqref{eq:CE_source}
+forces $\vec A = A(c^2)\,\vec c$ for some scalar $A$.  Expand $A(c^2)$
+in Sonine (associated Laguerre) polynomials:
+%
+\begin{equation}
+  A(c^2) = \sum_{p=0}^\infty a_p\,S_{3/2}^{(p)}\!\!\left(\frac{mc^2}{2k_B T}\right)\!,
+\end{equation}
+%
+where $S_{3/2}^{(p)}$ is the Sonine polynomial that diagonalises the
+linearised collision operator for a Maxwellian equilibrium.
+Truncating at first Sonine ($p=0$) gives the leading result;
+subsequent orders converge rapidly.
+
+\paragraph{Result.}  Solving for $a_0$ using the orthogonality of
+Sonine polynomials against the collision kernel gives, for elastic
+hard-sphere scattering with total cross section $\sigma$
+(Chapman \& Cowling 1970, \S 10.21):
+%
+\begin{equation}
+  \kappa = \frac{75\,k_B}{64\,\sigma}\sqrt{\frac{k_B T}{\pi m}}.
+  \label{eq:kappa_CE_full}
+\end{equation}
+%
+Comparing to \eqref{eq:kappa_mfp}:
+$\kappa_{\rm CE}/\kappa_{\rm mfp} = 25\pi/64 \approx 1.23$.  The
+mean-free-path estimate is off by only $\sim 25\%$: the Sonine
+expansion is efficient because the Maxwellian distribution is close
+to a $\delta$-function in $c^2$ for the moments that matter.
+
+\subsubsection{Higher-Sonine corrections}
+
+Adding the $p=1$ Sonine term corrects \eqref{eq:kappa_CE_full} by
+about $1\%$; $p=2$ by less than $10^{-3}$.  Rigorous bounds
+(Uhlenbeck) show the first-Sonine result is a strict lower bound and
+that the true $\kappa$ lies within $2\%$ for hard spheres.  The
+canonical value \eqref{eq:kappa_CE_full} is used throughout the SIDM
+literature.
+
+\subsubsection{From Chapman--Enskog to gravothermal SIDM}
+
+For an SIDM halo we replace $k_B T \to m\nu^2$ (SIDM is a
+self-gravitating gas whose ``temperature'' is the 1D velocity
+dispersion in kinetic units).  Substituting into
+\eqref{eq:kappa_CE_full} and expressing $\sigma$ per unit mass:
+%
+\begin{equation}
+  \kappa_{\rm SIDM,SMFP}
+    = \frac{75}{64\sqrt\pi}\,\frac{m\nu}{\sigma}
+    \simeq 2.1\,\frac{m\nu k_B}{\sigma}\,\frac{1}{k_B}
+    = 2.1\,\frac{\nu\,k_B}{\smx}.
+  \label{eq:kappa_SIDM_SMFP}
+\end{equation}
+%
+This matches Eq.~\eqref{eq:balberg_flux}'s SMFP limit within the
+$b = 25\sqrt\pi/32$ conductivity factor of \citet{Balberg2002} up to
+$O(1)$ manipulations.  The corresponding heat flux from Fourier's law
+is
+%
+\begin{equation}
+  \vec F_{\rm cond}^{\rm SMFP}
+   = -\kappa_{\rm SIDM,SMFP}\,\nabla\!\bigl(m\nu^2/k_B\bigr)
+   \propto -\frac{\nu}{\sigma}\,\nabla\nu^2,
+\end{equation}
+%
+which is exactly what appears in the fluid-model luminosity
+\eqref{eq:balberg_flux}.
+
+\subsubsection{The LMFP heat flux: gravothermal conduction}
+
+Chapman--Enskog assumes $\lambda_{\rm mfp}\ll H$.  In the outer halo
+(and initially, before any core forms), $\lambda_{\rm mfp}\gg H$ and
+the fluid picture manifestly fails: a particle traverses many scale
+heights before scattering, so it samples the temperature far from its
+starting location.  The correct LMFP heat flux is derived in
+\citet{LyndenBell1980} and \citet{Balberg2002}: particles travel a
+gravitational scale height
+$H \equiv (\nu^2/4\pi G\rho)^{1/2}$ between scatterings, and each
+scattering communicates the temperature difference over that scale.
+Effective ``mean free path for heat'' becomes $H$, and the effective
+conductivity is
+%
+\begin{equation}
+  \kappa_{\rm SIDM,LMFP}
+    \simeq 0.27\,C\,\frac{\rho\,\nu^3\,\sigma\,k_B}{Gm^2}
+    \propto \rho\,\sigma
+    \qquad (\lambda_{\rm mfp}\gg H).
+  \label{eq:kappa_SIDM_LMFP}
+\end{equation}
+%
+Note the opposite dependence on $\sigma$: SMFP conductivity is
+$\propto 1/\sigma$ (more collisions $\to$ slower diffusion), LMFP
+conductivity is $\propto\sigma$ (more collisions $\to$ more energy
+transferred between distant zones).  This is why the interpolated
+form
+$\kappa^{-1} = \kappa_{\rm SMFP}^{-1} + \kappa_{\rm LMFP}^{-1}$
+(used by \citealt{Balberg2002,Pollack2015,Meshveliani2023}) captures
+both regimes: in SMFP the term $\kappa_{\rm SMFP}$ dominates, in LMFP
+$\kappa_{\rm LMFP}$ does.  The interpolation is not a Chapman--Enskog
+result --- it is an ansatz calibrated against $N$-body simulations,
+with the $C\simeq 0.75$ (or $0.42$--$0.84$ depending on source)
+fudge factor absorbing the mismatch.
+
+\subsubsection{The IMFP problem}
+
+The $\mathrm{Kn}\sim 1$ region is where the interpolation breaks
+down.  Chapman--Enskog says $\kappa$ diverges as
+$\kappa_{\rm SMFP}\propto 1/\sigma$; LMFP says $\kappa_{\rm LMFP}
+\propto\rho\sigma$; these two functional forms only match in a
+neighbourhood of $\rho\sigma H = O(1)$.  \citet{Gurian2025Core} DSMC
+runs show that in the IMFP shell:
+%
+\begin{itemize}
+  \item The velocity distribution is bimodal-anisotropic: cold
+        particles from the core mix with hot particles from outside,
+        neither fully thermalising.
+  \item Ordinary Fourier's law $F = -\kappa\nabla T$ gives the wrong
+        \emph{sign} in some sub-shells (energy against the gradient),
+        because non-local energy transport dominates.
+  \item Ni entropy-production rate $\hat Q$ (which vanishes in local
+        equilibrium) turns positive.
+\end{itemize}
+%
+Fixing this within a fluid framework requires modelling $\sigma_{ij}$
+with a genuine viscous term \eqref{eq:navier_stokes_stress} (currently
+neglected in gravothermal models), computing higher-Sonine
+corrections, or matching to a solution of the actual Boltzmann
+equation via DSMC (Bird 1994).
+
+\subsection{Application: gravothermal fluid model for SIDM}
+\label{app:sidm_fluid}
+
+The \citet{Balberg2002} gravothermal fluid model of SIDM combines
+three inputs:
+%
+\begin{enumerate}
+  \item Momentum and mass conservation from the moment equations
+        \eqref{eq:momentum_equation}, adapted to spherical symmetry
+        with hydrostatic equilibrium
+        $\partial_r(\rho\nu^2) = -GM\rho/r^2$.
+  \item Chapman--Enskog thermal conductivity from
+        \eqref{eq:CE_transport}, rewritten in terms of the SIDM
+        cross section $\smx$ and 1D velocity dispersion $\nu$
+        (using $k_B T \to m\nu^2$):
+        %
+        \begin{equation}
+          \kappa_{\rm SMFP}
+            = \frac{75}{64}\,\frac{\nu\,k_B}{\sigma}
+            \simeq 2.1\,\frac{\nu k_B}{\sigma},
+          \label{eq:kappa_smfp}
+        \end{equation}
+        %
+        matching Eq.~\eqref{eq:balberg_flux}'s SMFP limit up to the
+        factor $75/64\simeq 1.17$.
+  \item An ad hoc interpolation to the LMFP regime where
+        Chapman--Enskog fails ($\mathrm{Kn}\gg 1$), giving the
+        conducting-flux ansatz Eq.~\eqref{eq:balberg_flux}.
+\end{enumerate}
+%
+The energy equation \eqref{eq:energy_equation} closes with
+$\vec F_{\rm cond}$ from \eqref{eq:fourier_law} and Fourier's law.
+Neglecting viscous dissipation ($\mathcal V = 0$) --- which is the
+standard fluid ansatz for the gravothermal problem --- yields
+\eqref{eq:balberg_energy}.
+
+The full derivation of $\kappa_{\rm SMFP}$ for gravitating hard
+spheres, including the numerical constant $b = 25\sqrt\pi/32\simeq
+1.0$ that appears in \citet{Balberg2002}, is in the classic kinetic
+theory literature (Chapman \& Cowling 1970; Huang 1987).
+
+\subsection{Where the fluid model fails}
+\label{app:CE_breakdown}
+
+Chapman--Enskog requires $\mathrm{Kn}\lesssim 1$ everywhere.  In an
+SIDM halo, $\mathrm{Kn}$ varies by many orders of magnitude between
+the outer halo ($\lambda_{\rm mfp}\gg H$, free-streaming) and the
+collapsing centre ($\lambda_{\rm mfp}\ll H$, fluid-like).  At any
+given time there is a shell where $\mathrm{Kn}\sim 1$ --- the
+intermediate-mean-free-path (IMFP) region.
+
+\citet{Gurian2025Core} used direct simulation Monte Carlo
+(KiSS-SIDM) to show that in the IMFP region:
+%
+\begin{itemize}
+  \item The velocity distribution is \emph{anisotropic}
+        ($\langle w_r^2\rangle \neq \langle w_\perp^2\rangle$), not
+        locally Maxwellian.
+  \item Non-Maxwellian tails in the radial component develop
+        (``boil-off'' particles).
+  \item The entropy-production diagnostic $\hat Q$ turns positive,
+        implying the fluid-model heat flow is going against the
+        temperature gradient --- a direct signature of Chapman--Enskog
+        breakdown.
+\end{itemize}
+%
+Physically, once $\mathrm{Kn}\sim 1$ the mean free path becomes
+comparable to the shell thickness, so particles no longer thermalise
+locally.  The Chapman--Enskog expansion is not just quantitatively
+inaccurate; its zeroth-order local-Maxwellian assumption is
+qualitatively wrong.  Fixing this requires either (i) computing
+higher-order terms in the Chapman--Enskog expansion (rarely
+practical), (ii) direct simulation Monte Carlo (KiSS-SIDM), or
+(iii) hybrid particle+fluid schemes that transition between regimes
+smoothly (SHH; \citealt{Schon2025}).
+
+\bibliography{references}
+
+\end{document}
