@@ -130,7 +130,7 @@ class ICField:
     # ----- constructor & basic accessors --------------------------------
     def __init__(self, hdf5_path: str, ngrid: int | None = None,
                  interlace: bool = True, h: float = 0.6711,
-                 load_velocities: bool = True, assignment: str = "cic"):
+                 load_velocities: bool = True, assignment: str = "pcs"):
         d = read_ic_hdf5(hdf5_path, want_velocities=load_velocities)
         self.coords      = d["coords"]
         self.velocities  = d.get("velocities")

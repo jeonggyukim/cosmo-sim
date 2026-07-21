@@ -30,7 +30,7 @@ from icpipe.windows import ASSIGNMENT_ORDER
 
 
 def _measure_one_level(coords, boxsize_mpc, ngrid, h, interlace, nkbins,
-                       *, assignment="cic", kmin_mpch=None, kmax_mpch=None,
+                       *, assignment="pcs", kmin_mpch=None, kmax_mpch=None,
                        shot_noise=True):
     """One-level helper: build a transient ICField from already-loaded
     coords (so we can fold positions in-place for sub-Nyquist levels)."""
@@ -65,10 +65,11 @@ def main():
                    help="H0 in km/s/Mpc for h conversion (default: 67.11)")
     p.add_argument("--no-interlace", action="store_true", default=False,
                    help="Disable interlaced assignment (default: on)")
-    p.add_argument("--assignment", choices=["ngp", "cic", "tsc", "pcs"], default="cic",
+    p.add_argument("--assignment", choices=["ngp", "cic", "tsc", "pcs"], default="pcs",
                    help="Mass-assignment scheme (Sefusatti+ 2016). Higher order = "
-                        "less near-Nyquist aliasing; 'pcs' + interlacing is the most "
-                        "accurate (default: cic).")
+                        "less near-Nyquist aliasing; 'pcs' + interlacing is accurate to "
+                        "~0.01 per cent at the Nyquist frequency (default: pcs). Use "
+                        "'cic' for a faster, lower-accuracy estimate.")
     p.add_argument("--fold", type=int, nargs="+", default=[], metavar="M",
                    help="Folding factors (Jenkins+ 1998). Each M folds positions "
                         "into a sub-box of size L/M, extending k_Nyquist by M and "

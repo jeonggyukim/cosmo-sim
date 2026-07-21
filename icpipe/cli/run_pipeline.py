@@ -37,6 +37,9 @@ def main():
                    help="Fix Fourier mode amplitudes (MUSIC fix_mode_amplitude / monofonic DoFixing)")
     p.add_argument("--lpt-order", choices=["1", "2", "3"], default="3",
                    help="LPT order (monofonic only; MUSIC uses use_2LPT)")
+    p.add_argument("--assignment", choices=["ngp", "cic", "tsc", "pcs"], default="pcs",
+                   help="P(k) mass-assignment scheme (Sefusatti+ 2016; pcs is most "
+                        "accurate near Nyquist, default: pcs)")
     p.add_argument("--seed", type=int, default=None,
                    help="Random seed for the IC white noise (paired-suite runs)")
     p.add_argument("--ic-source-dir", default=None,
@@ -62,6 +65,7 @@ def main():
         nthreads=args.nthreads,
         fix_amplitude=args.fix_amplitude,
         lpt_order=args.lpt_order,
+        assignment=args.assignment,
         seed=args.seed,
         ic_source_dir=args.ic_source_dir,
         corrfunc_dir=args.corrfunc_dir,

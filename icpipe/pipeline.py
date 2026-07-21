@@ -71,6 +71,7 @@ class RunConfig:
     nthreads: str = "4"
     fix_amplitude: str = "yes"
     lpt_order: str = "3"
+    assignment: str = "pcs"   # P(k) mass-assignment scheme: ngp/cic/tsc/pcs
     seed: int | None = None
     ic_source_dir: str | None = None
     corrfunc_dir: str | None = None
@@ -320,7 +321,8 @@ def step_xi_cic(cfg: RunConfig, stem: str, ic_file: str) -> None:
 def step_pk(cfg: RunConfig, stem: str, ic_file: str) -> str:
     pk_file = f"data/pk_{stem}.txt"
     log("Measuring P(k) with compute_pk...")
-    run(cfg, py_cli("icpipe.cli.compute_pk", ic_file, "--H0", H0, "-o", pk_file))
+    run(cfg, py_cli("icpipe.cli.compute_pk", ic_file, "--H0", H0,
+                    "--assignment", cfg.assignment, "-o", pk_file))
     print(f"    Saved: {pk_file}")
     return pk_file
 
