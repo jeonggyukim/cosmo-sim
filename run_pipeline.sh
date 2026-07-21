@@ -16,7 +16,7 @@
 #   ./run_pipeline.sh [--ngrid NGRID] [--lbox LBOX] [--zstart ZSTART] [--nthreads NTHREADS]
 #
 #   --ngrid          particles per side (default: 256)
-#   --lbox           box side length in Mpc/h (default: 1024)
+#   --lbox           box side length in Mpc/h (default: 1000)
 #   --zstart         IC starting redshift (default: 200)
 #   --nthreads       OpenMP threads for compute_xi (default: 8)
 #   --fix-amplitude  yes|no — fix Fourier mode amplitudes to sqrt(P(k)) (default: yes)
@@ -47,7 +47,7 @@ cd "$(dirname "$(readlink -f "$0")")"
 # Parse arguments
 # ---------------------------------------------------------------------------
 NGRID=256
-LBOX=1024
+LBOX=1000
 ZSTART=200
 # Default to all logical CPUs; detect cross-platform (macOS: sysctl, Linux: nproc)
 NTHREADS=$(sysctl -n hw.logicalcpu 2>/dev/null || nproc 2>/dev/null || echo 4)

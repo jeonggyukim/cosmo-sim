@@ -36,7 +36,7 @@ The `pip install -e .` step also wires `make-music-conf`, `make-rbins`,
 ## Run the full pipeline
 
 ```bash
-./run_pipeline.sh                                          # defaults: N=256, L=1024 Mpc/h, z=200
+./run_pipeline.sh                                          # defaults: N=256, L=1000 Mpc/h, z=200
 ./run_pipeline.sh --ngrid 256 --lbox 512 --zstart 200      # 256³, L=512 Mpc/h, z=200
 ./run_pipeline.sh --ngrid 256 --lbox 256 --zstart 200      # 256³, L=256 Mpc/h, z=200
 ```
