@@ -204,17 +204,19 @@ boundary artifacts.
 
 ## Notes / Documentation
 
-Three LaTeX write-ups live in `notes/`:
+LaTeX write-ups live in `notes/` (full list in `notes/README.md`); the main ones:
 
 | File | Contents |
 |------|----------|
 | `cosmo_ic.tex` | Cosmological ICs: fluid equations, ZA, 2LPT, Zel'dovich pancake, IC generation, starting redshifts, P(k)/ξ(r)/ψ(r), one-loop P(k); §11 MUSIC2 / monofonIC implementation (refinement hierarchy, hybrid Poisson solve, 2LPT/3LPT source, PLT, Orszag 3/2 rule, back-scaling). Appendix A: Fourier conventions (CFT, Fourier series, DFT, Hermitian symmetry); see `fft.pdf` for implementation details. Appendix B: P(k) estimation (CIC window, deconvolution, shot noise, sub-Poissonian lattice ICs) |
 | `ic_sampling.tex` | IC sampling methods (Pen 1997, Sirko 2005, Hahn & Abel 2011): P-sampled vs ξ-sampled, box window truncation errors |
 | `fft.tex` | FFT reference: DFT, Cooley–Tukey radix-2, FFTW mixed-radix, multi-D row-column algorithm, MPI slab vs. pencil decomposition, FFTW API, fftMPI (Plimpton 2019) and Tigris `BlockFFT` usage |
+| `qft.tex` | Field-theory foundations for scalar dark matter, expanded from the `fdm.tex` QFT appendix: least action, free scalar field, Noether, canonical quantisation, coherent states / classical-wave limit, axion potential, curved-spacetime coupling. Reference PDFs (Tong, Coleman, Srednicki) in `~/Documents/ref_qft/` |
 
 Planning docs (markdown, kept next to the notes):
 
 - `docs-claude/baryon_ic_plan.md` — roadmap for extending the pipeline from CDM-only to baryon+CDM ICs (theory write-up for `cosmo_ic.tex` §9, `--baryons` switch in `make_music_conf.py`, per-species P(k) diagnostics, two-species coherence test).
+- `docs-claude/swift_gpu_gravity_plan.md` — survey and plan for GPU porting of SWIFT gravity + SPH (KIAS project): architecture comparison of SWIFT / SWIFT-GPU fork (Nasar et al.) / cuGOTPM, feasibility analysis of short-range gravity P2P offload, step ordering.
 
 ```bash
 cd notes
