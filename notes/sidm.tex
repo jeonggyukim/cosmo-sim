@@ -152,7 +152,33 @@ with strength $\alpha'$ gives
 %
 Electromagnetic-strength dark coupling ($\alpha' \sim 10^{-2}$) with a
 sub-GeV mediator produces the astrophysical target; the DM particle
-itself does not need to be strongly coupled.
+itself does not need to be strongly coupled.  That last statement
+separates two meanings of ``strong'' that are easy to conflate:
+strongly \emph{interacting} in the astrophysical sense (a large cross
+section per unit mass, $\smx\sim 1\cmg$) versus strongly
+\emph{coupled} in the particle-physics sense (a large dimensionless
+coupling $\alpha'\gtrsim 1$, non-perturbative dynamics).  SIDM needs
+the first, not the second.  Equation~\eqref{eq:Yukawa_Born} shows
+why: the cross section scales as the inverse \emph{fourth} power of
+the mediator mass, so the enormous $\sigma$ comes from the mediator
+being light ($m_\phi\sim 10$--$40\,{\rm MeV}$, force range of tens of
+fm --- long-range by particle standards), not from the coupling being
+large.  Taking the same $\alpha' = 10^{-2}$ but a weak-scale mediator
+$m_\phi = 100\,{\rm GeV}$ suppresses $\sigma$ by
+$(100\,{\rm GeV}/40\,{\rm MeV})^4 \approx 4\times 10^{13}$ ---
+essentially the entire 14 orders of magnitude separating SIDM from
+WIMP self-scattering is mediator mass, none of it coupling strength.
+Familiar analogues: Rutherford scattering, whose huge low-energy
+cross sections come from a massless photon at $\alpha = 1/137$; and
+nucleon--nucleon scattering, where $\sigma/m_n \sim$ a few $\cmg$
+--- comparable to the SIDM target --- is set by the pion's range, not
+by any coupling being infinite.  The model-building consequence:
+$\alpha'$ stays perturbative, so the Born calculation is valid, a
+dark photon plus dark Higgs suffices as the underlying theory, and
+the Rutherford-like $\sigma(v)\propto v^{-4}$ falloff at high
+velocity --- the velocity dependence the data prefer
+(\S\ref{sec:vdep}) --- emerges automatically rather than being
+engineered.
 
 \subsection{Two regimes: cored and core-collapsed}
 \label{sec:regimes}
@@ -344,10 +370,12 @@ persistently out of LTE: the radial velocity dispersion develops
 non-Maxwellian tails from ``boil-off'' particles, and the fluid
 model's temperature-weighted entropy production $\hat Q$ turns positive
 --- an unambiguous signal of failure.  The local
-$d\log M_{\rm core}/d\log\langle v^2\rangle$ exponent differs from the
-fluid value by an order of magnitude in the SMFP regime, so the seed
-mass at relativistic instability could be substantially larger than
-fluid extrapolations predict.  Most of the halo's lifetime is still
+$d\log M_{\rm core}/d\log\langle v^2\rangle$ exponent in the SMFP
+regime is $-0.21$ (DSMC) versus $-0.27$ to $-0.37$ (fluid) --- an
+order-one disagreement in an exponential scaling that compounds over
+the many $e$-folds remaining to the relativistic instability --- so
+the seed mass at relativistic instability could be substantially
+larger than fluid extrapolations predict.  Most of the halo's lifetime is still
 LMFP-dominated, so collapse-time corrections are $\sim 30\%$ --- but
 current SIDM $N$-body codes already disagree at that level, and DSMC is
 now the reference calibration point \citep{Gurian2025Core}.
@@ -503,6 +531,14 @@ consistent with $\smx\lesssim 0.1$--$1\cmg$ cluster bounds.
 \section{Numerical methods}
 \label{sec:numerical}
 
+This section is a survey of the method landscape.  The companion
+note \texttt{sidm\_sim.tex} develops the simulation program in
+depth: the DSMC algorithm with derivations, the 3D generalization
+and its cost, moment-closure schemes (a two-moment gravothermal
+model), asymptotic-preserving integrators, and an implementation
+plan for the TIGRIS code.  The division of labor: this note covers
+the phenomenon; \texttt{sidm\_sim.tex} covers simulating it.
+
 \subsection{Particle-based Monte Carlo}
 
 The Rocha--Peter--Bullock--Kaplinghat scheme \citep{Rocha2013}, now
@@ -537,8 +573,11 @@ relativistic instability.
 
 Fast, spherically symmetric, cheap: solve
 Eqs.~\eqref{eq:balberg_mass}--\eqref{eq:balberg_flux} on a Lagrangian
-mass grid.  Codes: SoulICE (Essig+2019), gravothermal.jl (Pollack+2015
-lineage), \texttt{RecfastJulia}-style pipelines.  Limitations:
+mass grid.  In-house implementations accompany most of the
+fluid-model literature
+\citep{Balberg2002,Pollack2015,Correa2021,Meshveliani2023},
+differing mainly in the calibration of the conductivity constant
+$C$ against $N$-body simulations.  Limitations:
 spherical only, LTE assumed, breaks at IMFP boundary
 \citep{Gurian2025Core}.
 
@@ -1240,14 +1279,23 @@ neighbourhood of $\rho\sigma H = O(1)$.  \citet{Gurian2025Core} DSMC
 runs show that in the IMFP shell:
 %
 \begin{itemize}
-  \item The velocity distribution is bimodal-anisotropic: cold
-        particles from the core mix with hot particles from outside,
-        neither fully thermalising.
+  \item The velocity distribution is anisotropic and
+        non-Maxwellian in its radial component: the radial
+        distribution has a mode near zero and an extended,
+        asymmetric outward tail --- boil-off particles that have not
+        thermalized --- while the angular components stay closer to
+        Maxwellian (Fig.~3 of \citealt{Gurian2025Core}; the
+        radial-dispersion enhancement is visible in their Fig.~1).
   \item Ordinary Fourier's law $F = -\kappa\nabla T$ gives the wrong
         \emph{sign} in some sub-shells (energy against the gradient),
         because non-local energy transport dominates.
-  \item Ni entropy-production rate $\hat Q$ (which vanishes in local
-        equilibrium) turns positive.
+  \item The temperature-weighted entropy-production rate
+        $\dot Q = \int dM\,\tfrac13\langle v^2\rangle\,(ds_1/dt)_M$
+        (which pure conduction forces to zero when integrated over
+        the halo --- the integrand telescopes to boundary
+        luminosities) settles at a positive asymptote: entropy is
+        being \emph{produced}, not transported, which conduction
+        cannot do and viscous dissipation can.
 \end{itemize}
 %
 Fixing this within a fluid framework requires modelling $\sigma_{ij}$

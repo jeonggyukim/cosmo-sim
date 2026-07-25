@@ -1,4 +1,4 @@
-NOTES  = foundations ic_sampling cosmo_ic fft restriction_lpt music2_internals fdm dm_chemistry sidm
+NOTES  = foundations ic_sampling cosmo_ic fft restriction_lpt music2_internals fdm dm_chemistry sidm qft sidm_sim
 PYTHON = conda run -n cosmo python
 
 # Absolute path to this Makefile's directory — pdflatex is always run from here
@@ -51,7 +51,8 @@ FIGURES = \
     figures/restriction/alias_diagram.pdf \
     figures/restriction/zoom_ic_comparison.pdf \
     figures/restriction/zoom_ic_pk_full.pdf \
-    figures/music2/meyer.pdf
+    figures/music2/meyer.pdf \
+    figures/sidm_sim/dsmc_scheme.pdf
 
 all : figures notes
 
@@ -150,6 +151,9 @@ figures/restriction/zoom_ic_pk_full.pdf : figures/restriction/plot_zoom_ic_pk_fu
 figures/music2/meyer.pdf : figures/music2/plot_meyer.py
 	cd figures/music2 && $(PYTHON) plot_meyer.py
 
+figures/sidm_sim/dsmc_scheme.pdf : figures/sidm_sim/plot_dsmc_scheme.py
+	cd figures/sidm_sim && $(PYTHON) plot_dsmc_scheme.py
+
 # --- LaTeX ---
 notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
 
@@ -165,4 +169,5 @@ clean :
 	rm -f *.aux *.log *.bbl *.blg *.out *.toc *.fls *.synctex.gz
 	rm -f figures/*.png figures/*.pdf $(FIGURES) $(addsuffix .pdf, $(NOTES))
 	rm -f figures/ic_sampling/*.png figures/cosmo_ic/*.png \
-	      figures/fft/*.png figures/restriction/*.png figures/music2/*.png
+	      figures/fft/*.png figures/restriction/*.png figures/music2/*.png \
+	      figures/sidm_sim/*.png
