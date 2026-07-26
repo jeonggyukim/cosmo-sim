@@ -1,4 +1,4 @@
-NOTES  = foundations ic_sampling cosmo_ic fft restriction_lpt music2_internals fdm dm_chemistry sidm qft sidm_sim
+NOTES  = cosmo_stat classical_mechanics ic_sampling cosmo_ic fft restriction_lpt music2_internals fdm dm_chemistry sidm qft sidm_sim
 PYTHON = conda run -n cosmo python
 
 # Absolute path to this Makefile's directory — pdflatex is always run from here
