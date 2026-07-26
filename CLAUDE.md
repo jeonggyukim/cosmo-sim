@@ -1,327 +1,236 @@
 # CLAUDE.md — cosmo-pipeline
 
-This repo contains scripts and configuration files for running cosmological simulations, primarily IC generation with MUSIC2 and N-body/hydro runs with SWIFT.
+Two things live here:
+
+1. **An IC-generation pipeline.** Cosmological initial conditions from MUSIC2 or
+   MUSIC2-monofonIC, validated against CLASS linear theory by measuring P(k),
+   ξ(r), and ψ(r). Code in `icpipe/`, `src/`, `tools/`.
+2. **A collection of LaTeX study notes** on cosmology and dark matter, in
+   `notes/`. Several have nothing to do with IC generation (SIDM, fuzzy dark
+   matter, field theory, dark-matter chemistry). Treat them as the second
+   purpose of the repo, not an appendix to the first.
 
 ## Directory Structure
 
 ```
 cosmo-pipeline/
-  src/                — C source files + Makefile (compute_xi.c, compute_xi_corrfunc.c)
-  bin/                — compiled C binaries (gitignored)
-  icpipe/             — installable Python library (ICField, LinearTheory, io,
-                        pipeline.py = end-to-end pipeline orchestration)
-  icpipe/cli/         — pipeline-step CLI modules exposed as console_scripts
-                        (run-pipeline, make-music-conf, make-monofonic-conf,
-                         make-rbins, compute-pk, compute-pv, plot-ic)
-  scripts/analysis/   — ad-hoc inspection / one-off CLIs
-                        (check_ic, plot_box_size_comparison, plot_dr_histogram)
-  tools/              — build/clean shell scripts + cluster sbatch templates
-                        (build-music.sh, build-monofonic.sh, build-corrfunc.sh,
-                         clean.sh, mpirun_restart.sbatch, monofonic.sbatch)
-  data/               — IC HDF5 files, CLASS P(k) outputs, rbins files, wnoise binaries, measured P/xi tables
-  plots/       — PNG/PDF figures (pk_*.png, xi_*.png, ...)
-  conf/        — MUSIC2 configs (CV_22_MUSIC*.conf) and log files
-  notes/       — LaTeX write-ups and supporting plot scripts
-  music_build/ — compiled MUSIC2 binary (gitignored)
+  src/            — compute_xi.c + Makefile (CIC-grid ξ/ψ estimator)
+  bin/            — compiled C binaries (gitignored)
+  icpipe/         — installable Python library (ICField, LinearTheory, io,
+                    pipeline.py = end-to-end orchestration)
+  icpipe/cli/     — console_scripts: run-pipeline, make-music-conf,
+                    make-monofonic-conf, compute-pk, compute-pv, plot-ic
+  scripts/analysis/ — ad-hoc CLIs (check_ic, plot_box_size_comparison,
+                    plot_dr_histogram)
+  tools/          — build-music.sh, build-monofonic.sh, clean.sh, sbatch templates
+  tests/          — bundled validation tests (matched-noise zoom)
+  notebooks/      — worked examples using icpipe
+  conf/           — MUSIC2 / monofonIC configs and CLASS ini files
+  data/           — IC HDF5, CLASS P(k), wnoise binaries, measured tables
+  plots/          — output figures
+  notes/          — LaTeX study notes (see below)
+  docs-claude/    — planning docs and the MUSIC2 reference
+  music_build/, monofonic_build/ — compiled IC-code binaries (gitignored)
 ```
 
-Note: `data/*.hdf5` and `data/*.bin` are gitignored (large binary files).
+`data/*.hdf5` and `data/*.bin` are gitignored.
 
 ## Python Environment
 
-Use `conda run -n cosmo python ...` for all Python scripts in this project.
+Use `conda run -n cosmo python ...` for all Python in this project.
 
-## Pipeline: Quick Start
-
-Two IC codes are supported. Use the Python driver `run-pipeline` with
-`--ic-code`.
+## Pipeline
 
 ```bash
-conda run -n cosmo run-pipeline                                   # MUSIC (default), N=256, L=1000, z=200
-conda run -n cosmo run-pipeline --ic-code monofonic              # MUSIC2-monofonIC (PLT, 3LPT)
+conda run -n cosmo run-pipeline                        # MUSIC (default), N=256, L=1000, z=200
+conda run -n cosmo run-pipeline --ic-code monofonic    # monofonIC (PLT, 3LPT)
 conda run -n cosmo run-pipeline --ngrid 256 --lbox 512 --zstart 200
-conda run -n cosmo run-pipeline --ic-code monofonic --lpt-order 3
-
-# Point the IC-code build at an existing source checkout (else sibling dir or clone)
 conda run -n cosmo run-pipeline --ic-source-dir /path/to/MUSIC2
 ```
 
-`--ic-code music` and `--ic-code monofonic` runs at the same N, z, L coexist:
-monofonIC outputs carry a `_mono` tag in every stem (e.g.
-`data/ics_swift_n256_z200_L1000_mono.hdf5`). Both codes write a CLASS ini during
-the run (MUSIC: `input_class_parameters.ini`; monofonIC:
-`<config-basename>_input_class_parameters.ini`, prefixed and written to the CWD);
-the driver normalizes it to `conf/input_class_parameters_{stem}.ini` and adapts
-it for the matter-P(k) CLASS run. The result `data/class_pk_z0_pk.dat` is
-cosmology-keyed and reused across runs (identical CV_22 cosmology). monofonIC
-links CLASS as a library and builds no standalone `class` binary, so a
-monofonic-only setup regenerates the theory with MUSIC's CLASS binary or a
-prebuilt `class_pk` (else the theory overlay is skipped).
+Steps, each skipped if its output already exists:
 
-**Thread count**: `run-pipeline` defaults `--nthreads` to all logical CPUs on the current machine (`os.cpu_count()`). Override with `--nthreads N` to match a cluster job allocation.
-
-Pipeline steps (each skipped if output already exists):
-1. Build MUSIC2 binary
-2. Build `compute_xi` (CIC-grid ξ/ψ estimator; needs only HDF5 + FFTW, no Corrfunc)
-3. Generate MUSIC2 config from template
-4. Run MUSIC2 → IC HDF5 + `input_class_parameters.ini`
+1. Build the IC code
+2. Build `compute_xi`
+3. Generate the IC config from a template
+4. Run the IC code → IC HDF5 + a CLASS ini
 5. Run CLASS → `data/class_pk_z{z}_pk.dat`
-6. Measure ξ(r) and ψ(r) on CIC grid (`compute_xi --vel`; works at any z)
-7. Measure P(k) with CIC+FFT (`compute_pk.py`)
-8. Plot diagnostics (`plot_ic.py`) → `plots/pk_{STEM}.png`
+6. Measure ξ(r) and ψ(r) (`compute_xi --vel`)
+7. Measure P(k) (`compute-pk`)
+8. Plot diagnostics (`plot-ic`) → `plots/pk_{stem}.png`
 
-The Corrfunc pair-counting ξ(r) tool (`compute_xi_corrfunc`) and its rbins file
-are no longer part of the pipeline; they are an optional low-z cross-check (see
-below).
+Remove outputs with `tools/clean.sh` (`--all` also removes IC HDF5 files).
 
-Remove outputs with `tools/clean.sh` (or `--all` to also remove IC HDF5 files).
+**Two IC codes coexist** at the same N, z, L: monofonIC outputs carry a `_mono`
+tag in every stem. Both write a CLASS ini during the run, which the driver
+normalizes to `conf/input_class_parameters_{stem}.ini` and adapts for the
+matter-P(k) run. `data/class_pk_z0_pk.dat` is cosmology-keyed and reused across
+runs. monofonIC links CLASS as a library and builds no standalone `class`
+binary, so a monofonic-only setup needs MUSIC's CLASS binary or a prebuilt
+`class_pk`, or the theory overlay is skipped.
+
+**Thread count**: `run-pipeline` defaults `--nthreads` to `os.cpu_count()`.
+Override to match a cluster allocation.
+
+**Cluster**: `--launcher "srun"` or `--mpi-ranks N` launch the IC step across
+ranks; the orchestrator itself stays single-process.
 
 ## Key Files
 
-### Pipeline scripts
-- `run-pipeline` (console script → `icpipe/cli/run_pipeline.py`, a thin CLI over
-  the `icpipe/pipeline.py` module) — unified driver; `--ic-code {music,monofonic}`
-  selects the IC generator. Front-end (build → config → run) branches on the code;
-  the downstream (CLASS P(k) → ξ(r) → CIC ξ/ψ → P(k) → plot) is code-agnostic (both
-  write SWIFT HDF5). Runs against `--root` (default: the CWD, which must be a repo
-  checkout). Cluster: `--launcher "srun"` or `--mpi-ranks N` launch the IC step
-  across ranks (the orchestrator itself stays single-process). Preferred entry point.
-- `tools/clean.sh` — remove generated outputs; `--all` also removes IC HDF5 files and wnoise binaries
-- `tools/build-music.sh` — builds legacy MUSIC from source (see below)
-- `tools/build-monofonic.sh` — builds MUSIC2-monofonIC from source into
-  `monofonic_build/` (binary `monofonic_build/monofonIC`) with `-DENABLE_PLT=ON`
-  (monofonIC defaults PLT OFF), `-DENABLE_MPI=ON` (required — monofonIC's source
-  does not compile without MPI; the binary still runs single-rank, no mpirun),
-  PANPHASIA off, CLASS on. macOS deps: Homebrew gcc, gsl, open-mpi, FFTW3-with-MPI,
-  parallel `hdf5-mpi` (or the conda env's serial HDF5). Source resolution:
-  `$MONOFONIC_SOURCE_DIR`, `../monofonIC`, else clone. CLASS is fetched
-  automatically by monofonIC's CMake (FetchContent).
+**Drivers and builds**
+- `run-pipeline` → `icpipe/cli/run_pipeline.py`, a thin CLI over
+  `icpipe/pipeline.py`. `--ic-code {music,monofonic}` branches the front-end
+  (build → config → run); everything downstream is code-agnostic since both
+  write SWIFT HDF5. Preferred entry point.
+- `tools/build-music.sh` — source resolution: `$MUSIC2_SOURCE_DIR`, `../MUSIC2`,
+  else clone. macOS sets `FC=gfortran-14` and uses Homebrew; non-Darwin loads
+  cluster modules. Skips if `music_build/MUSIC` exists.
+- `tools/build-monofonic.sh` — builds into `monofonic_build/` with
+  `-DENABLE_PLT=ON` (monofonIC defaults it off) and `-DENABLE_MPI=ON` (required
+  to compile; the binary still runs single-rank). Source resolution:
+  `$MONOFONIC_SOURCE_DIR`, `../monofonIC`, else clone. CLASS is fetched by its
+  CMake.
 
-### IC generation (MUSIC2 / CLASS)
-- `conf/CV_22_MUSIC_template.conf` — MUSIC template config with `{BOXLENGTH}`, `{ZSTART}`, `{LEVEL}`, `{FILENAME}` placeholders
-- `conf/CV_22_MUSIC.conf` — canonical MUSIC2 config: 25 Mpc/h box, 256³ (level 8), z=127, SWIFT output
-- `icpipe/cli/make_music_conf.py` (`make-music-conf`) — generates a MUSIC config from the template given N, z, L
-- `conf/CV_22_monofonIC_template.conf` — monofonIC template with `{GRIDRES}`, `{BOXLENGTH}`,
-  `{ZSTART}`, `{LPTORDER}`, `{DOFIXING}`, `{SEED}`, `{NTHREADS}`, `{FILENAME}` placeholders;
-  same CV_22 cosmology as the MUSIC template
-- `icpipe/cli/make_monofonic_conf.py` (`make-monofonic-conf`) — generates a monofonIC config;
-  flags `--lpt-order` (1/2/3, default 3), `--fixing` (DoFixing), `--seed`, `--nthreads`.
-  Output IC stem carries a `_mono` tag
-- `input_class_parameters.ini` — written by MUSIC2 to repo root during each run; adapted by the pipeline for CLASS P(k) (gitignored)
-- `data/class_pk_z{z}_pk.dat` — CLASS P(k) output at redshift z; generated by `run-pipeline` (gitignored)
-- `music_build/MUSIC` — compiled MUSIC2 binary (gitignored)
-- `music_build/_deps/class-build/class` — CLASS binary (built by MUSIC2's CMake)
+**Configs** — `conf/CV_22_MUSIC_template.conf` and
+`conf/CV_22_monofonIC_template.conf` share the CV_22 cosmology;
+`make-music-conf` and `make-monofonic-conf` fill in N, z, L and write to
+`conf/`.
 
-### Python package: `icpipe`
-Reusable analysis library for IC fields. Install once with `pip install -e .` from the project root.
-- `icpipe.ICField(hdf5, ngrid=..., interlace=True, h=..., load_velocities=True)` — main class. Loads positions/velocities, exposes cached CIC density/momentum/velocity Fourier fields, and `.power(field, ...)` for δ or velocity spectra.
-- `icpipe.LinearTheory.from_class(class_pk_dat, z=..., h=..., Omega_m=...)` — linear-theory `Pk`, `Pv`, `xi`, `psi` from a single CLASS table (units consistent across all four).
-- `icpipe.io.read_pk` / `read_pv` / `write_pk` / `write_pv` — ASCII I/O for the table formats below.
+**Python package `icpipe`** (`pip install -e .`)
+- `ICField(hdf5, ngrid=..., interlace=True, h=..., load_velocities=True)` —
+  loads positions/velocities, caches CIC density/momentum/velocity Fourier
+  fields, `.power(field, ...)` for δ or velocity spectra.
+- `LinearTheory.from_class(class_pk_dat, z=..., h=..., Omega_m=...)` — `Pk`,
+  `Pv`, `xi`, `psi` from one CLASS table, units consistent across all four.
+- `icpipe.io` — `read_pk`/`read_pv`/`write_pk`/`write_pv`, `read_wnoise`,
+  `read_swift_ics`, `print_swift_ics_summary`.
 - Tests: `pytest icpipe/tests/` (17 tests).
-- Examples: `notebooks/01_quickstart.ipynb` and `notebooks/02_box_size_sensitivity.ipynb`.
 
-### IC validation
-- `icpipe/cli/compute_pk.py` (`compute-pk`) — estimates P(k) from IC particles via mass assignment + FFT; saves `pk_*.txt` (no plotting). Thin wrapper around `icpipe.ICField.power('delta')`. `--assignment {ngp,cic,tsc,pcs}` selects the mass-assignment scheme (default pcs, most accurate near Nyquist).
-- `icpipe/cli/compute_pv.py` (`compute-pv`) — estimates the velocity power spectrum P_v(k) via CIC velocity assignment + FFT; saves `pv_*.txt` (k[h/Mpc], Pv_raw[(km/s)²(Mpc/h)³], Pv_nodeconv, sigma_Pv, nmodes). Uses `icpipe.ICField.power('velocity')`.
-- `scripts/analysis/plot_box_size_comparison.py` — 4-panel figure (P_δ, P_v, ξ, ψ across box sizes) showing density-vs-velocity sensitivity to L.
-- `icpipe/cli/plot_ic.py` (`plot-ic`) — IC diagnostics plotter: reads `pk_*.txt`, auto-detects `xi_*.txt` / `xi_cic_*.txt` / `vel_cic_*.txt`; overlays CLASS theory P(k), ξ(r), ψ(r); class-based (`ICPlotter`)
-- `icpipe/cli/make_rbins.py` (`make-rbins`) — generates a Corrfunc bin file (rmin=2×mean spacing, rmax=L/3) for the optional `compute_xi_corrfunc` pair-counting tool; not used by the default pipeline
-- `src/compute_xi.c` → `bin/compute_xi` — measures ξ(r) and ψ(r) via CIC density/velocity grid autocorrelation (C, needs only HDF5 + FFTW; compiled via `make -C src`, the default target); use `--vel` for velocity correlation. Works at any z.
-- `src/compute_xi_corrfunc.c` → `bin/compute_xi_corrfunc` — optional low-z estimator; measures ξ(r) from IC particles using Corrfunc pair counting (C, compiled via `make -C src corrfunc`, which builds Corrfunc on demand)
+**Measurement and plotting**
+- `compute-pk` — P(k) via mass assignment + FFT. `--assignment {ngp,cic,tsc,pcs}`,
+  default pcs (most accurate near Nyquist).
+- `compute-pv` — velocity power spectrum via CIC velocity assignment + FFT.
+- `src/compute_xi.c` → `bin/compute_xi` — ξ(r) and ψ(r) by CIC density/velocity
+  grid autocorrelation. Needs only HDF5 + FFTW; `make -C src`. `--vel` adds the
+  velocity correlation. Works at any z, because lattice ICs have sub-Poissonian
+  shot noise (σ_δ ≈ D(z)·σ₀ ≪ 1) — particle pair counting cannot do this, since
+  at z ≳ 10 the signal is ~10⁻⁶ and drowns in Poisson noise.
+- `plot-ic` — reads `pk_*.txt`, auto-detects `xi_cic_*.txt` and `vel_cic_*.txt`
+  alongside it, overlays CLASS theory P(k), ξ(r), ψ(r).
+- `scripts/analysis/check_ic.py` — verifies DC (k=0) modes of
+  displacement/velocity; prints mass resolution and recommended SWIFT softening
+  (ε = Δx/40…Δx/25). `--explain` for the preamble, `--hist PNG` for histograms.
 
-### Utilities
-- `icpipe.io.read_wnoise(path)` — reads `wnoise_NNNN.bin` white noise binary into a numpy array
-- `icpipe.io.read_swift_ics(path)` — returns `(header, parts)` from `ics_swift.hdf5` (all PartType groups + Header attrs); use `icpipe.io.print_swift_ics_summary(path)` for the pretty-printer
-- `scripts/analysis/check_ic.py` — verifies DC (k=0) modes of displacement/velocity (Lagrangian + Eulerian CIC); prints mass resolution and recommended SWIFT force-softening range (ε = Δx/40…Δx/25). Add `--explain` for the preamble; `--hist PNG` to plot v_x/v_y/v_z (km/s) and δ histograms.
+## Units and conventions
 
-## IC Validation
+- **SWIFT stores coordinates and BoxSize in Mpc, not Mpc/h.** All internal
+  calculations use Mpc; convert with `h = H0/100` for plots.
+- **Velocities are peculiar velocities in km/s.** MUSIC2's SWIFT plugin writes
+  `v_out = a·H(a)·f·Ψ_comoving = v_pec`. SWIFT converts to its internal
+  canonical momentum `u = a·v_pec` only at IC read time. So ψ(r) from
+  `compute_xi` is already in (km/s)² and compares directly to
+  ψ_theory(r) = [H(z)f(z)]²/(2π²) ∫ P(k) j₀(kr) dk — no a² rescaling.
+- **MUSIC2 writes `wnoise_NNNN.bin` and `input_class_parameters.ini` to the
+  CWD** (hardcoded). `run-pipeline` moves both; direct invocations need
+  `mv wnoise_*.bin data/ && mv input_class_parameters.ini conf/`.
+- **Shot noise limits the k-range**: measurable while P(k,z) > P_shot = V/N × h³.
+  At high z, P(k) is suppressed by D(z)² ≈ 1/(1+z)², so P_shot wins at lower k
+  for larger or coarser boxes. At z=45: 256³/L=500 is shot-noise dominated
+  throughout; 512³/L=500 gives k ≲ 0.2; 1024³/L=500 gives k ≲ 0.7; 256³/L=25
+  gives k ≲ 3 h/Mpc.
 
-SWIFT stores coordinates and BoxSize in **Mpc** (not Mpc/h). All bin files and P(k) calculations use Mpc internally; convert to Mpc/h for plots using h = H0/100.
+## Notes
 
-### Power spectrum (recommended)
-
-```bash
-# Full pipeline (handles CLASS P(k) automatically):
-run-pipeline --ngrid 256 --lbox 1024 --zstart 200
-
-# Manually — two steps:
-conda run -n cosmo compute-pk data/ics_swift_n256_z200_L1024.hdf5
-conda run -n cosmo plot-ic data/pk_n256_z200_L1024.txt \
-    --theory data/class_pk_z0_pk.dat --theory-zref 0
-
-# Overlay multiple box sizes:
-conda run -n cosmo plot-ic \
-    data/pk_n256_z200_L256.txt data/pk_n256_z200_L512.txt data/pk_n256_z200_L1024.txt \
-    --theory data/class_pk_z0_pk.dat --theory-zref 0
-```
-
-CLASS P(k) is generated by the pipeline from `input_class_parameters.ini` (written by MUSIC2 to repo root), with `output` changed to `mPk` and `z_pk` set to match the IC redshift. The output goes to `data/class_pk_z{z}_pk.dat`.
-
-`plot_ic.py` auto-detects `xi_{stem}.txt`, `xi_cic_{stem}.txt`, and `vel_cic_{stem}.txt` in the same directory as the pk file and overlays them. It also computes theory ψ(r) from CLASS P(k).
-
-**SWIFT velocity convention**: MUSIC2's SWIFT plugin writes the on-disk `Velocities` dataset in
-peculiar-velocity units (km/s) — `v_out = a · H(a) · f · Ψ_comoving = v_pec`. SWIFT itself converts
-to its internal canonical-momentum variable `u = a · v_pec` at IC read time (via the `Cosmology:`
-flags in the SWIFT params), but the HDF5 array is v_pec. So the raw ψ(r) from `compute_xi`
-is already in (km/s)² and can be compared directly to the linear theory prediction
-ψ_theory(r) = [H(z)f(z)]²/(2π²) ∫ P(k) j₀(kr) dk — no a² rescaling needed.
-
-**Shot noise and k-range**: The measurable k-range is limited by when P(k,z) > P_shot = V/N × h³.
-At high z, P(k) is suppressed by D(z)² ≈ 1/(1+z)², so P_shot wins at lower k for larger/coarser boxes:
-
-| Config | P_shot [(Mpc/h)³] | Valid k range (z=45) |
-|--------|-------------------|----------------------|
-| 256³, L=500 Mpc/h | 7.45 | shot-noise dominated |
-| 512³, L=500 Mpc/h | 0.93 | k ≲ 0.2 h/Mpc |
-| 1024³, L=500 Mpc/h | 0.12 | k ≲ 0.7 h/Mpc |
-| 256³, L=25 Mpc/h | 0.06 | k ≲ 3 h/Mpc |
-
-### Correlation function
-
-```bash
-# CIC grid ξ(r) and ψ(r) — the default estimator, works at any z:
-./bin/compute_xi --input data/ics_swift_n256_z200_L1024.hdf5 \
-    --nthreads 8 --output data/xi_cic_n256_z200_L1024.txt --vel
-
-# Optional Corrfunc pair counting (low z only); build with `make -C src corrfunc`:
-conda run -n cosmo make-rbins --hdf5 data/ics_swift_n256_z2_L172.hdf5
-./bin/compute_xi_corrfunc data/ics_swift_n256_z2_L172.hdf5 data/rbins_n256_z2_L172.txt 8 \
-    > data/xi_n256_z2_L172.txt
-```
-
-The default CIC grid estimator (`compute_xi`) can measure ξ(r) and ψ(r) at any z
-because it exploits sub-Poissonian lattice shot noise (σ_δ ≈ D(z)·σ₀ ≪ 1). At
-z ≳ 10 the cosmological signal in pair-counting ξ(r) is ~10⁻⁶ — undetectable —
-so the optional `compute_xi_corrfunc` pair counter is useful only at low z. See
-`docs-claude/CLAUDE_CORRFUNC.md` § "When ξ(r) is the wrong tool".
-
-**Rbins** (optional pair-counting tool only): SWIFT stores coordinates in **Mpc**
-(not Mpc/h); rbins must be in Mpc to match. Generate rbins for each IC run with
-`make_rbins.py` — do not reuse a file from a different box size or resolution. The
-script sets rmin = 2 × mean particle spacing (d = BoxSize/N) and rmax = L/3; using
-smaller rmin gives empty bins (ξ = −1) and using larger rmax suffers periodic
-boundary artifacts.
-
-## Notes / Documentation
-
-LaTeX write-ups live in `notes/` (full list in `notes/README.md`); the main ones:
+LaTeX write-ups in `notes/`; full list and reading order in `notes/README.md`.
 
 | File | Contents |
 |------|----------|
-| `cosmo_ic.tex` | Cosmological ICs: fluid equations, ZA, 2LPT, Zel'dovich pancake, IC generation, starting redshifts, P(k)/ξ(r)/ψ(r), one-loop P(k); §11 MUSIC2 / monofonIC implementation (refinement hierarchy, hybrid Poisson solve, 2LPT/3LPT source, PLT, Orszag 3/2 rule, back-scaling). Appendix A: Fourier conventions (CFT, Fourier series, DFT, Hermitian symmetry); see `fft.pdf` for implementation details. Appendix B: P(k) estimation (CIC window, deconvolution, shot noise, sub-Poissonian lattice ICs) |
-| `ic_sampling.tex` | IC sampling methods (Pen 1997, Sirko 2005, Hahn & Abel 2011): P-sampled vs ξ-sampled, box window truncation errors |
-| `fft.tex` | FFT reference: DFT, Cooley–Tukey radix-2, FFTW mixed-radix, multi-D row-column algorithm, MPI slab vs. pencil decomposition, FFTW API, fftMPI (Plimpton 2019) and Tigris `BlockFFT` usage |
-| `qft.tex` | Field-theory foundations for scalar dark matter, expanded from the `fdm.tex` QFT appendix: least action, free scalar field, Noether, canonical quantisation, coherent states / classical-wave limit, axion potential, curved-spacetime coupling. Reference PDFs (Tong, Coleman, Srednicki) in `~/Documents/ref_qft/` |
+| `cosmo_ic.tex` | Cosmological ICs: fluid equations, ZA, 2LPT, IC generation, starting redshifts, P(k)/ξ(r)/ψ(r), one-loop P(k); §11 MUSIC2 / monofonIC implementation. App. A Fourier conventions, App. B P(k) estimation |
+| `ic_sampling.tex` | P-sampled vs ξ-sampled ICs (Pen 1997, Sirko 2005, Hahn & Abel 2011); box window truncation |
+| `restriction_lpt.tex` | Restriction of δ and Ψ⁽¹⁾; why restricting the displacement potential is Poisson-inconsistent |
+| `music2_internals.tex` | File-and-line walkthrough of MUSIC2's δ construction and zoom noise hierarchy |
+| `fft.tex` | FFT reference: DFT, Cooley–Tukey, FFTW, MPI slab vs. pencil, Tigris `BlockFFT` |
+| `classical_mechanics.tex` | Legendre transform, Hamilton's equations, phase space, Poisson brackets, canonical transformations, Liouville's theorem, symplectic integrators. Supplies what `sidm.tex` App. A and `qft.tex` §3/§7 assume |
+| `sidm.tex` | Self-interacting dark matter: cross sections, cored vs core-collapsed halos, gravothermal fluid model. App. A is the full kinetic-theory chain (Liouville → BBGKY → Boltzmann → moments → Chapman–Enskog) |
+| `sidm_sim.tex` | Simulating SIDM: KiSS-SIDM DSMC, 3D generalization, proposed two-moment scheme, TIGRIS mapping |
+| `qft.tex`, `fdm.tex` | Field theory for scalar dark matter; fuzzy dark matter |
+| `cosmo_stat.tex` | Statistics of cosmological fields: ensembles, ergodicity, ξ(r), P(k), covariance, Gaussian random fields, generating and measuring them |
+| `dm_chemistry.tex` | Dark-matter chemistry |
 
-Planning docs (markdown, kept next to the notes):
-
-- `docs-claude/baryon_ic_plan.md` — roadmap for extending the pipeline from CDM-only to baryon+CDM ICs (theory write-up for `cosmo_ic.tex` §9, `--baryons` switch in `make_music_conf.py`, per-species P(k) diagnostics, two-species coherence test).
-- `docs-claude/swift_gpu_gravity_plan.md` — survey and plan for GPU porting of SWIFT gravity + SPH (KIAS project): architecture comparison of SWIFT / SWIFT-GPU fork (Nasar et al.) / cuGOTPM, feasibility analysis of short-range gravity P2P offload, step ordering.
-
-```bash
-cd notes
-make -C notes              # regenerate figures + compile all PDFs (opens automatically)
-make -C notes figures      # regenerate figures only
-make -C notes notes        # compile PDFs only (assumes figures exist)
-make -C notes clean        # remove figures, PDFs, and LaTeX aux files
-```
-
-Figures are generated from `plot_box_window.py`, `plot_tophat_window.py`, and `plot_pgrid.py`
-(the last requires `data/class_pk_z2_pk.dat`).
-
-## MUSIC2
-
-See [`docs-claude/CLAUDE_MUSIC2.md`](docs-claude/CLAUDE_MUSIC2.md) for full details on the MUSIC2 code structure, build
-instructions, IC generation pipeline, transfer function internals, and file formats.
-
-### Quick usage
+Planning docs in `docs-claude/`: `CLAUDE_MUSIC2.md` (MUSIC2 code structure,
+transfer functions, file formats), `baryon_ic_plan.md`, `swift_gpu_gravity_plan.md`
+(KIAS GPU-porting project), plus per-feature plans.
 
 ```bash
-# Build (first time or after source changes); MUSIC2 source auto-resolved
-tools/build-music.sh
-
-# Use a specific MUSIC2 source directory
-MUSIC2_SOURCE_DIR=/path/to/MUSIC2 tools/build-music.sh
-
-# Generate a config (canonical CV_22 run: N=256, z=127, L=25 Mpc/h)
-conda run -n cosmo make-music-conf -N 256 -z 127 -L 25
-
-# Run (config is written to conf/ by make_music_conf.py)
-./music_build/MUSIC conf/CV_22_MUSIC_n256_z127_L25.conf
-# Note: MUSIC2 always writes wnoise_NNNN.bin and input_class_parameters.ini
-# to the CWD (paths are hardcoded in source).  run-pipeline moves both
-# to data/ and conf/ automatically.  For direct MUSIC2 invocations, move
-# them manually: mv wnoise_*.bin data/  &&  mv input_class_parameters.ini conf/
+make -C notes              # regenerate figures + compile all PDFs
+make -C notes figures      # figures only
+make -C notes notes        # PDFs only
+make -C notes clean
 ```
 
-### tools/build-music.sh
+### Writing style for the notes
 
-MUSIC2 source directory resolution order:
-1. `$MUSIC2_SOURCE_DIR` environment variable (if set)
-2. `../MUSIC2` — sibling of the repo root (default)
-3. Clones from `https://github.com/cosmo-sims/MUSIC2` into `../MUSIC2` if not found
+These notes are for self-study. The reader is meeting the material for the first
+time, or returning to it after a long gap, and has nothing else in front of them.
+Write the way a good textbook written for international students reads:
 
-Uses `uname -s` to detect macOS vs cluster:
-- **macOS (Darwin):** sets `FC=gfortran-14`, relies on Homebrew-installed fftw, gsl, hdf5, open-mpi
-- **Cluster (non-Darwin):** loads modules via `module load gnu12 openmpi4 fftw hdf5 gsl cmake`
+- Say what you are about to do before doing it.
+- Justify each non-obvious step. If a line of algebra holds because mixed partial
+  derivatives commute, say so.
+- Define every term, symbol, and name where it first appears, including where a
+  name comes from when that makes it memorable.
+- State in words what a result means once it has been derived.
+- Give a concrete worked example where a general statement is hard to picture.
+- One idea per sentence; plain word order; no inverted or fronted clauses.
 
-Skips compilation if `music_build/MUSIC` already exists.
+Length is not a cost to this reader. Having to re-read a paragraph three times
+is. A rewrite that triples the length of a compressed passage is the correct
+trade. §A.1 and §A.2 of `notes/sidm.tex` are the reference for this style.
 
-### Matched-noise validation (MUSIC2-anisotropic-zoom fork)
+This is the opposite of the standard for a PR body, where the reader already
+knows the material and padding is a defect. Do not mix the two.
 
-For Hahn 2011 §4.3 matched-noise zoom-vs-unigrid validation in the
-`MUSIC2-anisotropic-zoom` fork, the working combination is:
+## Matched-noise validation (MUSIC2-anisotropic-zoom fork)
 
-- `[random]/kaveraging = no` — makes MUSIC's level-N white noise coord-deterministic (per-cell RNG keyed on `(seed[N], i, j, k)`), no Meyer-window FFT splice across array shapes.
-- `[setup]/density_boundary = yes` — Hahn 2011 §2.3.3 three-term density assembly at the coarse-fine boundary.
+For the Hahn 2011 §4.3 zoom-vs-unigrid check in the `MUSIC2-anisotropic-zoom`
+fork, the working combination is `[random]/kaveraging = no` (makes level-N white
+noise coordinate-deterministic, per-cell RNG keyed on `(seed[N], i, j, k)`, with
+no Meyer-window FFT splice across array shapes) and `[setup]/density_boundary =
+yes` (Hahn 2011 §2.3.3 three-term density assembly at the coarse-fine boundary).
+With both set and the same `seed[levelmax]` in the zoom and the unigrid
+(`levelmin=levelmax`) conf, the patch-interior δ(q) rms residual is 2.6×10⁻⁴σ at
+margin = 24 (commit `b90cfad`).
 
-With both options set and the same `seed[levelmax]` integer in the zoom and the
-single-level (`levelmin=levelmax`) unigrid conf, the patch-interior δ(q) rms
-residual is 2.6×10⁻⁴σ at margin = 24 (commit `b90cfad` in
-`MUSIC2-anisotropic-zoom`).  Do NOT try to pass the zoom's `wnoise_NNNN.bin` as
-`seed[N] = <path>` — MUSIC2's wnoise reader expects strict GRAFIC
-Fortran-unformatted records, not the plain dump format MUSIC2 writes by default
-(it will throw "corrupt random number file").
+Do not pass the zoom's `wnoise_NNNN.bin` as `seed[N] = <path>` — MUSIC2's wnoise
+reader expects strict GRAFIC Fortran-unformatted records, not the plain dump
+format MUSIC2 writes by default, and throws "corrupt random number file".
 
-Reproducible pipeline: `tests/validation/matched_noise/run.sh` — produces
-`~/Documents/music_validation/figures/matched_noise_<lpt>_l<lmin>-<lmax>_re<re>_b<box>_z<z>_s<sc>-<sf>.png`.
-Flags: `--use-2lpt | --use-1lpt`, `--seed-coarse N --seed-fine N`,
-`--boxlength MPC --zstart Z --levelmin L --levelmax L --ref-extent F`,
-`--padding N --accuracy F --smooth N`.  Recommended-quality knobs:
-`padding=16`, `accuracy=1e-9`, `smooth=5` — drops the m=16 interior Ψ
-residual by ~30% at the cost of a moderately larger doubled-patch FFT.
+Reproducible pipeline: `tests/validation/matched_noise/run.sh`. Recommended
+quality knobs: `padding=16`, `accuracy=1e-9`, `smooth=5` — drops the m=16
+interior Ψ residual by ~30% for a moderately larger doubled-patch FFT.
 
-**What the matched-noise test is — and is not.**  Zoom ICs exist to pump
-compute into a specific region (halo, filament, void, lensing target) at much
-higher resolution than the user could afford box-wide, while the rest of the
-box supplies the long-range tides at coarse resolution.  The user gets the
-correct large-scale environment for free, and the fine particles resolve the
-small-scale physics that motivated the run.
+Note what this test does and does not show. It asks whether a hypothetical
+full-box unigrid at the patch resolution would have produced identical noise —
+an internal consistency check on the zoom machinery. What a science run needs is
+statistical equivalence: the right P(k), local tidal tensor, and cosmic
+environment in the patch, so the halo that forms matches what a full-resolution
+box would give. A ~10⁻²σ displacement residual at the patch face, decaying
+inward, does not disturb that. Bit-equality matters for code-validation figures,
+not for science runs.
 
-The matched-noise test asks "would a hypothetical full-box unigrid at the
-patch resolution have produced bit-identical noise here?"  That is an
-internal consistency check on the zoom machinery — not the user-facing goal.
-What the user actually needs is **statistical equivalence**: ICs in the patch
-with the right P(k), the right local tidal tensor, and the right cosmic
-environment, so the halo that forms is physically the same one a
-(computationally impossible) full-resolution box would produce.
+## Subagent and skill guidance
 
-A residual of ~10⁻²σ on the displacement field — concentrated at the patch
-face, decaying inward with a smooth k-space spectrum — does not visibly
-disturb any of that.  The halo at the patch centre has the same mass,
-profile, and accretion history.  The bit-equality target only becomes
-load-bearing for code-validation paper figures, not for science runs.
-
-### Corrfunc (optional)
-
-Corrfunc is only needed for the optional low-z pair-counting estimator
-`compute_xi_corrfunc`; it is not a dependency of the default pipeline. Build the
-tool with `make -C src corrfunc`, which links against Corrfunc, resolved in order:
-1. `CORRFUNCDIR` make variable: `make -C src corrfunc CORRFUNCDIR=/path/to/Corrfunc`
-2. `../Corrfunc` — sibling of the repo root (default)
-3. Clones from `https://github.com/manodeep/Corrfunc` into `../Corrfunc` and builds if not found
+- Run `/prose-review` on any prose document before the user reads it. It routes
+  by audience: `prose-reviewer` for the LaTeX notes and docs (reports passages
+  too compressed to follow), `pr-body-reviewer` for PR bodies and issue text
+  (reports missing evidence and padding). Shared word and sentence rules:
+  `~/.claude/skills/prose-review/register.md`.
+- Use the **Explore** agent for searches across `icpipe/`, `src/`, `scripts/`.
 
 ## Maintenance Rules
 
-- **Always update `README.md` and `CLAUDE.md`** when making structural changes to the repo: new directories, moved or renamed files, added/removed tools. Update the directory layout block and any file references in the same commit as the structural change.
-- **Always compile LaTeX from the `notes/` directory.** Run `make` (or `make -C notes`) rather than invoking `pdflatex` directly from the repo root — otherwise `.log`, `.out`, `.aux` files land in the root instead of `notes/`. The notes/Makefile enforces this via `cd $(NOTESDIR) &&` before every pdflatex call.
+- **Update `README.md` and `CLAUDE.md`** in the same commit as any structural
+  change: new directories, moved or renamed files, added or removed tools.
+- **Compile LaTeX with `make -C notes`**, never `pdflatex` from the repo root —
+  otherwise `.log`, `.aux`, `.out` land in the root. The notes/Makefile enforces
+  this with `cd $(NOTESDIR) &&` before every pdflatex call.
