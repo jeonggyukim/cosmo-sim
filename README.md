@@ -78,10 +78,11 @@ and the MUSIC2 build).
 | `conf/`             | MUSIC2 config files (template + generated)               | —         |
 | `data/`             | CLASS outputs, measured P/ξ/ψ tables (gitignored)        | —         |
 | `plots/`            | output figures (gitignored)                              | —         |
-| `notes/`            | LaTeX write-ups                                          | (sources) |
+| `notes/`            | LaTeX write-ups on the theory behind the pipeline        | [`notes/README.md`](notes/README.md) |
 | `notes/figures/`    | plot scripts feeding the LaTeX figures                   | [`notes/figures/README.md`](notes/figures/README.md) |
 | `notebooks/`        | worked examples using `icpipe`                           | [`notebooks/README.md`](notebooks/README.md) |
 | `tests/validation/` | bundled validation tests (e.g. matched-noise zoom)       | (per-test) |
+| `docs-claude/`      | planning documents and the MUSIC2 reference              | —         |
 
 ## Run the full pipeline
 
