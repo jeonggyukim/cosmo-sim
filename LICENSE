@@ -1,0 +1,67 @@
+This repository contains two kinds of material, licensed separately.
+
+================================================================================
+1. SOFTWARE — MIT License
+================================================================================
+
+Applies to the code in this repository: icpipe/, src/, tools/, scripts/,
+notes/figures/ (the Python plotting scripts), notebooks/, and the
+configuration templates in conf/.
+
+Copyright (c) 2026 Jeong-Gyu Kim
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+2. NOTES — Creative Commons Attribution 4.0 International (CC BY 4.0)
+================================================================================
+
+Applies to the written notes: the LaTeX sources notes/*.tex, the PDFs built
+from them, and notes/README.md.
+
+Copyright (c) 2026 Jeong-Gyu Kim
+
+These notes are licensed under the Creative Commons Attribution 4.0
+International License. You are free to share and adapt the material for any
+purpose, including commercially, provided you give appropriate credit,
+link to the license, and indicate if changes were made.
+
+Full text: https://creativecommons.org/licenses/by/4.0/legalcode
+
+Please note the disclaimer carried on the first page of every note: these
+documents were compiled with the assistance of an AI language model and have
+not been reviewed by a human domain expert. They may contain errors in
+derivations, physical reasoning, or numerical estimates. Verify against the
+primary literature before relying on them.
+
+================================================================================
+3. THIRD-PARTY MATERIAL — not covered by either license above
+================================================================================
+
+notes/aasjournal.bst
+    BibTeX style file distributed by the American Astronomical Society,
+    maintained by Amy Hendrickson with contributions from AAS staff. It is
+    included unmodified because the file is required to build the notes and is
+    not present in TeX Live under this name. All rights remain with its
+    authors; it is redistributed here under the terms that accompany the
+    AASTeX distribution.
+
+This repository generates input for, and reads output from, several external
+codes — MUSIC2, MUSIC2-monofonIC, CLASS, and SWIFT. None of their source code
+is included here, and each carries its own license.
