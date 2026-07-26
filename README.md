@@ -174,21 +174,11 @@ figure-script layout.
 
 ## License
 
-Two licenses, because this repository holds two kinds of material:
+[MIT](LICENSE), for the code and the notes alike. If they are useful, a link
+back is appreciated.
 
-| Material | License |
-|----------|---------|
-| Code — `icpipe/`, `src/`, `tools/`, `scripts/`, `notebooks/`, `conf/`, and the plotting scripts under `notes/figures/` | [MIT](LICENSE) |
-| Notes — `notes/*.tex` and the PDFs built from them | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
-
-`notes/aasjournal.bst` is an American Astronomical Society BibTeX style,
-included unmodified because it is needed to build the notes and is not in
-TeX Live under that name. It is not covered by either license above.
-
-The external codes this pipeline drives — MUSIC2, MUSIC2-monofonIC, CLASS and
-SWIFT — are not included here and carry their own licenses.
-
-Every note carries a disclaimer on its first page: these documents were
-compiled with AI assistance and have not been reviewed by a human domain
-expert. Check derivations against the primary literature before relying on
-them.
+Much of this repository was drafted with AI assistance, and no note has been
+reviewed by a human domain expert; check derivations against the primary
+literature before relying on them. See [NOTICE](NOTICE) for what that means
+for authorship, for the one third-party file included here, and for the
+external codes this pipeline drives.
