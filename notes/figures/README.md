@@ -23,7 +23,7 @@ of which subdirectory `X.pdf` lives in.
 |-------------------|--------------------------------------------------------|------------------------|
 | `ic_sampling/`    | `plot_box_window`, `plot_tophat_window`, `plot_pgrid`  | `ic_sampling.tex`      |
 | `cosmo_ic/`       | `plot_pancake`                                         | `cosmo_ic.tex`         |
-| `fft/`            | `plot_dft_pairs`, `plot_cft_pairs`, `plot_grf_exponential`, `plot_complex_modes` | `fft.tex` |
+| `fft/`            | `plot_grf_exponential` | shared with `cosmo_stat.tex` |
 | `restriction/`    | `plot_restriction_{density,psi,deformation,phi,phi_spectral,cdm,cdm_truth}`, `plot_window_compare`, `plot_alias_diagram`, `plot_zoom_ic_{comparison,pk_full}` | `restriction_lpt.tex` |
 | `music2/`         | `plot_meyer`                                           | `music2_internals.tex` |
 | `figures/` (top)  | `plot_growth`, `plot_aliasing`                         | shared (used by 4 .tex each) |

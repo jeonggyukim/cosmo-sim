@@ -70,7 +70,7 @@ views of the same object connected by a \emph{Fourier transform}.  This
 note builds all of that from scratch, with full derivations and physical
 interpretation, assuming only calculus and a first course in
 probability.  Read it before \code{cosmo\_ic.tex} (cosmological initial
-conditions), \code{fft.tex} (the numerical Fourier transform), and
+conditions), the numerical Fourier transform, and
 \code{ic\_sampling.tex} (sampling methods).  Wherever a topic is
 developed more deeply in one of those notes, a pointer is given.
 \end{tcolorbox}
@@ -358,7 +358,7 @@ matrices have a magical diagonalisation that we will exploit.
 
 The power spectrum is the correlation function seen in Fourier space, so
 we need the Fourier transform first.  This section fixes conventions and
-states the few facts we use; the companion note \code{fft.tex} develops
+states the few facts we use; a standard reference on the discrete Fourier transform develops
 the numerical (discrete, fast) transform in full, and Appendix~A of
 \code{cosmo\_ic.tex} carries out the careful bookkeeping of factors that
 we here quote.
@@ -440,7 +440,7 @@ coefficients by hand you must impose Eq.~(\ref{eq:hermitian}), whereas if
 you build the field from real-space white noise it comes out
 automatically.  A handful of special modes (the $\bk = 0$ mode, and the
 Nyquist modes on an even grid) are their own conjugates and must
-therefore be purely real; \code{fft.tex} \S\ref{sec:fourier} works
+therefore be purely real; the discrete-transform literature works
 through those corner cases.
 
 %======================================================================
@@ -950,7 +950,7 @@ The Kronecker delta collapses the double sum to a single one; the result
 is independent of $\bk$, which is the Fourier-space statement of
 ``white''.  This $N_{\rm tot}$ is the factor that has to be divided out
 when converting a raw FFT amplitude into a physically normalised power
-spectrum; \code{fft.tex} Appendix and \code{cosmo\_ic.tex} Appendix~A
+spectrum; \code{cosmo\_ic.tex} Appendix~A
 track exactly where it goes.
 
 \subsection{Colouring: the recipe}
@@ -1067,7 +1067,7 @@ measured from the FFT of real white noise.
 \includegraphics[width=\textwidth]{grf_exponential.pdf}
 \caption{Per-mode statistics of the FFT of real white noise on a
 $64\times64$ grid, over $20{,}000$ realisations at one generic mode
-(reproduced from \code{fft.tex}).
+(reproduced from a companion note).
 \textbf{(a)} The complex amplitude $(X, Y) = (\mathrm{Re},\mathrm{Im})$
 is an isotropic 2D Gaussian --- random phase, Gaussian real and imaginary
 parts.
@@ -1270,7 +1270,7 @@ irreducible cosmic-variance floor.
         detail of \S\ref{sec:estimate}.
   \item \textbf{The numerical Fourier transform} --- the discrete and
         fast transforms, per-mode statistics, radix and parallel FFT
-        algorithms: \code{fft.tex}.  Figure~\ref{fig:grf-exp} is borrowed
+        algorithms: any standard FFT reference.  Figure~\ref{fig:grf-exp} is borrowed
         from there.
   \item \textbf{Sampling methods and finite-box biases} --- the
         $P$-sampled versus $\xi$-sampled distinction of

@@ -1,4 +1,4 @@
-NOTES  = cosmo_stat classical_mechanics ic_sampling cosmo_ic fft restriction_lpt music2_internals fdm dm_chemistry sidm qft
+NOTES  = cosmo_stat classical_mechanics ic_sampling cosmo_ic restriction_lpt music2_internals fdm dm_chemistry sidm qft
 PYTHON = conda run -n cosmo python
 
 # Absolute path to this Makefile's directory — pdflatex is always run from here
@@ -38,8 +38,7 @@ FIGURES = \
     figures/ic_sampling/pgrid_comparison.pdf \
     figures/cosmo_ic/pancake.pdf \
     figures/cosmo_ic/shotnoise_order.pdf \
-    figures/fft/dft_pairs.pdf figures/fft/cft_pairs.pdf \
-    figures/fft/grf_exponential.pdf figures/fft/complex_modes.pdf \
+    figures/fft/grf_exponential.pdf \
     figures/restriction/restriction_density.pdf \
     figures/restriction/restriction_psi.pdf \
     figures/restriction/restriction_deformation.pdf \
@@ -102,17 +101,8 @@ figures/cosmo_ic/pancake.pdf : figures/cosmo_ic/plot_pancake.py
 figures/cosmo_ic/shotnoise_order.pdf : figures/cosmo_ic/plot_shotnoise_order.py
 	cd figures/cosmo_ic && $(PYTHON) plot_shotnoise_order.py
 
-figures/fft/dft_pairs.pdf : figures/fft/plot_dft_pairs.py
-	cd figures/fft && $(PYTHON) plot_dft_pairs.py
-
-figures/fft/cft_pairs.pdf : figures/fft/plot_cft_pairs.py
-	cd figures/fft && $(PYTHON) plot_cft_pairs.py
-
 figures/fft/grf_exponential.pdf : figures/fft/plot_grf_exponential.py
 	cd figures/fft && $(PYTHON) plot_grf_exponential.py
-
-figures/fft/complex_modes.pdf : figures/fft/plot_complex_modes.py
-	cd figures/fft && $(PYTHON) plot_complex_modes.py
 
 figures/restriction/restriction_density.pdf : figures/restriction/plot_restriction_density.py
 	cd figures/restriction && $(PYTHON) plot_restriction_density.py

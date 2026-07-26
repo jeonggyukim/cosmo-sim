@@ -155,7 +155,6 @@ LaTeX write-ups under `notes/`:
 
 | note                     | contents |
 |--------------------------|----------|
-| `fft.tex`                | FFT reference: DFT, Cooley–Tukey, FFTW, multi-dim row–column, MPI slab vs. pencil, `BlockFFT` |
 | `cosmo_ic.tex`           | Cosmological ICs: fluid eqs, ZA, 2LPT, pancake, IC generation, P(k)/ξ(r)/ψ(r), MUSIC2 / monofonIC internals |
 | `ic_sampling.tex`        | Pen 1997 / Sirko 2005 / Hahn 2011 IC sampling methods; box window truncation |
 | `restriction_lpt.tex`    | Restriction of δ, Ψ⁽¹⁾, deformation, S⁽²⁾, φ⁽¹⁾; zoom-IC application |

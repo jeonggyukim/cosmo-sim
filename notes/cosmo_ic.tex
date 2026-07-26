@@ -4042,7 +4042,7 @@ that the linear power spectrum is negligible at $k_{\rm Ny}$.
 For the FFTW conventions used when implementing the forward and
 inverse transforms, the Cooley--Tukey radix-2 algorithm, the
 row--column multi-dimensional extension, and the slab/pencil MPI
-decompositions, see the companion notes \texttt{fft.pdf}.
+decompositions, see any standard reference on distributed FFTs.
 
 %======================================================================
 \section{Power Spectrum Estimation from $N$-body Simulations}
@@ -4122,7 +4122,7 @@ than NGP.
 FFTW computes the unnormalised DFT
 $\delta^{\rm FFTW}(\mathbf{n}_k) = \sum_{\mathbf{n}_r}
 \delta(\mathbf{n}_r)\,e^{-2\pi i\mathbf{n}_k\cdot\mathbf{n}_r/N}$
-(see \texttt{fft.pdf} for FFTW conventions).  In the notation of
+(FFTW's conventions are assumed here).  In the notation of
 Eq.~(\ref{eq:dft_fwd}), $\delta(\bk_p) = H^3\,\delta^{\rm FFTW}(\mathbf{n}_k)$,
 so the correctly normalized Fourier mode is
 %

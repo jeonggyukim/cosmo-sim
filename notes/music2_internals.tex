@@ -99,7 +99,7 @@ notes in this directory:
   \item \texttt{cosmo\_ic.tex} on cosmological perturbation theory,
         LPT, and the relation between $P(k)$, $\xi(r)$, and the
         velocity field.
-  \item \texttt{fft.tex} on the continuous-to-discrete Fourier transform
+  \item a standard reference on the continuous-to-discrete Fourier transform
         chain, the FFTW normalisation conventions, and aliasing.
         All $2\pi$ and $1/N$ factors here use the convention defined
         there: forward DFT unnormalised, inverse DFT carries the
@@ -242,7 +242,7 @@ identically.}
 
 This section fixes the units, indexing, and Fourier-transform
 normalisations used throughout the note.  The conventions are those
-of \texttt{fft.tex} and \texttt{cosmo\_ic.tex} unless otherwise stated.
+of \texttt{cosmo\_ic.tex} unless otherwise stated.
 They are listed here in one place because every Stage-A and Stage-B
 operation in \texttt{MUSIC2} relies on them.
 
@@ -337,7 +337,7 @@ binning of the displaced particles; it is \emph{not} what
 \subsection{Fourier conventions}
 \label{sec:notation-fft}
 
-We use the conventions of \texttt{fft.tex}~\S2.  The continuum
+We use the standard FFTW conventions.  The continuum
 Fourier transform pair is
 \begin{equation}
   \tilde f(\bk) = \int \mathrm{d}^3 \bx \, f(\bx)\,e^{-\mathrm{i}\bk\cdot\bx}\,,

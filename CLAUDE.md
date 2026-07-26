@@ -149,7 +149,6 @@ LaTeX write-ups in `notes/`; full list and reading order in `notes/README.md`.
 | `ic_sampling.tex` | P-sampled vs ξ-sampled ICs (Pen 1997, Sirko 2005, Hahn & Abel 2011); box window truncation |
 | `restriction_lpt.tex` | Restriction of δ and Ψ⁽¹⁾; why restricting the displacement potential is Poisson-inconsistent |
 | `music2_internals.tex` | File-and-line walkthrough of MUSIC2's δ construction and zoom noise hierarchy |
-| `fft.tex` | FFT reference: DFT, Cooley–Tukey, FFTW, MPI slab vs. pencil, Tigris `BlockFFT` |
 | `classical_mechanics.tex` | Legendre transform, Hamilton's equations, phase space, Poisson brackets, canonical transformations, Liouville's theorem, symplectic integrators. Supplies what `sidm.tex` App. A and `qft.tex` §3/§7 assume |
 | `sidm.tex` | Self-interacting dark matter: cross sections, cored vs core-collapsed halos, gravothermal fluid model. App. A is the full kinetic-theory chain (Liouville → BBGKY → Boltzmann → moments → Chapman–Enskog) |
 | `qft.tex`, `fdm.tex` | Field theory for scalar dark matter; fuzzy dark matter |

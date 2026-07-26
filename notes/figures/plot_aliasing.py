@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-plot_aliasing.py — Figure illustrating aliasing for fft.tex.
+plot_aliasing.py — Figure illustrating aliasing.
 
 N=8 equally spaced samples on [0,1], Delta=1/8.
 True signal:   5 cycles in [0,1]  →  k = 5·(2π/Δ), above k_Nyq = 4·(2π/Δ)

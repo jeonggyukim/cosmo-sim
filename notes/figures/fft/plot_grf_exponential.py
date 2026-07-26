@@ -1,5 +1,5 @@
 """
-Figure for fft.tex sec:per_mode_dist: why |n_hat(k)|^2 is exponentially
+Figure for cosmo_stat.tex: why |n_hat(k)|^2 is exponentially
 distributed.
 
 Three panels:
