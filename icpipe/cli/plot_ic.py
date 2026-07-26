@@ -4,7 +4,6 @@ plot_ic.py — Plot P(k) and ξ(r)/ψ(r) from saved pk_*.txt files.
 
 Reads the output of compute_pk.py (pk_*.txt) and, if present in the same
 directory, overlays:
-  - Corrfunc xi(r) from xi_<stem>.txt
   - CIC grid xi(r) from xi_cic_<stem>.txt
   - CIC velocity correlation ψ(r) from vel_cic_<stem>.txt
   - CLASS theory P(k), ξ(r), ψ(r)
@@ -29,7 +28,6 @@ Output units: k in h/Mpc, P(k) in (Mpc/h)³, r in Mpc/h, ψ(r) in (km/s)².
 import argparse
 import os
 import re
-import subprocess
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -67,7 +65,6 @@ class ICPlotter:
         self.theory_xi = None
         self.theory_psi_r = None   # theory ψ(r) [(km/s)²]
         self.theory_psi = None
-        self.corrfunc_xi = None   # dict: r_mid, xi, err, nseeds_used
         self.xi_cic_list = []     # list of dicts: r_mid, xi, stem (one per pk run)
         self.vel_cic_list = []     # list of dicts: r_mid, psi, stem (one per pk run)
 
@@ -307,49 +304,6 @@ class ICPlotter:
         psi *= (a * Hz_hMpc * fz) ** 2 / (2 * np.pi**2)
         return r, psi
 
-    def load_corrfunc_xi(self, xi_file, hdf5_file=None, rbins_file=None,
-                         repo_root=None, nseeds=8, nthreads=4):
-        """
-        Load a Corrfunc xi(r) file and optionally estimate subsampling variance
-        by re-running compute_xi with multiple random seeds.
-        """
-        cf = np.loadtxt(xi_file, comments='#')
-        r_low = cf[:, 1]
-        r_high = cf[:, 2]
-        xi_cf = cf[:, 3]
-        npairs = cf[:, 4]
-        r_mid = np.sqrt(r_low * r_high) * self.h   # Mpc → Mpc/h
-
-        xi_poisson_err = (1 + xi_cf) / np.sqrt(np.maximum(npairs, 1))
-        xi_subsample_std = np.zeros_like(xi_cf)
-        nseeds_used = 0
-
-        xi_binary = os.path.join(repo_root, 'bin', 'compute_xi') if repo_root else None
-        if (nseeds > 1
-                and xi_binary and os.path.exists(xi_binary)
-                and rbins_file and os.path.exists(rbins_file)
-                and hdf5_file and os.path.exists(hdf5_file)):
-            xi_runs = []
-            for seed in range(1, nseeds + 1):
-                result = subprocess.run(
-                    [xi_binary, hdf5_file, rbins_file, str(nthreads), '-s', str(seed)],
-                    capture_output=True, text=True
-                )
-                if result.returncode == 0:
-                    lines = [ln for ln in result.stdout.splitlines() if not ln.startswith('#')]
-                    vals = np.array([list(map(float, ln.split()))
-                                     for ln in lines if ln.strip()])
-                    if vals.ndim == 2 and vals.shape[0] == len(xi_cf):
-                        xi_runs.append(vals[:, 3])
-            if len(xi_runs) >= 2:
-                xi_subsample_std = np.std(xi_runs, axis=0, ddof=1)
-                nseeds_used = len(xi_runs)
-
-        xi_err = np.sqrt(xi_poisson_err**2 + xi_subsample_std**2)
-        self.corrfunc_xi = {
-            "r_mid": r_mid, "xi": xi_cf, "err": xi_err, "nseeds_used": nseeds_used
-        }
-
     def load_xi_cic(self, xi_cic_file, stem=None):
         """Load CIC density correlation ξ(r) from xi_cic_*.txt."""
         ngrid = None
@@ -386,13 +340,11 @@ class ICPlotter:
             "stem": stem or os.path.basename(vel_cic_file),
         })
 
-    def auto_load_xi(self, nseeds=8, nthreads=4,
-                     xi_cic_file=None, vel_cic_file=None):
+    def auto_load_xi(self, xi_cic_file=None, vel_cic_file=None):
         """
-        Auto-detect and load xi/vel_cic/Corrfunc files for all pk runs.
+        Auto-detect and load xi_cic/vel_cic files for all pk runs.
 
         Looks alongside each pk_*.txt for:
-          xi_<stem>.txt       → Corrfunc pair-counting ξ(r)  (single-run only)
           xi_cic_<stem>.txt   → CIC grid ξ(r)
           vel_cic_<stem>.txt  → CIC velocity ψ(r)
 
@@ -402,19 +354,6 @@ class ICPlotter:
         """
         if not self.pk_runs:
             return
-
-        repo_root = os.path.dirname(self.pk_runs[0]["data_dir"])
-
-        # Corrfunc xi (single-run only)
-        if len(self.pk_runs) == 1:
-            run = self.pk_runs[0]
-            xi_cf_path = os.path.join(run["data_dir"], f"xi_{run['stem']}.txt")
-            if os.path.exists(xi_cf_path):
-                hdf5_file = os.path.join(run["data_dir"], f"ics_swift_{run['stem']}.hdf5")
-                rbins_file = os.path.join(run["data_dir"], f"rbins_{run['stem']}.txt")
-                self.load_corrfunc_xi(
-                    xi_cf_path, hdf5_file, rbins_file, repo_root,
-                    nseeds=nseeds, nthreads=nthreads)
 
         # CIC xi and vel — load for every pk run
         for i, run in enumerate(self.pk_runs):
@@ -450,7 +389,7 @@ class ICPlotter:
 
         Top-left    : P(k), theory, shot noise level, k_fund, k_Ny
         Bottom-left : (P_meas/P_theory − 1) fractional residual
-        Top-right   : ξ(r) from theory / Corrfunc / CIC grid;
+        Top-right   : ξ(r) from theory / CIC grid;
                       ψ(r) on a twin y-axis if velocity data loaded
         Bottom-right: (ξ_meas/ξ_theory − 1) fractional residual
 
@@ -577,23 +516,6 @@ class ICPlotter:
             if neg.any():
                 ax2.plot(r[neg], -xi_th[neg], 'k--', lw=1.2, zorder=10)
 
-        # Corrfunc ξ(r) — |ξ| with solid (ξ>0) / dashed (ξ<0)
-        if self.corrfunc_xi is not None:
-            d = self.corrfunc_xi
-            label = 'Corrfunc'
-            if d["nseeds_used"] > 0:
-                label += f' (±{d["nseeds_used"]}-seed)'
-            r_c, xi_c, err_c = d["r_mid"], d["xi"], d["err"]
-            pos = xi_c > 0
-            neg = xi_c < 0
-            ax2.errorbar(r_c[pos], xi_c[pos], yerr=err_c[pos],
-                         fmt='s-', ms=4, lw=1.2, elinewidth=0.8, capsize=2,
-                         color='C1', mfc='none', label=label)
-            if neg.any():
-                ax2.errorbar(r_c[neg], -xi_c[neg], yerr=err_c[neg],
-                             fmt='s--', ms=4, lw=1.2, elinewidth=0.8, capsize=2,
-                             color='C1', mfc='none')
-
         # CIC ξ(r) — |ξ| with solid (ξ>0) / dashed (ξ<0) segments
         for j, d in enumerate(self.xi_cic_list):
             color = f'C{j}'
@@ -608,27 +530,20 @@ class ICPlotter:
                          color=color, alpha=0.5)
 
         # Reference lines: L/2 (torus Nyquist for CIC-grid ξ) and Δx per run.
-        # L/3 is drawn only when Corrfunc pair-count data is present (pair
-        # counts beyond L/3 are biased by periodic images; the CIC FFT path
-        # is exact on the torus up to L/2).
+        # The CIC FFT path is exact on the torus up to L/2.
         if self.pk_runs:
             import matplotlib.lines as mlines
-            show_L3 = self.corrfunc_xi is not None
             for i, run in enumerate(self.pk_runs):
                 L = run["boxsize_mpch"]
                 n = run["npart_side"]
                 if L:
                     ax2.axvline(L / 2, color=f'C{i}', ls='--', lw=0.9)
-                    if show_L3:
-                        ax2.axvline(L / 3, color=f'C{i}', ls='-.', lw=0.9)
                 if L and n:
                     ax2.axvline(L / n, color=f'C{i}', ls=':', lw=0.9)
-            handles = [mlines.Line2D([], [], color='gray', ls='--', lw=1.0, label=r'$L/2$')]
-            if show_L3:
-                handles.append(
-                    mlines.Line2D([], [], color='gray', ls='-.', lw=1.0, label=r'$L/3$'))
-            handles.append(
-                mlines.Line2D([], [], color='gray', ls=':', lw=1.0, label=r'$\Delta x$'))
+            handles = [
+                mlines.Line2D([], [], color='gray', ls='--', lw=1.0, label=r'$L/2$'),
+                mlines.Line2D([], [], color='gray', ls=':', lw=1.0, label=r'$\Delta x$'),
+            ]
             ax2.add_artist(ax2.legend(
                 handles=handles, fontsize='medium', loc='upper right'))
 
@@ -646,8 +561,6 @@ class ICPlotter:
         # y-range: driven by measured |ξ|; avoids the log-axis stretching down
         # to theory zero-crossings where |ξ| dips many decades below the signal.
         all_xi = [np.abs(d["xi"]) for d in self.xi_cic_list]
-        if self.corrfunc_xi is not None:
-            all_xi.append(np.abs(self.corrfunc_xi["xi"]))
         if all_xi:
             xi_abs = np.concatenate(all_xi)
             xi_abs = xi_abs[np.isfinite(xi_abs) & (xi_abs > 0)]
@@ -786,22 +699,11 @@ class ICPlotter:
                 ax.semilogx(r[valid], d["xi"][valid] / xi_th[valid] - 1.0,
                             'o-', ms=3, lw=1.2, color=f'C{j}', alpha=0.5)
 
-            if self.corrfunc_xi is not None:
-                d = self.corrfunc_xi
-                r = d["r_mid"]
-                xi_th = np.interp(r, self.theory_xi_r, self.theory_xi)
-                valid = xi_th != 0
-                ax.semilogx(r[valid], d["xi"][valid] / xi_th[valid] - 1.0,
-                            's-', ms=3, lw=1.2, color='C1', mfc='none', alpha=0.5)
-
-        # Repeat L/3 and Δx reference lines for each run
-        show_L3 = self.corrfunc_xi is not None
+        # Repeat L/2 and Δx reference lines for each run
         for i, run in enumerate(self.pk_runs):
             L, n = run["boxsize_mpch"], run["npart_side"]
             if L:
                 ax.axvline(L / 2, color=f'C{i}', ls='--', lw=0.9)
-                if show_L3:
-                    ax.axvline(L / 3, color=f'C{i}', ls='-.', lw=0.9)
             if L and n:
                 ax.axvline(L / n, color=f'C{i}', ls=':', lw=0.9)
 
@@ -842,8 +744,6 @@ def main():
                         help="Explicit xi_cic_*.txt (otherwise auto-detected)")
     parser.add_argument("--vel-cic", default=None, metavar="FILE",
                         help="Explicit vel_cic_*.txt (otherwise auto-detected)")
-    parser.add_argument("--nseeds",  type=int, default=8,
-                        help="Seeds for Corrfunc subsampling variance (default 8; 1=skip)")
     parser.add_argument("--show-nodeconv", action="store_true",
                         help="Also plot the un-deconvolved P(k) curve")
     parser.add_argument("--hankel",  action="store_true",
@@ -869,7 +769,6 @@ def main():
         plotter.load_theory(args.theory, z_ref=args.theory_zref)
 
     plotter.auto_load_xi(
-        nseeds=args.nseeds,
         xi_cic_file=args.xi_cic,
         vel_cic_file=args.vel_cic,
     )

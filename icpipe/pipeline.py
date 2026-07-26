@@ -5,7 +5,7 @@ Orchestrates two IC codes, selected by ``RunConfig.ic_code``:
   * ``monofonic`` — MUSIC2-monofonIC (unigrid; adds PLT, 3LPT)
 
 The IC front-end (build, config, run) branches on the code; every downstream
-step (CLASS P(k), rbins, xi, psi, P(k), plotting) is code-agnostic because both
+step (CLASS P(k), xi, psi, P(k), plotting) is code-agnostic because both
 codes write the same SWIFT HDF5 output.
 
 Steps (each skipped if its output already exists):

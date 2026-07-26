@@ -33,7 +33,6 @@ After install, the following commands appear on `$PATH`:
 | command           | module                       | one-liner |
 |-------------------|------------------------------|-----------|
 | `make-music-conf` | `icpipe.cli.make_music_conf` | expand the MUSIC2 config template for a given (N, z, L) |
-| `make-rbins`      | `icpipe.cli.make_rbins`      | write a Corrfunc bin file (rmin = 2 × mean spacing, rmax = L/3) |
 | `compute-pk`      | `icpipe.cli.compute_pk`      | estimate P(k) from IC particles (CIC + FFT) → `pk_*.txt` |
 | `compute-pv`      | `icpipe.cli.compute_pv`      | estimate the velocity power spectrum P_v(k) → `pv_*.txt` |
 | `plot-ic`         | `icpipe.cli.plot_ic`         | overlay measured + CLASS theory on `pk_*`, `xi_*`, `vel_cic_*` |

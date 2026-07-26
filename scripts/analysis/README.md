@@ -3,7 +3,7 @@
 CLIs that are **not** part of `run-pipeline`.  Each one is run by
 hand to inspect or compare ICs already produced by the pipeline.
 
-For the pipeline-step CLIs (`compute-pk`, `make-rbins`, ...) see
+For the pipeline-step CLIs (`compute-pk`, `compute-pv`, ...) see
 `icpipe/README.md`.
 
 ## Tools

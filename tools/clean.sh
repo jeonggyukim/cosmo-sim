@@ -2,7 +2,7 @@
 # clean.sh — Remove generated files from the pipeline.
 #
 # Usage:
-#   ./clean.sh           # remove fast-to-regenerate outputs (plots, tables, rbins, configs)
+#   ./clean.sh           # remove fast-to-regenerate outputs (plots, tables, configs)
 #   ./clean.sh --all     # also remove ICs, CLASS P(k), wnoise (slow to regenerate)
 
 set -euo pipefail
@@ -15,7 +15,7 @@ fi
 log() { echo "==> $*"; }
 
 # ---------------------------------------------------------------------------
-# Always remove: plots, measured P(k)/xi tables, rbins, generated configs
+# Always remove: plots, measured P(k)/xi tables, generated configs
 # ---------------------------------------------------------------------------
 log "Removing plots..."
 rm -f plots/*.png plots/*.pdf
@@ -23,16 +23,13 @@ rm -f plots/*.png plots/*.pdf
 log "Removing measured P(k) and xi tables..."
 rm -f data/pk_*.txt data/xi_*.txt data/vel_cic_*.txt
 
-log "Removing rbins files..."
-rm -f data/rbins*.txt
-
 log "Removing generated MUSIC2 configs and CLASS ini files..."
 rm -f conf/CV_22_MUSIC_n*.conf
 rm -f conf/CV_22_monofonIC_n*.conf
 rm -f conf/input_class_parameters_*.ini
 
-log "Removing compiled compute_xi binaries..."
-rm -f bin/compute_xi bin/compute_xi_corrfunc
+log "Removing compiled compute_xi binary..."
+rm -f bin/compute_xi
 
 log "Removing CLASS P(k) outputs..."
 rm -f data/class_pk_z*.dat

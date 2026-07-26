@@ -10,14 +10,6 @@ SRC_DIR  := $(dir $(lastword $(MAKEFILE_LIST)))
 REPO_DIR := $(SRC_DIR)..
 BIN_DIR  := $(REPO_DIR)/bin
 
-# --- Corrfunc paths ---
-# Default: ../Corrfunc (sibling of the repo root). Override with:
-#   make CORRFUNCDIR=/path/to/Corrfunc
-# or via run-pipeline --corrfunc-dir /path/to/Corrfunc
-CORRFUNCDIR ?= $(realpath $(REPO_DIR)/../Corrfunc)
-CORRFUNC_INC := $(CORRFUNCDIR)/theory/xi $(CORRFUNCDIR)/utils
-CORRFUNC_LIB := $(CORRFUNCDIR)/theory/xi/libcountpairs_xi.a
-
 # --- Compiler and HDF5 paths (platform-specific) ---
 ifeq ($(UNAME_S), Darwin)
     CC       := clang
@@ -62,17 +54,9 @@ else
     OMP_LDFLAGS := -fopenmp
 endif
 
-CORRFUNC_VERSION := $(shell cd $(CORRFUNCDIR) && git describe --tags --abbrev=0 2>/dev/null || echo "2.5.3")
-
-CFLAGS := -O3 -std=c99 -Wall -Wno-unused-local-typedef $(OMP_CFLAGS) \
-          $(addprefix -I, $(CORRFUNC_INC)) -I$(HDF5_INC) \
-          -DVERSION=\"$(CORRFUNC_VERSION)\"
-
-LDFLAGS := -L$(HDF5_LIB) -lhdf5 -lm $(OMP_LDFLAGS)
-
 # --- Targets ---
-# Default build is the CIC-grid FFT-autocorrelation xi(r)/psi(r) estimator,
-# which works at any redshift and needs only HDF5 + FFTW (no Corrfunc).
+# compute_xi is the CIC-grid FFT-autocorrelation xi(r)/psi(r) estimator.
+# It works at any redshift and needs only HDF5 and FFTW.
 all: $(BIN_DIR)/compute_xi
 
 $(BIN_DIR):
@@ -83,20 +67,7 @@ $(BIN_DIR)/compute_xi: $(SRC_DIR)compute_xi.c | $(BIN_DIR)
 	      -L$(HDF5_LIB) -L$(FFTW_LIB) -lhdf5 -lfftw3 -lm $(OMP_LDFLAGS) \
 	      $< -o $@
 
-# Optional: the Corrfunc pair-counting xi(r) estimator (low z only).
-#   make -C src corrfunc            # build (clones + builds Corrfunc if missing)
-#   make -C src corrfunc CORRFUNCDIR=/path/to/Corrfunc
-corrfunc: $(BIN_DIR)/compute_xi_corrfunc
-
-$(CORRFUNC_LIB):
-	@echo "==> Corrfunc not found — cloning from GitHub..."
-	git clone --depth=1 https://github.com/manodeep/Corrfunc.git $(CORRFUNCDIR)
-	$(MAKE) -C $(CORRFUNCDIR) CC=$(CC) theory
-
-$(BIN_DIR)/compute_xi_corrfunc: $(SRC_DIR)compute_xi_corrfunc.c $(CORRFUNC_LIB) | $(BIN_DIR)
-	$(CC) $(CFLAGS) $< $(CORRFUNC_LIB) $(LDFLAGS) -o $@
-
 clean:
-	rm -f $(BIN_DIR)/compute_xi $(BIN_DIR)/compute_xi_corrfunc
+	rm -f $(BIN_DIR)/compute_xi
 
-.PHONY: all clean corrfunc
+.PHONY: all clean

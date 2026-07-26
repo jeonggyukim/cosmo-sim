@@ -4,21 +4,18 @@ Generate cosmological initial conditions with **MUSIC2** and validate them.
 The pipeline measures the density power spectrum **P(k)** (CIC + FFT), the
 two-point correlation **ξ(r)** (CIC-grid FFT autocorrelation), and the velocity
 correlation **ψ(r)**, then compares them against linear theory from **CLASS**.
-An optional low-z Corrfunc pair-counting ξ(r) estimator is available as a
-cross-check but is not part of the default run.
 
 The reusable analysis code is the installable Python package **`icpipe`**
 (`ICField`, `LinearTheory`, `io`, and the pipeline-step CLIs). The end-to-end
-run is driven by `run-pipeline`; the default C tool `compute_xi` measures ξ(r)
-and ψ(r) on a CIC grid (any z, needs only HDF5 + FFTW), while the optional
-`compute_xi_corrfunc` does low-z particle pair counting.
+run is driven by `run-pipeline`; the C tool `compute_xi` measures ξ(r) and
+ψ(r) on a CIC grid at any z, and needs only HDF5 and FFTW.
 
 ## Install
 
 `icpipe` is a standard `pyproject.toml` package. Pick one of the three options
 below — all use an editable install (`-e`) so edits to `icpipe/` take effect
 without reinstalling. Installing also wires the pipeline-step CLIs onto `$PATH`:
-`make-music-conf`, `make-rbins`, `compute-pk`, `compute-pv`, `plot-ic`.
+`make-music-conf`, `compute-pk`, `compute-pv`, `plot-ic`.
 
 **Option 1 — conda + pip** (recommended; full analysis environment)
 ```bash
@@ -42,7 +39,7 @@ uv pip install -e ".[plot]"         # numpy/scipy/h5py + matplotlib/mcfit from P
 ```
 
 `--no-deps` on the conda paths keeps pip/uv from pulling PyPI wheels over the
-conda-forge binaries (`corrfunc`, `h5py`, …); there `env.yml` is the dependency
+conda-forge binaries (`h5py`, `numpy`, …); there `env.yml` is the dependency
 source. The uv-only path resolves every dependency from PyPI via `pyproject.toml`
 (add the `test` extra — `".[plot,test]"` — to run the test suite).
 
@@ -53,10 +50,10 @@ pytest icpipe/tests/                # 17 tests (needs the `test` extra)
 ```
 
 Note: the uv-only environment has the `icpipe` library but not the conda-only
-analysis extras (`corrfunc` Python bindings, `astropy`, `jupyter`) or the
-compiled C tools. The `bin/compute_xi*` binaries and the MUSIC2 / CLASS builds
-are separate and need system libraries — see `tools/build-music.sh`,
-`tools/build-corrfunc.sh`, and [`tools/README.md`](tools/README.md).
+analysis extras (`astropy`, `jupyter`) or the compiled C tools. The
+`bin/compute_xi` binary and the MUSIC2 / CLASS builds are separate and need
+system libraries — see `tools/build-music.sh` and
+[`tools/README.md`](tools/README.md).
 
 ## Uninstall
 
@@ -72,14 +69,14 @@ and the MUSIC2 build).
 
 | dir                 | purpose                                                  | sub-README |
 |---------------------|----------------------------------------------------------|-----------|
-| `src/`              | C sources + Makefile (`compute_xi`, `compute_xi_corrfunc`) | —       |
+| `src/`              | C source + Makefile (`compute_xi`)                       | [`src/README.md`](src/README.md) |
 | `bin/`              | compiled C binaries (gitignored)                         | —         |
 | `icpipe/`           | Python library: `ICField`, `LinearTheory`, `io`          | [`icpipe/README.md`](icpipe/README.md) |
 | `icpipe/cli/`       | pipeline-step console scripts                            | (in `icpipe/README.md`) |
 | `scripts/analysis/` | ad-hoc inspection CLIs (not in `run-pipeline`)        | [`scripts/analysis/README.md`](scripts/analysis/README.md) |
 | `tools/`            | build / clean / cluster sbatch scripts                   | [`tools/README.md`](tools/README.md) |
 | `conf/`             | MUSIC2 config files (template + generated)               | —         |
-| `data/`             | CLASS outputs, rbins, measured P/ξ/ψ tables (gitignored) | —         |
+| `data/`             | CLASS outputs, measured P/ξ/ψ tables (gitignored)        | —         |
 | `plots/`            | output figures (gitignored)                              | —         |
 | `notes/`            | LaTeX write-ups                                          | (sources) |
 | `notes/figures/`    | plot scripts feeding the LaTeX figures                   | [`notes/figures/README.md`](notes/figures/README.md) |
@@ -108,17 +105,13 @@ tool for nested zoom ICs. The downstream validation is identical for both codes.
 Each step is skipped if its output already exists:
 
 1. Build MUSIC2 (clones source if absent — `tools/build-music.sh`)
-2. Build the `compute_xi` C binary (CIC-grid ξ/ψ; needs only HDF5 + FFTW, no Corrfunc) → `bin/`
+2. Build the `compute_xi` C binary (CIC-grid ξ/ψ; needs only HDF5 + FFTW) → `bin/`
 3. Generate MUSIC2 config from `conf/CV_22_MUSIC_template.conf`
 4. Run MUSIC2 → `data/ics_swift_*.hdf5` + `conf/input_class_parameters_*.ini`
 5. Run CLASS → `data/class_pk_z{z}_pk.dat`
 6. Measure ξ(r) and ψ(r) on a CIC grid (`bin/compute_xi --vel`; works at any z)
 7. Measure P(k) with CIC + FFT (`compute-pk`)
 8. Plot diagnostics (`plot-ic`) → `plots/pk_{stem}.png`
-
-The optional Corrfunc pair-counting ξ(r) estimator (`compute_xi_corrfunc`, low z
-only) and its rbins file are no longer pipeline steps; see below to build and run
-them by hand.
 
 Clean up with `tools/clean.sh` (or `tools/clean.sh --all` to also wipe ICs / wnoise / MUSIC2 build).
 
@@ -139,8 +132,8 @@ plot-ic data/pk_n256_z200_L1024.txt \
     --theory data/class_pk_z0_pk.dat --theory-zref 0           # plots/pk_*.png
 ```
 
-`plot-ic` auto-detects `xi_*.txt`, `xi_cic_*.txt`, and `vel_cic_*.txt`
-alongside the input `pk_*.txt` and overlays them.  Pass several
+`plot-ic` auto-detects `xi_cic_*.txt` and `vel_cic_*.txt` alongside the
+input `pk_*.txt` and overlays them.  Pass several
 `pk_*.txt` files to overlay multiple box sizes.
 
 ## Units & conventions (gotchas)
@@ -155,9 +148,6 @@ alongside the input `pk_*.txt` and overlays them.  Pass several
 - MUSIC2 always writes `wnoise_NNNN.bin` and `input_class_parameters.ini`
   to the CWD; `run-pipeline` moves them into `data/` and `conf/`
   automatically.
-- Always generate rbins per-IC with `make-rbins` (rmin = 2 × mean
-  spacing, rmax = L/3).  Reusing rbins from a different box size or
-  resolution silently produces empty bins or periodic-boundary artifacts.
 
 ## Notes
 

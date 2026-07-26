@@ -42,21 +42,22 @@
  *     equals the inverse Fourier transform of |δ(k)|², i.e. the result is
  *     mathematically equivalent to FFT P(k) → Hankel transform → ξ(r).
  *
- * ─── Comparison with compute_xi_corrfunc.c (Corrfunc pair counting) ───────────────
+ * ─── Why a density grid rather than particle pair counting ───────────────
  *
- *  compute_xi_corrfunc.c counts actual particle–particle pairs, subsampling to Nsub.
- *  Its shot noise is σ(ξ) ≈ 1/√DD_pairs, dominated by Poisson counting noise.
+ *  A pair-counting estimator counts actual particle–particle pairs, so its
+ *  shot noise is σ(ξ) ≈ 1/√DD_pairs, dominated by Poisson counting noise.
  *
- *  compute_xi.c works on the CIC density field.  The noise is
+ *  This code works on the CIC density field instead.  Its noise is
  *  σ(ξ_CIC) ≈ σ_δ² / √N_cells, where σ_δ is the rms overdensity on the grid.
  *  For a perturbed lattice at high z the particles are nearly uniformly
- *  distributed, σ_δ ≈ D(z)·σ_δ(z=0) ≪ 1, so σ(ξ_CIC) ≪ σ(ξ_Corrfunc).
- *  This is why the CIC estimator can detect ξ at high z where Corrfunc fails.
+ *  distributed, σ_δ ≈ D(z)·σ_δ(z=0) ≪ 1, so σ(ξ_CIC) ≪ σ(ξ_pairs).
+ *  That is why the CIC estimator can detect ξ at high z, where pair
+ *  counting cannot: the lattice shot noise is sub-Poissonian.
  *
  *  Schematically:
  *    | Estimator       | Uses particles | Shot noise     | Works at high z |
- *    | Corrfunc        | sampled pairs  | Poisson ~1/√DD | No              |
- *    | compute_xi  | density grid   | σ_δ²/√N_cells  | Yes             |
+ *    | pair counting   | sampled pairs  | Poisson ~1/√DD | No              |
+ *    | compute_xi      | density grid   | σ_δ²/√N_cells  | Yes             |
  *
  * ─── SWIFT IC file conventions ────────────────────────────────────────────
  *
@@ -1579,9 +1580,7 @@ int main(int argc, char **argv)
     /* ── Step 8: write output ─────────────────────────────────────────────
      *
      * Output columns: r_avg  r_low  r_high  xi(r)  DD  DR  RR
-     * Columns 0-3 match the format written by compute_xi_corrfunc.c so that
-     * compute_pk.py can read both files identically (cols 1-3 for r_low,
-     * r_high, xi) and overlay them on the same panel.
+     * Columns 1-3 (r_low, r_high, xi) are what plot_ic.py reads.
      * DD/DR/RR are written for diagnostics; they are not needed for plotting.
      */
     const char *mode_str =

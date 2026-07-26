@@ -1,9 +1,9 @@
 # `tools/` — build & ops scripts
 
-Setup, build, cleanup, and SLURM templates.  These are NOT part of
-`run-pipeline` invocation surface (well — `build-music.sh` and
-`build-corrfunc.sh` ARE invoked by `run-pipeline` as needed; see
-each script's header for the exact resolution order).
+Setup, build, cleanup, and SLURM templates.  Most are not part of the
+`run-pipeline` command line, but `build-music.sh` is invoked by
+`run-pipeline` as needed; see each script's header for the exact
+resolution order.
 
 ## Scripts
 
@@ -28,25 +28,12 @@ tools/build-music.sh                            # auto-detect or clone
 MUSIC2_SOURCE_DIR=/path/to/MUSIC2 tools/build-music.sh
 ```
 
-### `build-corrfunc.sh`
-
-Clone + build Corrfunc.  Default location:
-
-- **macOS, user jgkim**: `$HOME/Dropbox/Projects/Corrfunc`
-- **other**: `$HOME/Corrfunc`
-
-Skips compilation if the static library is already present.
-
-```bash
-tools/build-corrfunc.sh
-```
-
 ### `clean.sh`
 
 Remove generated pipeline outputs.  Two modes:
 
 ```bash
-tools/clean.sh           # fast: plots, P(k)/ξ tables, rbins, configs, CLASS outputs, compiled binaries
+tools/clean.sh           # fast: plots, P(k)/ξ tables, configs, CLASS outputs, compiled binary
 tools/clean.sh --all     # also removes ICs (HDF5), wnoise binaries, and music_build/ (slow to regenerate)
 ```
 

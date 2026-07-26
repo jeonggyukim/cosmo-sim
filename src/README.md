@@ -1,27 +1,18 @@
-# `src/` — C estimators (ξ, ψ) for SWIFT ICs
+# `src/` — C estimator (ξ, ψ) for SWIFT ICs
 
-Two C programs that estimate the matter two-point correlation function
-ξ(r) — and, for `compute_xi --vel`, the velocity correlation
-ψ(r) = ⟨v·v'⟩ — from a SWIFT IC HDF5 file.  Both write ASCII tables;
-neither produces plots (use `plot-ic` from `icpipe` for that).
-
-`compute_xi` (CIC-grid autocorrelation) is the default tool and the one
-the pipeline runs.  `compute_xi_corrfunc` (particle-pair counting) is an
-optional low-z cross-check with an extra Corrfunc dependency.
+`compute_xi` estimates the matter two-point correlation function ξ(r) —
+and, with `--vel`, the velocity correlation ψ(r) = ⟨v·v'⟩ — from a
+SWIFT IC HDF5 file.  It writes ASCII tables and produces no plots (use
+`plot-ic` from `icpipe` for that).
 
 ## Build
 
 ```bash
-make -C src                          # → bin/compute_xi (default; HDF5 + FFTW only)
-make -C src corrfunc                 # → bin/compute_xi_corrfunc (links Corrfunc)
-make -C src corrfunc CORRFUNCDIR=/path/to/Corrfunc
+make -C src                          # → bin/compute_xi (HDF5 + FFTW only)
 make -C src clean
 ```
 
 Defaults:
-- The default target needs only HDF5 and FFTW — no Corrfunc.
-- `corrfunc` target: `CORRFUNCDIR` → `../Corrfunc` (sibling of repo
-  root); cloned + built if missing.  Override with the make variable.
 - macOS: clang + `-Xclang -fopenmp` + Homebrew `libomp` (keg-only).
   HDF5 and FFTW come from the regular `/opt/homebrew/{include,lib}`
   symlinks.
@@ -29,7 +20,7 @@ Defaults:
   `$HOME/local/...` or `$HOME/libs/<arch>_gnu/...` per
   hostname-specific branch in the Makefile.
 
-## `compute_xi` — CIC-grid autocorrelation (default)
+## `compute_xi` — CIC-grid autocorrelation
 
 Deposits the N particles onto an Ngrid³ CIC density grid, normalises
 to `den = 1 + δ`, and autocorrelates the grid.  By the
@@ -67,64 +58,30 @@ Key options (see `--help` for the full set):
   `r_avg r_low r_high xi DD DR RR`).  ψ is `r_avg r_low r_high psi
   [(km/s)²]`.
 
-**Where it works**: any z, including z = 200.  Lattice ICs have
-sub-Poissonian shot noise σ_δ ≈ D(z)·σ₀ ≪ 1 because the unperturbed
-particle positions form a regular grid; the CIC autocorrelation
-inherits that, so the tiny high-z cosmological signal stays visible.
+## Why a density grid rather than particle pair counting
 
-## `compute_xi_corrfunc` — particle-pair counting (Corrfunc, optional)
+This tool works at any z, including z = 200.  A pair-counting estimator
+does not, and the reason is worth stating.
 
-Counts pairs of *actual particles* falling in each (rmin, rmax) bin and
-applies the Peebles–Hauser estimator for a periodic box:
+Pair counting counts pairs of actual particles, so its shot noise is
+Poisson, σ_ξ ≈ √(1+ξ)/√N_pairs.  That is fine at low z, where the
+clustering signal is large.  At z ≳ 10 the matter signal is suppressed
+by D(z)² ≈ 1/(1+z)² to ~10⁻⁶ and drowns in that noise.
 
-```
-ξ(r) = DD(r) / DD_rand(r) − 1
-```
-
-RR (random–random) is analytic for a periodic box, so no random
-catalogue is needed.  Corrfunc's grid acceleration brings the cost
-from O(N²) down to O(N × N_in_shell).
-
-```
-./bin/compute_xi_corrfunc <ics.hdf5> <binfile> [nthreads] [-n NSUB] [-s SEED]
-```
-
-- `binfile` — two columns per line: `rmin rmax` (Mpc).  Generate with
-  `make-rbins --hdf5 file.hdf5` (rmin = 2 × mean spacing, rmax = L/3).
-- `-n NSUB` — subsample to NSUB particles before pair counting; if
-  omitted, NSUB is auto-chosen for runtime.
-- `-s SEED` — subsample random seed (default 42).
-
-Output to stdout: `r_avg r_low r_high xi npairs`.  Redirect with `>`.
-
-**Where it works**: low z, where the cosmological signal is well above
-the Poisson particle shot noise σ_ξ ≈ √(1+ξ)/√N_pairs.
-
-**Where it fails**: z ≳ 10.  At high z the matter signal is suppressed
-by D(z)² ≈ 1/(1+z)² to ~10⁻⁶, drowning in shot noise.  Use
-`compute_xi` instead.
-
-## Choosing between them
-
-| IC redshift  | use                          | why                                    |
-|--------------|------------------------------|----------------------------------------|
-| z ≲ 5        | `compute_xi_corrfunc`        | strong signal, faster, no Ngrid tuning |
-| 5 ≲ z ≲ 10   | either                       | both work; CIC is cleaner              |
-| z ≳ 10       | `compute_xi`                 | particle shot noise drowns the signal  |
-| any z, velocity ψ(r) | `compute_xi --vel`   | only CIC estimator handles velocities  |
-
-See CLAUDE.md "When ξ(r) is the wrong tool" for the full discussion
-and `compute_xi.c`'s top-of-file block for the estimator derivation.
+Lattice ICs escape this because their unperturbed particle positions
+form a regular grid, which makes the shot noise sub-Poissonian:
+σ_δ ≈ D(z)·σ₀ ≪ 1.  The CIC autocorrelation inherits that, so the noise
+on ξ falls with D(z) alongside the signal and the tiny high-z
+cosmological signal stays visible.  See the top-of-file block in
+`compute_xi.c` for the estimator derivation.
 
 ## Files
 
 ```
 src/
-├── Makefile              # `make -C src` (default) / `make -C src corrfunc`
-├── compute_xi.c          # ~1000 lines, self-contained CIC + FFT estimator
-└── compute_xi_corrfunc.c # ~300 lines, includes Corrfunc public headers
+├── Makefile     # `make -C src`
+└── compute_xi.c # ~1000 lines, self-contained CIC + FFT estimator
 ```
 
-Binaries land in `../bin/` (gitignored).  `run-pipeline` calls
-`./bin/compute_xi --vel` (step 6); `compute_xi_corrfunc` is not a
-pipeline step (build and run it by hand for low-z cross-checks).
+The binary lands in `../bin/` (gitignored).  `run-pipeline` calls
+`./bin/compute_xi --vel` as step 6.
