@@ -1,6 +1,6 @@
 # Baryon + CDM IC Generation — Plan
 
-Working roadmap for extending `cosmo-pipeline` from pure-CDM ICs to
+Working roadmap for extending `cosmo-sim` from pure-CDM ICs to
 joint baryon + CDM ICs.  Three layers; can be pursued independently.
 
 ## 1. Theory write-up — fill `notes/cosmo_ic.tex` §9 (`sec:baryons_cdm`)

@@ -1,4 +1,4 @@
-# Makefile for cosmo-pipeline C programs.
+# Makefile for cosmo-sim C programs.
 # Sources live alongside this Makefile in src/; binaries are written to ../bin/.
 # Platform detection follows the same pattern as ../tigris/prepare.sh.
 

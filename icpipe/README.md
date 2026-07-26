@@ -1,6 +1,6 @@
 # `icpipe` — IC analysis library + pipeline CLIs
 
-Python package backing the `cosmo-pipeline` repo.  Two roles:
+Python package backing the `cosmo-sim` repo.  Two roles:
 
 1. **Library** (`icpipe.field`, `icpipe.theory`, `icpipe.io`, ...): import
    from notebooks or other scripts to load SWIFT ICs, build CIC grids,

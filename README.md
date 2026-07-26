@@ -1,4 +1,4 @@
-# cosmo-pipeline
+# cosmo-sim
 
 Generate cosmological initial conditions with **MUSIC2** and validate them.
 The pipeline measures the density power spectrum **P(k)** (CIC + FFT), the

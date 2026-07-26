@@ -33,7 +33,7 @@ export OMP_PROC_BIND=close
 # export OMPI_MCA_pml=ob1
 # export OMPI_MCA_btl=tcp,self,vader
 
-REPO=/path/to/cosmo-pipeline          # <-- edit
+REPO=/path/to/cosmo-sim          # <-- edit
 cd "$REPO"
 conda activate cosmo                  # or: source activate cosmo
 

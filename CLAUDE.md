@@ -1,4 +1,4 @@
-# CLAUDE.md — cosmo-pipeline
+# CLAUDE.md — cosmo-sim
 
 Two things live here:
 
@@ -13,7 +13,7 @@ Two things live here:
 ## Directory Structure
 
 ```
-cosmo-pipeline/
+cosmo-sim/
   src/            — compute_xi.c + Makefile (CIC-grid ξ/ψ estimator)
   bin/            — compiled C binaries (gitignored)
   icpipe/         — installable Python library (ICField, LinearTheory, io,

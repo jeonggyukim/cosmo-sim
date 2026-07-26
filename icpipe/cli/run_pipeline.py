@@ -10,7 +10,7 @@ Examples:
     run-pipeline --ic-code monofonic --lpt-order 3
     run-pipeline --ic-code monofonic --launcher "srun"     # multi-node on SLURM
     run-pipeline --ic-code monofonic --mpi-ranks 4         # 4 local MPI ranks
-    run-pipeline --root /scratch/cosmo-pipeline --ngrid 512
+    run-pipeline --root /scratch/cosmo-sim --ngrid 512
 """
 
 from __future__ import annotations
