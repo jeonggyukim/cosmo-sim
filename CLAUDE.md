@@ -152,7 +152,6 @@ LaTeX write-ups in `notes/`; full list and reading order in `notes/README.md`.
 | `fft.tex` | FFT reference: DFT, Cooley–Tukey, FFTW, MPI slab vs. pencil, Tigris `BlockFFT` |
 | `classical_mechanics.tex` | Legendre transform, Hamilton's equations, phase space, Poisson brackets, canonical transformations, Liouville's theorem, symplectic integrators. Supplies what `sidm.tex` App. A and `qft.tex` §3/§7 assume |
 | `sidm.tex` | Self-interacting dark matter: cross sections, cored vs core-collapsed halos, gravothermal fluid model. App. A is the full kinetic-theory chain (Liouville → BBGKY → Boltzmann → moments → Chapman–Enskog) |
-| `sidm_sim.tex` | Simulating SIDM: KiSS-SIDM DSMC, 3D generalization, proposed two-moment scheme, TIGRIS mapping |
 | `qft.tex`, `fdm.tex` | Field theory for scalar dark matter; fuzzy dark matter |
 | `cosmo_stat.tex` | Statistics of cosmological fields: ensembles, ergodicity, ξ(r), P(k), covariance, Gaussian random fields, generating and measuring them |
 | `dm_chemistry.tex` | Dark-matter chemistry |
