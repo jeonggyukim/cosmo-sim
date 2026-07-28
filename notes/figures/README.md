@@ -26,6 +26,7 @@ of which subdirectory `X.pdf` lives in.
 | `fft/`            | `plot_grf_exponential` | shared with `cosmo_stat.tex` |
 | `restriction/`    | `plot_restriction_{density,psi,deformation,phi,phi_spectral,cdm,cdm_truth}`, `plot_window_compare`, `plot_alias_diagram`, `plot_zoom_ic_{comparison,pk_full}` | `restriction_lpt.tex` |
 | `music2/`         | `plot_meyer`                                           | `music2_internals.tex` |
+| `xi_estimators/`  | `plot_xi_toy`, `plot_xi_identity`                      | `xi_estimators.tex`    |
 | `figures/` (top)  | `plot_growth`, `plot_aliasing`                         | shared (used by 4 .tex each) |
 | `figures/` (top)  | `plot_2lpt_cic_pk`, `plot_zoom_ic_pk`                  | orphan: exploratory, not in `notes/Makefile` |
 

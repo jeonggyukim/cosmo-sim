@@ -153,6 +153,7 @@ LaTeX write-ups in `notes/`; full list and reading order in `notes/README.md`.
 | `sidm.tex` | Self-interacting dark matter: cross sections, cored vs core-collapsed halos, gravothermal fluid model. App. A is the full kinetic-theory chain (Liouville → BBGKY → Boltzmann → moments → Chapman–Enskog) |
 | `qft.tex`, `fdm.tex` | Field theory for scalar dark matter; fuzzy dark matter |
 | `cosmo_stat.tex` | Statistics of cosmological fields: ensembles, ergodicity, ξ(r), P(k), covariance, Gaussian random fields, generating and measuring them |
+| `xi_estimators.tex` | Why a direct lag sum and a zero-padded FFT are the same estimator: grid Landy–Szalay in the infinite-random limit and Slepian & Eisenstein's N = D−R convolution form, Wiener–Khinchin as a finite identity, circular vs linear autocorrelation and the padding condition d ≤ P−N, the separable N−d pair count, per-axis boundaries for pencil beams, cost scaling, and the gridding artefacts the FFT route concedes |
 | `dm_chemistry.tex` | Dark-matter chemistry |
 
 Planning docs in `docs-claude/`: `CLAUDE_MUSIC2.md` (MUSIC2 code structure,

@@ -1,4 +1,4 @@
-NOTES  = cosmo_stat classical_mechanics ic_sampling cosmo_ic restriction_lpt music2_internals fdm dm_chemistry sidm qft
+NOTES  = cosmo_stat classical_mechanics ic_sampling cosmo_ic restriction_lpt music2_internals xi_estimators fdm dm_chemistry sidm qft
 PYTHON = conda run -n cosmo python
 
 # Absolute path to this Makefile's directory — pdflatex is always run from here
@@ -50,7 +50,9 @@ FIGURES = \
     figures/restriction/alias_diagram.pdf \
     figures/restriction/zoom_ic_comparison.pdf \
     figures/restriction/zoom_ic_pk_full.pdf \
-    figures/music2/meyer.pdf
+    figures/music2/meyer.pdf \
+    figures/xi_estimators/xi_toy.pdf \
+    figures/xi_estimators/xi_identity.pdf
 
 all : figures notes
 
@@ -139,6 +141,12 @@ figures/restriction/zoom_ic_pk_full.pdf : figures/restriction/plot_zoom_ic_pk_fu
 
 figures/music2/meyer.pdf : figures/music2/plot_meyer.py
 	cd figures/music2 && $(PYTHON) plot_meyer.py
+
+figures/xi_estimators/xi_toy.pdf : figures/xi_estimators/plot_xi_toy.py
+	cd figures/xi_estimators && $(PYTHON) plot_xi_toy.py
+
+figures/xi_estimators/xi_identity.pdf : figures/xi_estimators/plot_xi_identity.py
+	cd figures/xi_estimators && $(PYTHON) plot_xi_identity.py
 
 # --- LaTeX ---
 notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
