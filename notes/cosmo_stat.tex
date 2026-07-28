@@ -40,7 +40,7 @@
 
 \title{Statistical Foundations for Cosmological Fields:\\
        Random Fields, Correlation Functions, Power Spectra,\\
-       and the Fourier Machinery that Links Them}
+       and the Fourier Transforms that Connect Them}
 \author{}
 \date{\today}
 
@@ -204,13 +204,41 @@ Note carefully what homogeneity does \emph{not} say.  It does not say
 $\delta$ is the same everywhere --- that would be a constant field with
 no structure.  It says the \emph{statistics} are the same everywhere:
 a void near here is as likely as a void of the same size near there.
-Any one realisation is still as bumpy as ever.
+The single realisation we actually observe is as irregular as the map we
+started from, with dense knots of galaxies in some places and nearly
+empty regions in others.  Eq.~(\ref{eq:homog}) constrains the probabilities.  Pick any set of
+points and ask how likely the field is to take some particular set of
+values there.  The answer must come out the same after sliding every one
+of those points by a common displacement.  It places no constraint on the arrangement itself.  You
+cannot use homogeneity to predict where any particular cluster or void
+lies on our map.
 
 The immediate consequence, applied to the two-point average, is that
 $\avg{\delta(\bx)\,\delta(\bx')}$ can depend only on the separation
-$\br = \bx' - \bx$, not on where the pair sits.  This is what makes the
-correlation function a function of one vector argument instead of two,
-and it is the single most-used assumption in this note.
+$\br = \bx' - \bx$, not on where the pair sits.  Eq.~(\ref{eq:homog})
+holds for \emph{every} choice of the points and for \emph{every} shift
+$\ba$, so we may instantiate it however is convenient.  Keep only two
+points, set $\bx_1 = \bx$ and $\bx_2 = \bx'$, and choose
+$\ba = -\bx$, which slides the first point onto the origin:
+\begin{equation}
+  \avg{\delta(\bx)\,\delta(\bx')}
+  \;=\; \avg{\delta(\bx - \bx)\,\delta(\bx' - \bx)}
+  \;=\; \avg{\delta(\mathbf 0)\,\delta(\br)},
+  \qquad \br \equiv \bx' - \bx .
+  \label{eq:homog-xi}
+\end{equation}
+The first equality is Eq.~(\ref{eq:homog}) with those two points and that
+shift; the second is the definition of $\br$.  The right-hand side
+contains no $\bx$.  It depends on $\br$ alone.  The two sides are
+equal, so the left-hand side depends on $\br$ alone as well.
+
+A function of two position vectors carries six numbers; after
+Eq.~(\ref{eq:homog-xi}) it carries three, and we may define
+$\xi(\br) \equiv \avg{\delta(\mathbf 0)\,\delta(\br)}$ with no ambiguity
+about which pair of points was meant.  Isotropy
+(\S\ref{sec:isotropy}) will cut the three down to one.  This is what
+makes the correlation function a function of one vector argument instead
+of two, and it is the single most-used assumption in this note.
 
 \subsection{Statistical isotropy}
 \label{sec:isotropy}
@@ -242,7 +270,7 @@ so far is an ensemble average --- an average over universes we do not
 have.  We have one universe.  How can we possibly measure
 $\avg{\delta\,\delta}$?
 
-The rescue is \emph{ergodicity}: the assumption that widely separated
+The resolution is \emph{ergodicity}: the assumption that widely separated
 regions of a single realisation are statistically independent, so that
 they behave like independent draws from the ensemble.  If that holds,
 then averaging a quantity over the volume of one large realisation gives
@@ -256,8 +284,8 @@ the same answer as averaging over the ensemble at a point:
 \end{equation}
 Physically the condition is that the correlation function falls to zero
 at large separation (\S\ref{sec:xi-props}): once two patches are farther
-apart than the correlation length, they know nothing about each other
-and count as independent samples.  A box many correlation lengths across
+apart than the correlation length, their fluctuations are uncorrelated
+and they count as independent samples.  A box many correlation lengths across
 therefore contains many effectively-independent sub-volumes, and the
 spatial average over it converges to the ensemble average.  The residual
 error from having only a finite number of independent patches is
@@ -266,8 +294,8 @@ measurement of $\xi$ or $P$ from a finite volume (\S\ref{sec:cosmicvar}).
 
 Every measured correlation function and power spectrum in cosmology ---
 and every one computed from a simulation box --- relies on
-Eq.~(\ref{eq:ergodic}).  Keep it in mind: it is the bridge between the
-theory (ensemble language) and the data (one box).
+Eq.~(\ref{eq:ergodic}).  Keep it in mind: it is what lets a prediction
+written as an ensemble average be tested against a single box.
 
 %======================================================================
 \section{The two-point correlation function}
@@ -288,7 +316,7 @@ with the right-hand side independent of $\bx$.  Under isotropy it
 reduces further to $\xi(r)$ with $r = |\br|$.
 
 What does it mean?  Suppose you stand at a point where the density is
-above average ($\delta(\bx) > 0$).  The correlation function tells you
+above average ($\delta(\bx) > 0$).  The correlation function measures
 whether a point a distance $r$ away tends to be above or below average
 too.  If $\xi(r) > 0$, the two points are \emph{positively correlated}:
 an overdensity here makes an overdensity there more likely --- matter
@@ -341,7 +369,7 @@ independent.
 \subsection{The correlation function is a covariance}
 \label{sec:xi-covariance}
 
-It pays to see $\xi$ through the lens of ordinary statistics.  For two
+It helps to write $\xi$ in the language of ordinary statistics.  For two
 random variables $X$ and $Y$ with zero mean, the \emph{covariance} is
 $\mathrm{Cov}(X, Y) = \avg{XY}$.  Comparing with
 Eq.~(\ref{eq:xi-def-box}), the correlation function is nothing but the
@@ -396,7 +424,7 @@ wave.  A large $k$ is a short-wavelength, small-scale feature; a small
 $k$ is a long-wavelength, large-scale feature.  This dictionary ---
 \emph{large $k$ means small scale} --- is worth internalising because
 cosmological intuition is usually phrased in terms of scales but the
-mathematics lives in $k$.
+mathematics is written in $k$.
 
 The one identity we lean on repeatedly is the integral representation of
 the Dirac delta,
@@ -664,7 +692,7 @@ This is Result~1 of \S\ref{sec:pk-derive} (modes are uncorrelated) stated
 as linear algebra: in the Fourier basis the covariance matrix is
 diagonal, with the power spectrum down the diagonal.
 
-\subsection{Why this is the whole game}
+\subsection{Why nothing beyond the covariance is needed}
 
 The correlation function is the covariance in the position basis (a full
 matrix); the power spectrum is the covariance in the Fourier basis (a
@@ -856,7 +884,7 @@ This is why cosmologists spend so much effort measuring $P(k)$: for
 Gaussian initial conditions it is not just \emph{a} statistic, it is
 \emph{the} statistic --- knowing it is knowing the field's full
 distribution.  It is also what makes generating a realisation so cheap
-(\S\ref{sec:generate}): match the two-point function and, for free, you
+(\S\ref{sec:generate}): match the two-point function and you
 have matched everything.
 
 \subsection{Where Gaussianity fails}
@@ -874,8 +902,9 @@ holds, the higher cumulants are nonzero, and $P(k)$ no longer determines
 the distribution.  The three-point function (bispectrum) becomes an
 independent observable, and a single ``draw white noise, colour by
 $\sqrt P$'' construction cannot produce the field.  Everything in the
-next section assumes Gaussianity; non-Gaussian generators bolt an extra
-nonlinear term like Eq.~(\ref{eq:fnl}) onto the Gaussian core.
+next section assumes Gaussianity.  A non-Gaussian generator adds a
+nonlinear term like Eq.~(\ref{eq:fnl}) to a field that was generated as a
+Gaussian one.
 
 %======================================================================
 \section{Generating a Gaussian random field on a computer}
@@ -893,7 +922,7 @@ construction of the initial conditions.
 Start in the finite-dimensional picture of \S\ref{sec:xi-covariance}: we
 want a Gaussian vector $\boldsymbol\delta \in \mathbb R^N$ with a
 prescribed covariance $C = \avg{\boldsymbol\delta\,\boldsymbol\delta^\top}$.
-The trick is to start from the easiest possible Gaussian vector ---
+The method starts from the simplest possible Gaussian vector ---
 \emph{white noise} $\boldsymbol\mu$, with independent unit-variance
 components, $\avg{\boldsymbol\mu\,\boldsymbol\mu^\top} = I$ --- and
 transform it linearly.  If $C = LL^\top$ for some matrix $L$ (a ``square
@@ -920,8 +949,8 @@ trivial: in Fourier space $C$ is the diagonal matrix
 $\mathrm{diag}\,P(\bk)$, and its square root is
 $\mathrm{diag}\,\sqrt{P(\bk)}$.  Applying $L$ is then just:
 Fourier-transform, multiply each mode by $\sqrt{P(\bk)}$, transform back.
-Cost: $\mathcal O(N \log N)$, the cost of an FFT.  This is the payoff of
-the diagonalisation of \S\ref{sec:covariance}.
+Cost: $\mathcal O(N \log N)$, the cost of an FFT.  This is what the
+diagonalisation of \S\ref{sec:covariance} was for.
 
 \subsection{White noise and its flat spectrum}
 \label{sec:whitenoise}
@@ -939,7 +968,7 @@ identically distributed $\mathcal N(0,1)$ values, one per cell, with
   \label{eq:whitenoise}
 \end{equation}
 Its correlation function is a spike at zero separation and zero
-elsewhere: each cell knows nothing about its neighbours.  By
+elsewhere: each cell is uncorrelated with its neighbours.  By
 Wiener--Khinchin (\ref{eq:wiener-khinchin}) the Fourier transform of a
 delta is a constant, so white noise has a \emph{flat} power spectrum,
 $P_\mu(k) = 1$ --- equal power on every scale.  That is the origin of the
@@ -1024,10 +1053,10 @@ $\sigma_8$ in small boxes.
 \subsection{The statistics of a single Fourier amplitude}
 \label{sec:mode-stats}
 
-It is worth knowing the distribution --- not just the mean --- of a
-single mode's amplitude, because it is what one plots to check that a
-generated field is correctly normalised, and it explains the ragged
-look of a raw (unbinned) power-spectrum measurement.
+A single mode's amplitude has a distribution, not just a mean.  That
+distribution is what one plots to check that a generated field is
+correctly normalised, and it accounts for the ragged appearance of a
+raw (unbinned) power-spectrum measurement.
 
 Fix a generic mode $\bk$ (not $\bk=0$, not a Nyquist self-conjugate
 corner).  From Method~B, $\tilde\delta_\bk = X + iY$ with $X$ and $Y$
@@ -1149,8 +1178,8 @@ $\lambda = 2\Delta$):
 \end{itemize}
 By Wick (\S\ref{sec:wick}), once (a) and (c) hold the \emph{entire}
 distribution of $\{\delta_n\}$ matches the target.  Matching the two
-lines of second-moment algebra has, for free, matched every higher
-correlator.  That is the whole content of Gaussianity, made arithmetic.
+lines of second-moment algebra has matched every higher
+correlator as well.  That is the whole content of Gaussianity, made arithmetic.
 
 %======================================================================
 \section{Measuring $\xi$ and $P$ from one realisation}
@@ -1158,7 +1187,7 @@ correlator.  That is the whole content of Gaussianity, made arithmetic.
 
 The last piece is the inverse problem: given one box (a simulation
 snapshot or a galaxy survey), estimate its correlation function and power
-spectrum.  This is where ergodicity (\S\ref{sec:ergodic}) does its work
+spectrum.  This is where ergodicity (\S\ref{sec:ergodic}) is used
 --- we replace the unavailable ensemble average with an average over the
 box --- and where the finite size of the box sets the ultimate error.
 The estimator details specific to $N$-body simulations (mass assignment,
@@ -1185,7 +1214,7 @@ shells contain few modes and are noisy; small-scale (large-$k$) shells
 contain many modes and are smooth.  The procedure in practice: assign the
 particles to a density grid, FFT, square, and bin in $|\bk|$.
 
-\subsection{Cosmic variance: the price of a finite box}
+\subsection{Cosmic variance: the error from a finite box}
 \label{sec:cosmicvar}
 
 The number of independent modes in a shell of width $\Delta k$ is

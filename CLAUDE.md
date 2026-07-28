@@ -1,6 +1,6 @@
 # CLAUDE.md — cosmo-sim
 
-Two things live here:
+This repository holds two things:
 
 1. **An IC-generation pipeline.** Cosmological initial conditions from MUSIC2 or
    MUSIC2-monofonIC, validated against CLASS linear theory by measuring P(k),
@@ -165,7 +165,23 @@ make -C notes notes        # PDFs only
 make -C notes clean
 ```
 
+### Prose in `.tex` and `.md` files
+
+The rules are in `~/.claude/CLAUDE.md` under `## Prose`, and they apply to
+every word written into a `.tex` or `.md` file here. They are not repeated in
+this file. The short form: write the plainest sentence that states the fact,
+then stop.
+
+Defects that reached `notes/cosmo_stat.tex` and had to be corrected sentence
+by sentence, kept here as worked examples: "the bridge between theory and
+data", "for free", "the whole game", "the price of a finite box", "the rescue
+is ergodicity", "through the lens of ordinary statistics", "each cell knows
+nothing about its neighbours", "the right-hand side mentions x nowhere",
+"even though it looked as though it might".
+
 ### Writing style for the notes
+
+The rule above applies first. What follows is specific to `notes/`.
 
 These notes are for self-study. The reader is meeting the material for the first
 time, or returning to it after a long gap, and has nothing else in front of them.
