@@ -5,10 +5,12 @@ Two things live here:
 1. **An IC-generation pipeline.** Cosmological initial conditions from MUSIC2 or
    MUSIC2-monofonIC, validated against CLASS linear theory by measuring P(k),
    ξ(r), and ψ(r). Code in `icpipe/`, `src/`, `tools/`.
-2. **A collection of LaTeX study notes** on cosmology and dark matter, in
-   `notes/`. Several have nothing to do with IC generation (SIDM, fuzzy dark
-   matter, field theory, dark-matter chemistry). Treat them as the second
-   purpose of the repo, not an appendix to the first.
+2. **A collection of LaTeX study notes** on cosmological ICs and field
+   statistics, in `notes/`. Treat them as the second purpose of the repo, not
+   an appendix to the first. The dark-matter physics notes (SIDM, fuzzy dark
+   matter, field theory, dark-matter chemistry, classical mechanics) moved to
+   the `ai-notes` repository on 2026-07-28; they had no dependency on this
+   code.
 
 ## Directory Structure
 
@@ -21,7 +23,7 @@ cosmo-sim/
   icpipe/cli/     — console_scripts: run-pipeline, make-music-conf,
                     make-monofonic-conf, compute-pk, compute-pv, plot-ic
   scripts/analysis/ — ad-hoc CLIs (check_ic, plot_box_size_comparison,
-                    plot_dr_histogram)
+                    plot_dr_histogram, xi_sweep)
   tools/          — build-music.sh, build-monofonic.sh, clean.sh, sbatch templates
   tests/          — bundled validation tests (matched-noise zoom)
   notebooks/      — worked examples using icpipe
@@ -149,12 +151,8 @@ LaTeX write-ups in `notes/`; full list and reading order in `notes/README.md`.
 | `ic_sampling.tex` | P-sampled vs ξ-sampled ICs (Pen 1997, Sirko 2005, Hahn & Abel 2011); box window truncation |
 | `restriction_lpt.tex` | Restriction of δ and Ψ⁽¹⁾; why restricting the displacement potential is Poisson-inconsistent |
 | `music2_internals.tex` | File-and-line walkthrough of MUSIC2's δ construction and zoom noise hierarchy |
-| `classical_mechanics.tex` | Legendre transform, Hamilton's equations, phase space, Poisson brackets, canonical transformations, Liouville's theorem, symplectic integrators. Supplies what `sidm.tex` App. A and `qft.tex` §3/§7 assume |
-| `sidm.tex` | Self-interacting dark matter: cross sections, cored vs core-collapsed halos, gravothermal fluid model. App. A is the full kinetic-theory chain (Liouville → BBGKY → Boltzmann → moments → Chapman–Enskog) |
-| `qft.tex`, `fdm.tex` | Field theory for scalar dark matter; fuzzy dark matter |
 | `cosmo_stat.tex` | Statistics of cosmological fields: ensembles, ergodicity, ξ(r), P(k), covariance, Gaussian random fields, generating and measuring them |
 | `xi_estimators.tex` | Why a direct lag sum and a zero-padded FFT are the same estimator: grid Landy–Szalay in the infinite-random limit and Slepian & Eisenstein's N = D−R convolution form, Wiener–Khinchin as a finite identity, circular vs linear autocorrelation and the padding condition d ≤ P−N, the separable N−d pair count, per-axis boundaries for pencil beams, cost scaling, and the gridding artefacts the FFT route concedes |
-| `dm_chemistry.tex` | Dark-matter chemistry |
 
 Planning docs in `docs-claude/`: `CLAUDE_MUSIC2.md` (MUSIC2 code structure,
 transfer functions, file formats), `baryon_ic_plan.md`, `swift_gpu_gravity_plan.md`
@@ -184,7 +182,9 @@ Write the way a good textbook written for international students reads:
 
 Length is not a cost to this reader. Having to re-read a paragraph three times
 is. A rewrite that triples the length of a compressed passage is the correct
-trade. §A.1 and §A.2 of `notes/sidm.tex` are the reference for this style.
+trade. The opening sections of `notes/kinetic_theory.tex` in the `ai-notes`
+repository (formerly §A.1 and §A.2 of `sidm.tex`) are the reference for this
+style.
 
 This is the opposite of the standard for a PR body, where the reader already
 knows the material and padding is a defect. Do not mix the two.
