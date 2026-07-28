@@ -101,8 +101,22 @@ the average voltage, the size of the fluctuations, how the voltage now
 is related to the voltage a microsecond later.  Cosmology is in exactly
 this situation, with one extra twist that we will have to confront: we
 get to observe only \emph{one} roll of the cosmic die --- a single
-universe --- and yet we want to test statistical predictions.  Making
-that possible is the job of \emph{ergodicity} (\S\ref{sec:ergodic}).
+universe --- and yet we want to test statistical predictions.
+
+The way out is worth seeing now, because the whole subject is built on
+it.  Although we have only one universe, that universe is large, and two
+patches of it that are far enough apart have essentially nothing to do
+with one another.  They were laid down by the same random process but
+their fluctuations are independent, so each distant patch is, for
+statistical purposes, its own roll of the die.  We can therefore trade
+the average over many imagined universes --- which we cannot perform ---
+for an average over many widely separated regions of the one universe we
+have, which we can.  The assumption that licenses that trade is called
+\emph{ergodicity}.  It is not free: it requires that correlations die
+away with separation, and it is what makes a finite survey volume a
+source of irreducible statistical error rather than merely a small
+sample.  Section~\ref{sec:ergodic} states it precisely and shows where
+it comes from.
 
 \subsection{The density contrast as the basic field}
 
@@ -829,7 +843,7 @@ the three ways of pairing four objects.  The same bookkeeping at order
 $J^{2k}$ gives Eq.~(\ref{eq:wick-even}) with its
 $(2k)!/(2^k k!)$ pairings --- $15$ for the six-point function, and so on.
 
-\paragraph{The punchline.}  Every correlator of a Gaussian field is an
+\paragraph{The consequence.}  Every correlator of a Gaussian field is an
 explicit polynomial in $\xi$.  Nothing is independent of the two-point
 function.  Combined with Definition~3 (which says $Z[J]$, hence the
 entire probability distribution, is fixed once $\xi$ is known), this
@@ -985,9 +999,12 @@ accounting is Appendix~A of \code{cosmo\_ic.tex}.
 \paragraph{Method B --- draw the modes directly in Fourier space.}
 \begin{enumerate}
   \item For each independent mode $\bk$, draw a complex Gaussian
-        amplitude $\tilde\delta_\bk = \sqrt{P(\bk)\,V/2}\,(u + iv)$ with
-        $u, v \sim \mathcal N(0,1)$ independent, so that
-        $\avg{|\tilde\delta_\bk|^2} = P(\bk)\,V$.
+        amplitude
+        \begin{equation*}
+          \tilde\delta_\bk = \sqrt{P(\bk)\,V/2}\;(u + iv),
+          \qquad u, v \sim \mathcal N(0,1)\ \text{independent},
+        \end{equation*}
+        so that $\avg{|\tilde\delta_\bk|^2} = P(\bk)\,V$.
   \item Impose Hermitian symmetry by hand:
         $\tilde\delta_{-\bk} = \tilde\delta_\bk^*$.
   \item For the self-conjugate modes ($\bk = 0$ and the Nyquist corners
