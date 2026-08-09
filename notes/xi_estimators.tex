@@ -29,9 +29,8 @@
 % Correlation (star) product, as used by Slepian & Eisenstein.
 \newcommand{\corr}{\star}
 
-\title{The Grid Correlation Function:\\
-       the Direct Lag Sum and the Padded FFT\\
-       Are the Same Estimator}
+\title{Estimating the Correlation Function\\
+       on a Grid}
 \author{}
 \date{\today}
 
@@ -48,90 +47,52 @@ equations and conclusions before relying on them.
 
 \tableofcontents
 
-\section{The question this note answers}\label{sec:question}
+\section{Two ways to compute $\xi$ on a grid}\label{sec:question}
 
-Suppose you want the two-point correlation function $\xi(r)$ of a density
-field that has been sampled onto a grid inside some sub-region of a larger
-periodic simulation box. There are two obvious ways to compute it.
+You have a box of particles, or a patch cut out of one, and you want the
+correlation function of the density field inside it.  One program walks over
+every pair of grid cells at a given separation, multiplies the two density
+contrasts, and averages.  Another Fourier transforms the field, squares the
+modulus, and transforms back.  Run both on the same data and they print the
+same number, digit after digit, until the last two or three.
 
-The first is to do exactly what the definition says. For every separation
-vector, walk over all pairs of cells separated by that vector, multiply the
-two density contrasts, and average. This is a \emph{direct lag sum}. It is
-transparently correct, and it is slow.
+The first program is doing what the definition of $\xi$ says, so its answer
+needs no explanation.  The second one does.  A Fourier transform mixes every
+cell into every coefficient, so a value at one separation appears to depend on
+data from the far side of the box.  Squaring the modulus discards the phases,
+and the phases are most of what tells one field from another.  An FFT is also
+a numerical algorithm with its own rounding behaviour, so even if it computed
+the right quantity one would expect an approximation to it rather than the
+same number.
 
-The second is to use the Fourier route. Transform the field, take the squared
-modulus to get the power spectrum, and transform back. This is fast, but it
-looks suspicious for at least three reasons. The Fourier transform is a
-global operation, so information from the far side of the region seems to
-leak into every output value. Taking $|\hat\delta|^2$ throws away all the
-phase information, so it seems that something has been destroyed. And the
-fast Fourier transform is a numerical algorithm with its own roundoff
-behaviour, so one would expect it to give an \emph{approximation} to the
-direct sum rather than the same answer.
+None of those objections holds up, and the reason is worth working through
+slowly.  The Fourier method does not approximate the lag sum.  It
+is the same finite sum with its terms added in a different order, so in exact
+arithmetic the two are one expression.  That leaves only the last two or three
+digits to account for, which \S\ref{sec:roundoff} does.
 
-Run both on the same data and they return the same number.
+The two programs are real ones.  They are
+\texttt{measure\_xi\_mpi.c}, which evaluates the direct sum, and
+\texttt{measure\_xi\_fft\_mpi.c}, which evaluates the padded FFT.  Both
+sit in the KIAS \texttt{HR-ICs-pipeline} repository and are documented as
+agreeing bin for bin.  Everything below stands on its own without them.
 
-This note explains why that has to be so. The Fourier route is not a
-numerical method that approximates the lag sum: it is an algebraic
-rearrangement of the identical finite sum, so in exact arithmetic the two are
-the same expression. The three objections above dissolve along the way, and
-the only thing left over is why the last digits differ at all
-(\S\ref{sec:roundoff}).
-
-\subsection{How the note is arranged}
-
-Sections~\ref{sec:setup}--\ref{sec:denominator} set up the object being
-computed. They define the field and the mask (\S\ref{sec:setup}), show that
-the grid estimator is the Landy--Szalay estimator rather than a simplified
-stand-in for it (\S\ref{sec:ls}), and evaluate its denominator in closed form
-(\S\ref{sec:denominator}). All of this is shared by both methods, which is
-why it comes first.
-
-Sections~\ref{sec:direct}--\ref{sec:roundoff} are the two methods and their
-comparison: the direct sum (\S\ref{sec:direct}), the Fourier route with its
-padding and per-axis boundary handling (\S\ref{sec:fft}), and the residual
-floating-point difference (\S\ref{sec:roundoff}).
-
-Sections~\ref{sec:cost}--\ref{sec:validates} are the practical part, and are
-the sections to read if you are choosing between the two methods rather than
-checking one against the other. They cover cost
-(\S\ref{sec:cost}), what the Fourier route gives up
-(\S\ref{sec:gives-up}), the bias from estimating the mean from the data
-itself (\S\ref{sec:integral-constraint}), and what a two-method comparison
-does and does not prove (\S\ref{sec:validates}).
-
-\subsection{Relation to the literature}
-
-None of the mathematics here is new. That the correlation function can be
-obtained from a Fourier transform is old, and \citet{Slepian2016} give the
-compact modern statement for galaxy surveys: the Landy--Szalay estimator is
-\emph{itself} a binned convolution, so both its numerator and its denominator
-can be evaluated with fast Fourier transforms in
-$\mathcal{O}(N_g \log N_g)$ operations. Their \S2 is the direct reference for
+\citet{Slepian2016} give the compact statement of all this for galaxy surveys:
+the Landy--Szalay estimator is itself a binned convolution, so its numerator
+and its denominator can both be evaluated with fast Fourier transforms in
+$\mathcal{O}(N_g \log N_g)$ operations.  Their \S2 is the reference for
 \S\ref{sec:ls}, \S\ref{sec:pad-howmuch} and \S\ref{sec:gives-up} below, and
-their paper goes considerably further than this note by extending the same
-idea to the anisotropic two-point function and to the three-point function.
+they go on to the anisotropic two-point function and the three-point function,
+which this note does not.
 
-What this note adds is not new results but a slower path through the
-two-point case, worked at the level of the individual array indices, for a
-reader who wants to know why two programs on their disk return the same
-number.
-
-The concrete motivation is a pair of estimators in the KIAS
-\texttt{HR-ICs-pipeline} repository, both under \texttt{tools/pk\_pipeline/}:
-\texttt{measure\_xi\_mpi.c} evaluates the direct lag sum, and
-\texttt{measure\_xi\_fft\_mpi.c} evaluates the padded FFT. They are
-documented as agreeing bin-for-bin. Everything below is written so that it
-stands on its own without those files.
-
-\section{Setup: field, mask, and estimator}\label{sec:setup}
+\section{The gridded field, the mask, and the estimator}\label{sec:setup}
 
 \subsection{The gridded density contrast}
 
-Start from particles inside a rectangular measurement region. Lay a uniform
+Start from particles inside a rectangular measurement region.  Lay a uniform
 grid of cells over that region and assign each particle's mass to nearby
 cells using some mass-assignment scheme; cloud-in-cell (CIC) is the usual
-choice, and its details do not matter until \S\ref{sec:gives-up}. The result
+choice, and its details do not matter until \S\ref{sec:gives-up}.  The result
 is a mass per cell, which divided by the cell volume is a density $\rho_x$,
 where $x$ now labels a cell rather than a continuous position.
 
@@ -144,14 +105,14 @@ The choice of $\bar\rho$ matters and will come back in
 \S\ref{sec:integral-constraint}; for now note only that it forces
 $\sum_x \delta_x = 0$ when the sum runs over the region.
 
-Both estimators discussed below start from the same array $\delta_x$. Nothing
+Both estimators discussed below start from the same array $\delta_x$.  Nothing
 in \S\S\ref{sec:ls}--\ref{sec:roundoff} depends on how that array was
 produced.
 
 \subsection{The mask}
 
 We need a way to say that one cell is inside the measurement region and
-another is not. Introduce the \emph{mask}, sometimes called the selection
+another is not.  Introduce the \emph{mask}, sometimes called the selection
 function,
 \begin{equation}\label{eq:mask}
   \W_x \;=\;
@@ -161,16 +122,32 @@ function,
   \end{cases}
 \end{equation}
 The name ``mask'' is borrowed from survey analysis, where $\W$ encodes which
-patches of sky were actually observed. Here the region is a rectangular box
+patches of sky were actually observed.  Here the region is a rectangular box
 cut out of a larger simulation, so $\W$ is the indicator function of a
 rectangle, but it is worth keeping the general notation because
 \S\ref{sec:denominator} turns on the fact that our $\W$ is rectangular.
 
 Zero-padding a field outside the region --- literally storing zeros there ---
-is the same thing as forming the product $\W_x \delta_x$. That observation is
+is the same thing as forming the product $\W_x \delta_x$.  That observation is
 the entire content of the padding trick, and it is worth stating early.
 
-\subsection{What ``the estimator'' is}
+\subsection{The estimator}
+
+The word \emph{estimator} is used throughout what follows, so it is worth
+saying plainly what it means.  An estimator is a formula that turns the data
+you actually have into a number meant to approximate a quantity you cannot
+observe.  Here the data is the gridded density field in one box.  The
+quantity is $\xi(r)$, which by its definition is an average over an ensemble
+of universes, and there is only one universe to look at.  The formula below
+is therefore not $\xi$ itself but a stand-in for it, and the hat in
+$\hat\xi$ is there to keep the two apart.  Section~\ref{sec:estimator-vs-ensemble}
+returns to the distinction, and \code{cosmo\_stat.pdf} treats it at length.
+
+Two different formulas can estimate the same quantity, and two different
+programs can evaluate the same formula.  Both distinctions matter below.  The
+whole of this note is about one formula evaluated two ways; how well that
+formula recovers the true $\xi$ is a separate question, and not one taken up
+here.
 
 We want, for each separation $d$, the average of $\delta_x \delta_{x+d}$ over
 all cell pairs that are both inside the region:
@@ -181,14 +158,14 @@ all cell pairs that are both inside the region:
   \qquad
   n(d) = \sum_x \W_x \W_{x+d} .
 \end{equation}
-The numerator $s(d)$ is the sum of products over valid pairs. The denominator
+The numerator $s(d)$ is the sum of products over valid pairs.  The denominator
 $n(d)$ is the number of valid pairs, which is just the numerator with the
-field replaced by unity. Both sums run over all cells of whatever array we
+field replaced by unity.  Both sums run over all cells of whatever array we
 are storing.
 
-Two names are worth attaching here. The quantity $s(d)$ is the
+Two names are worth attaching here.  The quantity $s(d)$ is the
 \emph{autocorrelation} of the masked field, and $n(d)$ is the
-autocorrelation of the mask. The word autocorrelation means precisely ``a
+autocorrelation of the mask.  The word autocorrelation means precisely ``a
 field correlated against a shifted copy of itself,'' which is what both sums
 are.
 
@@ -214,10 +191,10 @@ sign convention of \code{cosmo\_ic.pdf} App.~A.
 
 We have one realisation, not an ensemble, so Eq.~\eqref{eq:estimator}
 replaces the ensemble average by an average over positions $x$ within the
-region. That substitution is justified by ergodicity and is exact only in the
+region.  That substitution is justified by ergodicity and is exact only in the
 limit of an infinite volume; at finite volume it leaves the cosmic variance
 and the integral constraint discussed in
-\S\ref{sec:integral-constraint}. None of that is at issue in this note. Both
+\S\ref{sec:integral-constraint}.  None of that is at issue in this note.  Both
 methods estimate the \emph{same} $\hat\xi$ from the \emph{same} realisation,
 so every statement below is about two evaluations of one estimator, not about
 how well that estimator recovers Eq.~\eqref{eq:xi-ensemble}.
@@ -229,10 +206,10 @@ about recognising $n(d)$ in closed form.
 
 Equation~\eqref{eq:estimator} looks like a naive pair average, not like the
 Landy--Szalay estimator \citep{LandySzalay1993} that one normally uses for a
-region with edges. In fact it is Landy--Szalay, and seeing this explains why
+region with edges.  In fact it is Landy--Szalay, and seeing this explains why
 no random catalogue appears anywhere in the code.
 
-\subsection{Uniform selection: the case at hand}\label{sec:ls-uniform}
+\subsection{Uniform selection}\label{sec:ls-uniform}
 
 Landy--Szalay is usually written in terms of pair counts,
 \begin{equation}\label{eq:ls}
@@ -240,25 +217,25 @@ Landy--Szalay is usually written in terms of pair counts,
 \end{equation}
 where $D$ is the data catalogue, $R$ is a synthetic random catalogue filling
 the same region with no clustering, and $DD$, $DR$, $RR$ count pairs at
-separation $d$ within and between the two catalogues. The role of $R$ is to
+separation $d$ within and between the two catalogues.  The role of $R$ is to
 measure the geometry: $RR$ tells you how many pairs at separation $d$ the
 region could possibly supply, so that the shape of the region does not get
 mistaken for clustering.
 
 Now put both catalogues on our grid, and let the random catalogue become
-infinitely dense while its total mass is held fixed. In that limit $R$ stops
+infinitely dense while its total mass is held fixed.  In that limit $R$ stops
 fluctuating and becomes exactly its own expectation value, which is a
 constant density inside the region and zero outside:
 \begin{equation}\label{eq:R-limit}
   R_x \;\longrightarrow\; \bar\rho\, \W_x .
 \end{equation}
-This is the step that removes the random catalogue from the problem. A finite
+This is the step that removes the random catalogue from the problem.  A finite
 random catalogue would carry Poisson noise that we would have to average
 down by making it large; an infinitely dense one has no noise, and we can
 write its contribution analytically.
 
 Write the data field as $D_x = \bar\rho\,\W_x (1 + \delta_x)$, which is
-just Eq.~\eqref{eq:delta-def} rearranged. The three pair counts at
+just Eq.~\eqref{eq:delta-def} rearranged.  The three pair counts at
 separation $d$ then become, using the symmetric definition of $DR$,
 \begin{align}
   DD(d) &= \bar\rho^2 \sum_x \W_x \W_{x+d} (1+\delta_x)(1+\delta_{x+d}),
@@ -277,7 +254,7 @@ cancel, and the bracket in the numerator collapses because
   \;=\; \delta_x \delta_{x+d} .
 \end{equation}
 Every term linear in $\delta$ cancels against the $DR$ subtraction, and the
-constants cancel against $RR$. What is left is
+constants cancel against $RR$.  What is left is
 \begin{equation}\label{eq:ls-equals-ours}
   \hat\xi_{\rm LS}(d)
   \;=\; \frac{\sum_x \W_x \W_{x+d}\, \delta_x \delta_{x+d}}
@@ -287,8 +264,8 @@ constants cancel against $RR$. What is left is
 which is exactly Eq.~\eqref{eq:estimator}.
 
 So a grid of $\delta$ with a lag-by-lag pair-count denominator \emph{is} the
-Landy--Szalay estimator, not an approximation to it. The $RR$ term has not
-been dropped; it has been evaluated analytically and appears as $n(d)$. This
+Landy--Szalay estimator, not an approximation to it.  The $RR$ term has not
+been dropped; it has been evaluated analytically and appears as $n(d)$.  This
 is why the code never draws a random catalogue: drawing one would only
 re-introduce, with Poisson noise, a quantity we already know exactly.
 
@@ -296,13 +273,13 @@ re-introduce, with Poisson noise, a quantity we already know exactly.
 
 The derivation above used Eq.~\eqref{eq:R-limit}, which assumes the selection
 is \emph{uniform} inside the region: every cell inside the mask has the same
-expected density. That is true for a rectangular cut through a simulation
+expected density.  That is true for a rectangular cut through a simulation
 box, which is our case, and false for a real galaxy survey, where the
 selection function varies with position and depth.
 
 It is worth knowing the general form, both because it shows what our special
 case is a special case \emph{of}, and because it is the version that
-generalises to the Fourier route without any assumption about the geometry.
+generalises to the Fourier method without any assumption about the geometry.
 Following \citet{Slepian2016}, define the \emph{data-minus-randoms} field
 \begin{equation}\label{eq:N-field}
   N \;\equiv\; D - R ,
@@ -318,7 +295,7 @@ Then the binned Landy--Szalay estimator for a separation bin $S$ is
               \theta(\br_1 - \br_2; S)\, R(\br_1) R(\br_2)} ,
 \end{equation}
 where $\theta(\cdot\,; S)$ is the bin indicator, equal to one when its
-argument is a separation inside bin $S$ and zero otherwise. Changing
+argument is a separation inside bin $S$ and zero otherwise.  Changing
 variables to the separation $\bs = \br_2 - \br_1$ and
 doing the integral over $\br_1$, which is a translation average, this
 becomes
@@ -331,9 +308,9 @@ where $\corr$ denotes correlation, the same shift-multiply-and-sum operation
 as in Eq.~\eqref{eq:estimator}.
 
 Read Eq.~\eqref{eq:ls-convolution} carefully, because it is the whole idea in
-one line. The Landy--Szalay estimator is a ratio of two correlations, each
-subsequently averaged over a separation bin. Both correlations can be
-computed by fast Fourier transform. Nothing has been approximated to get
+one line.  The Landy--Szalay estimator is a ratio of two correlations, each
+subsequently averaged over a separation bin.  Both correlations can be
+computed by fast Fourier transform.  Nothing has been approximated to get
 here.
 
 Our Eq.~\eqref{eq:ls-equals-ours} is the special case in which $R$ is
@@ -341,28 +318,28 @@ constant inside the mask, so that $[R\corr R](d)$ reduces to
 $\bar\rho^2 n(d)$ and can be written down without transforming anything.
 When the selection is not uniform, the recipe is unchanged except that the
 denominator must be computed the same way as the numerator, by transforming
-$R$. The identity between the two methods, which is the subject of this note,
+$R$.  The identity between the two methods, which is the subject of this note,
 holds either way.
 
 There is one important consequence of writing the estimator with $N$ and $R$
-rather than with $\delta$, and it is easy to miss. Because the padded zeros
-enter the numerator and the denominator in the same way, they cancel. If
+rather than with $\delta$, and it is easy to miss.  Because the padded zeros
+enter the numerator and the denominator in the same way, they cancel.  If
 instead one forms $\delta$, pads it, transforms it and stops there ---
 dividing by a constant volume rather than by the matching $[R\corr R]$ ---
 the result is \emph{misnormalised} by the padding
-\citep{Slepian2016}. What protects Eq.~\eqref{eq:estimator} from that fate is
-precisely the lag-dependent $n(d)$ in its denominator. This is the single
+\citep{Slepian2016}.  What protects Eq.~\eqref{eq:estimator} from that fate is
+precisely the lag-dependent $n(d)$ in its denominator.  This is the single
 most common way to get an FFT correlation function wrong, and
 \S\ref{sec:denominator} is therefore not an implementation detail.
 
-\section{The pair count in closed form}\label{sec:denominator}
+\section{The pair count for a rectangular region}\label{sec:denominator}
 
 Both methods need $n(d) = \sum_x \W_x \W_{x+d}$, the number of valid pairs,
-so we evaluate it once here before splitting into the two routes.
+so we evaluate it once here before splitting into the two methods.
 
 In general $n(d)$ is the autocorrelation of the mask, and one can obtain it
 exactly as one obtains the numerator, by transforming $\W$ and inverting
-$|\hat\W_k|^2$. For a rectangular region we can do better and write it
+$|\hat\W_k|^2$.  For a rectangular region we can do better and write it
 down.
 
 In one dimension with a solid run of $N$ occupied cells and a real edge, the
@@ -376,20 +353,20 @@ On a periodic axis every cell has a partner at every lag, so
   n(d) \;=\; N \quad \text{for all } d .
 \end{equation}
 The linear decline of Eq.~\eqref{eq:nd-nonperiodic} is the familiar
-triangular pair-count profile. It says that large separations are sampled by
+triangular pair-count profile.  It says that large separations are sampled by
 fewer pairs than small ones, purely because of geometry, and dividing by it
 is what stops that geometric effect being read as a decline in clustering.
 
 In three dimensions the crucial property is that a rectangular mask is
 \emph{separable}: it factorises into one indicator function per axis,
-$\W_{\bx} = \W^{(1)}_{x_1}\W^{(2)}_{x_2}\W^{(3)}_{x_3}$. The
+$\W_{\bx} = \W^{(1)}_{x_1}\W^{(2)}_{x_2}\W^{(3)}_{x_3}$.  The
 autocorrelation of a product of functions of independent variables is the
 product of their autocorrelations, so
 \begin{equation}\label{eq:nd-3d}
   n(\bd) \;=\; n^{(1)}(d_1)\, n^{(2)}(d_2)\, n^{(3)}(d_3),
 \end{equation}
 with each factor given by Eq.~\eqref{eq:nd-nonperiodic} or
-Eq.~\eqref{eq:nd-periodic} according to that axis's boundary condition. For a
+Eq.~\eqref{eq:nd-periodic} according to that axis's boundary condition.  For a
 region that is periodic in $z$ and cut in $x$ and $y$,
 \begin{equation}\label{eq:nd-pencil}
   n(\bd) \;=\; (N_x - d_1)(N_y - d_2)\,N_z .
@@ -397,149 +374,149 @@ region that is periodic in $z$ and cut in $x$ and $y$,
 
 This closed form is why the direct lag sum can divide by a simple product and
 still be a correct Landy--Szalay estimator, and it is also why the two
-methods can share a denominator exactly. Both use Eq.~\eqref{eq:nd-3d};
+methods can share a denominator exactly.  Both use Eq.~\eqref{eq:nd-3d};
 neither computes $RR$ numerically.
 
-It is worth being explicit about the limitation. Equation~\eqref{eq:nd-3d}
-holds because the region is a rectangle. For an irregularly shaped mask ---
+It is worth being explicit about the limitation.  Equation~\eqref{eq:nd-3d}
+holds because the region is a rectangle.  For an irregularly shaped mask ---
 an ellipsoidal Lagrangian patch, a survey footprint, a zoom region with a
 ragged boundary --- there is no product formula, and $n(\bd)$ must be
 computed as the autocorrelation of $\W$, most cheaply by the same
-transform machinery used for the numerator. The identity between the two
+transform machinery used for the numerator.  The identity between the two
 methods survives unchanged; only the closed form for the denominator is lost.
 
-\section{Method A: the direct lag sum}\label{sec:direct}
+\section{Direct evaluation: the lag sum}\label{sec:direct}
 
 The first way to evaluate $s(d)$ is to do what Eq.~\eqref{eq:estimator}
-says. For a given separation $d$, loop over every cell $x$ such that both $x$
+says.  For a given separation $d$, loop over every cell $x$ such that both $x$
 and $x+d$ lie inside the region, accumulate $\delta_x\delta_{x+d}$, and count
 the terms.
 
 If the region has $N_{\rm cell}$ cells and we want all separations out to a
 maximum lag of $k_{\max}$ cells per axis, the cost is
 $\mathcal{O}(k_{\max}^3\, N_{\rm cell})$, because there are of order
-$k_{\max}^3$ separation vectors and each one costs a pass over the grid. For
+$k_{\max}^3$ separation vectors and each one costs a pass over the grid.  For
 a $16\times16\times128$ pencil with $k_{\max}=25$ this is roughly
-$5\times10^{8}$ multiply-adds, which is seconds. For a large region with
+$5\times10^{8}$ multiply-adds, which is seconds.  For a large region with
 large $k_{\max}$ it becomes the dominant cost of the whole analysis, and
 \S\ref{sec:cost} makes that comparison quantitative.
 
 The virtue of this method is that there is nothing to get wrong
-conceptually. It is the definition, transcribed. That makes it the natural
+conceptually.  It is the definition, transcribed.  That makes it the natural
 reference implementation against which anything faster should be checked.
 
-\section{Method B: the Fourier route}\label{sec:fft}
+\section{Evaluation by fast Fourier transform}\label{sec:fft}
 
 \subsection{The discrete Fourier transform and its orthogonality relation}
 
 Work in one dimension for the moment; the three-dimensional case is the same
 statement applied on each axis, and we return to it at the end of
-\S\ref{sec:wk}. Let $f_x$ be an array of $P$ numbers indexed by
-$x = 0,1,\dots,P-1$. Its discrete Fourier transform (DFT) is
+\S\ref{sec:wk}.  Let $f_x$ be an array of $M$ numbers indexed by
+$x = 0,1,\dots,M-1$.  Its discrete Fourier transform (DFT) is
 \begin{equation}\label{eq:dft}
-  \hat f_k \;=\; \sum_{x=0}^{P-1} f_x\, e^{-2\pi i k x / P},
-  \qquad k = 0,1,\dots,P-1 ,
+  \hat f_k \;=\; \sum_{x=0}^{M-1} f_x\, e^{-2\pi i k x / M},
+  \qquad k = 0,1,\dots,M-1 ,
 \end{equation}
 and the inverse transform is
 \begin{equation}\label{eq:idft}
-  f_x \;=\; \frac{1}{P} \sum_{k=0}^{P-1} \hat f_k\, e^{+2\pi i k x / P} .
+  f_x \;=\; \frac{1}{M} \sum_{k=0}^{M-1} \hat f_k\, e^{+2\pi i k x / M} .
 \end{equation}
 The fast Fourier transform (FFT) is an algorithm for evaluating
-Eq.~\eqref{eq:dft} in $\mathcal{O}(P\log P)$ operations instead of the
-$\mathcal{O}(P^2)$ that the formula suggests \citep{CooleyTukey1965}. It
+Eq.~\eqref{eq:dft} in $\mathcal{O}(M\log M)$ operations instead of the
+$\mathcal{O}(M^2)$ that the formula suggests \citep{CooleyTukey1965}.  It
 computes the same quantity; it is not a different or approximate transform.
 This point deserves emphasis because it is the source of much of the
-suspicion the Fourier route attracts. An FFT is a regrouping of the sum in
+suspicion the Fourier method attracts.  An FFT is a regrouping of the sum in
 Eq.~\eqref{eq:dft} using the algebraic structure of the roots of unity, in
 the same way that Horner's rule is a regrouping of a polynomial evaluation.
 
 The one fact we need is the \emph{orthogonality relation}
 \begin{equation}\label{eq:orthogonality}
-  \frac{1}{P}\sum_{k=0}^{P-1} e^{2\pi i k m / P}
+  \frac{1}{M}\sum_{k=0}^{M-1} e^{2\pi i k m / M}
   \;=\;
   \begin{cases}
-    1 & \text{if } m \equiv 0 \pmod P,\\
+    1 & \text{if } m \equiv 0 \pmod M,\\
     0 & \text{otherwise}.
   \end{cases}
 \end{equation}
-The proof is a geometric series and takes one line. Write
-$z = e^{2\pi i m / P}$. If $m \equiv 0 \pmod P$ then $z = 1$ and the sum is
-$P$, giving $1$ after the prefactor. Otherwise $z \neq 1$, and the finite
-geometric series gives $\sum_{k=0}^{P-1} z^k = (z^P - 1)/(z - 1)$. The
-numerator vanishes because $z^P = e^{2\pi i m} = 1$ for integer $m$, while
+The proof is a geometric series and takes one line.  Write
+$z = e^{2\pi i m / M}$.  If $m \equiv 0 \pmod M$ then $z = 1$ and the sum is
+$M$, giving $1$ after the prefactor.  Otherwise $z \neq 1$, and the finite
+geometric series gives $\sum_{k=0}^{M-1} z^k = (z^M - 1)/(z - 1)$.  The
+numerator vanishes because $z^M = e^{2\pi i m} = 1$ for integer $m$, while
 the denominator does not, so the sum is zero.
 
 Note what Eq.~\eqref{eq:orthogonality} is: a Kronecker delta, but one that
-identifies indices \emph{modulo} $P$. That ``modulo'' is the whole story of
+identifies indices \emph{modulo} $M$.  That ``modulo'' is the whole story of
 \S\ref{sec:wraparound}.
 
 \subsection{Wiener--Khinchin as a finite identity}\label{sec:wk}
 
 Now compute the inverse transform of the squared modulus, which is what
-``transform, square, transform back'' means. Start from the definition of
+``transform, square, transform back'' means.  Start from the definition of
 $|\hat f_k|^2$ and expand it as a double sum:
 \begin{equation}\label{eq:modsq}
   |\hat f_k|^2
   \;=\; \hat f_k\, \overline{\hat f_k}
-  \;=\; \left(\sum_x f_x e^{-2\pi i k x / P}\right)
-        \left(\sum_y f_y e^{+2\pi i k y / P}\right)
-  \;=\; \sum_x \sum_y f_x f_y\, e^{-2\pi i k (x-y)/P} ,
+  \;=\; \left(\sum_x f_x e^{-2\pi i k x / M}\right)
+        \left(\sum_y f_y e^{+2\pi i k y / M}\right)
+  \;=\; \sum_x \sum_y f_x f_y\, e^{-2\pi i k (x-y)/M} ,
 \end{equation}
 where the overbar denotes complex conjugation, and we used that $f$ is real
-so that $\overline{f_y} = f_y$. Apply the inverse transform,
+so that $\overline{f_y} = f_y$.  Apply the inverse transform,
 Eq.~\eqref{eq:idft}, and exchange the order of the sums, which is allowed
 because all sums are finite:
 \begin{align}
-  \frac{1}{P}\sum_k |\hat f_k|^2 e^{2\pi i k d / P}
+  \frac{1}{M}\sum_k |\hat f_k|^2 e^{2\pi i k d / M}
   &= \sum_x \sum_y f_x f_y \;
-     \underbrace{\frac{1}{P}\sum_k e^{2\pi i k\,(d - x + y)/P}}_{\text{use Eq.~\eqref{eq:orthogonality}}}
+     \underbrace{\frac{1}{M}\sum_k e^{2\pi i k\,(d - x + y)/M}}_{\text{use Eq.~\eqref{eq:orthogonality}}}
      \label{eq:wk-step1}\\[4pt]
   &= \sum_x \sum_y f_x f_y \;
-     \big[\, x - y \equiv d \!\!\pmod P \,\big]
+     \big[\, x - y \equiv d \!\!\pmod M \,\big]
      \label{eq:wk-step2}\\[4pt]
-  &= \sum_x f_x\, f_{(x-d) \bmod P} .
+  &= \sum_x f_x\, f_{(x-d) \bmod M} .
      \label{eq:wk-step3}
 \end{align}
 In Eq.~\eqref{eq:wk-step2} the square bracket is $1$ when the condition
-holds and $0$ otherwise. Going to Eq.~\eqref{eq:wk-step3} we used that
+holds and $0$ otherwise.  Going to Eq.~\eqref{eq:wk-step3} we used that
 condition to do the $y$ sum, which has exactly one surviving term for each
-$x$, namely $y = (x-d) \bmod P$. Relabelling the dummy index turns this into
-$\sum_x f_x f_{(x+d) \bmod P}$, which is the more familiar form.
+$x$, namely $y = (x-d) \bmod M$.  Relabelling the dummy index turns this into
+$\sum_x f_x f_{(x+d) \bmod M}$, which is the more familiar form.
 
-This is the Wiener--Khinchin theorem in its finite, discrete form. Read it
-carefully and notice what it is not. There is no limit, no integral, no
-truncation, no assumption of stationarity, no ensemble average. It is an
-identity between two finite sums of products of the same $P$ numbers, valid
-for any array $f$ whatsoever. In exact arithmetic the two sides are the same
+This is the Wiener--Khinchin theorem in its finite, discrete form.  Read it
+carefully and notice what it is not.  There is no limit, no integral, no
+truncation, no assumption of stationarity, no ensemble average.  It is an
+identity between two finite sums of products of the same $M$ numbers, valid
+for any array $f$ whatsoever.  In exact arithmetic the two sides are the same
 number.
 
 The generalisation to three dimensions is immediate: apply
 Eq.~\eqref{eq:orthogonality} once per axis, and the three Kronecker deltas
-together fix the full separation vector. Nothing about the argument changes.
+together fix the full separation vector.  Nothing about the argument changes.
 
 So the answer to ``how can squaring the modulus not lose information?'' is
-this. Squaring \emph{does} lose the phases, and the phases are exactly what
-you would need to reconstruct the field $f$ itself. But we never asked for
-$f$. We asked for its autocorrelation, and the autocorrelation is precisely
-the phase-independent content of the field. Nothing that $\xi$ contains has
+this.  Squaring \emph{does} lose the phases, and the phases are exactly what
+you would need to reconstruct the field $f$ itself.  But we never asked for
+$f$.  We asked for its autocorrelation, and the autocorrelation is precisely
+the phase-independent content of the field.  Nothing that $\xi$ contains has
 been thrown away, because $\xi$ and $P(k)$ are a Fourier pair by definition.
 
 \subsection{Circular versus linear autocorrelation}\label{sec:wraparound}
 
 The identity just derived gives the \emph{circular} autocorrelation: the
-index arithmetic is modulo $P$, so cell $P-1$ is treated as a neighbour of
-cell $0$. Whether that is what we want depends on the region.
+index arithmetic is modulo $M$, so cell $M-1$ is treated as a neighbour of
+cell $0$.  Whether that is what we want depends on the region.
 
 If the axis in question is genuinely periodic --- a full simulation box, or
 the long axis of a pencil beam that spans the box --- then wrapping is
-physically correct. A pair straddling the boundary is a real pair at a real
+physically correct.  A pair straddling the boundary is a real pair at a real
 separation, and it should be counted.
 
 If the axis was cut, so the region has a real edge there, wrapping is wrong.
 It manufactures pairs between cells at opposite ends of the region, which are
 not close together at all.
 
-Take $P = N = 4$ with $f = (a,b,c,d)$ and look at lag $1$. The circular
+Take $M = N = 4$ with $f = (a,b,c,d)$ and look at lag $1$.  The circular
 autocorrelation, which is what an unpadded FFT returns, is
 \begin{equation}\label{eq:circ-example}
   s_{\rm circ}(1) \;=\; ab + bc + cd + \underbrace{da}_{\text{wrap}} .
@@ -550,54 +527,54 @@ real edges returns, is
   s_{\rm lin}(1) \;=\; ab + bc + cd .
 \end{equation}
 They differ by the single term $da$, which pairs the last cell with the
-first. In general,
+first.  In general,
 \begin{equation}\label{eq:circ-vs-lin}
   s_{\rm circ}(d) \;=\; s_{\rm lin}(d)
   \;+\; \sum_{x=N-d}^{N-1} f_x\, f_{x+d-N} ,
 \end{equation}
-and the extra sum has $d$ terms. For small lags on a large array this is a
+and the extra sum has $d$ terms.  For small lags on a large array this is a
 small contamination, which is exactly why it is easy to miss; for lags
 approaching $N$ it dominates.
 
 \subsection{How much padding is enough}\label{sec:pad-howmuch}
 
-Now embed the $N$-cell array in a longer array of length $P$, filling the
+Now embed the $N$-cell array in a longer array of length $M$, filling the
 extra entries with zeros:
 \begin{equation}\label{eq:padded-array}
   \tilde f_x \;=\;
   \begin{cases}
     f_x & 0 \le x < N,\\
-    0   & N \le x < P .
+    0   & N \le x < M .
   \end{cases}
 \end{equation}
-Apply the identity of \S\ref{sec:wk} to $\tilde f$. The wrap terms are those
+Apply the identity of \S\ref{sec:wk} to $\tilde f$.  The wrap terms are those
 in which one index exceeds $N-1$, and every such term contains a factor
-$\tilde f$ evaluated in the padded zone, which is zero. So they vanish
+$\tilde f$ evaluated in the padded zone, which is zero.  So they vanish
 identically --- not approximately, but term by term.
 
 How much padding is enough? A wrap term at lag $d$ pairs index $x$ near the
-top of the array with index $x + d - P$. For this to reach back into the
-occupied region $[0,N)$ we need $x + d - P \ge 0$ with $x \le N-1$, that is
-$d \ge P - N + 1$. So all lags with
+top of the array with index $x + d - M$.  For this to reach back into the
+occupied region $[0,N)$ we need $x + d - M \ge 0$ with $x \le N-1$, that is
+$d \ge M - N + 1$.  So all lags with
 \begin{equation}\label{eq:pad-condition}
-  d \;\le\; P - N
+  d \;\le\; M - N
 \end{equation}
 are free of wrap contamination.
 
 Equation~\eqref{eq:pad-condition} is the statement worth remembering, and it
 is worth stating in words: \emph{pad by the largest separation you intend to
-measure, not by the size of the region}. If the region is $N$ cells across
+measure, not by the size of the region}.  If the region is $N$ cells across
 but you only want $\xi$ out to $d_{\max} = N/4$, then
-$P = N + N/4$ suffices, and the transform is done on an array a quarter
+$M = N + N/4$ suffices, and the transform is done on an array a quarter
 larger rather than twice as large.
 
 The stronger-sounding rule that one must always embed a non-periodic region
 in a padded array of twice its size is, as \citet{Slepian2016} point out, a
-common misunderstanding. It is the worst case of
+common misunderstanding.  It is the worst case of
 Eq.~\eqref{eq:pad-condition}, obtained by demanding every lag the region can
-supply, $d_{\max} = N$. It is a safe default and it is what
+supply, $d_{\max} = N$.  It is a safe default and it is what
 \texttt{measure\_xi\_fft\_mpi.c} does, since for a pencil only $16$ cells
-across there is nothing to gain by being clever. For a large survey volume in
+across there is nothing to gain by being clever.  For a large survey volume in
 which only separations far below the box size are of interest, the saving
 from padding by $d_{\max}$ instead is real.
 
@@ -606,14 +583,14 @@ periodic embedding need only be large enough that the separation between any
 point in the region and any point in its periodic image exceeds the largest
 separation being measured.
 
-Take the $P=4$ example above and pad to $P=8$, giving
-$\tilde f = (a,b,c,d,0,0,0,0)$. The circular autocorrelation of $\tilde f$ at
+Take the $M=4$ example above and pad to $M=8$, giving
+$\tilde f = (a,b,c,d,0,0,0,0)$.  The circular autocorrelation of $\tilde f$ at
 lag $1$ is $ab + bc + cd + d\cdot 0 + 0 + 0 + 0 + 0\cdot a = ab+bc+cd$, which
-is $s_{\rm lin}(1)$. The offending $da$ term has been replaced by two terms
+is $s_{\rm lin}(1)$.  The offending $da$ term has been replaced by two terms
 that each contain a zero.
 
 Figure~\ref{fig:toy} works this through numerically, together with a small
-two-dimensional grid in which one axis is cut and the other is periodic. The
+two-dimensional grid in which one axis is cut and the other is periodic.  The
 grid is deliberately small enough that any single entry can be recomputed by
 hand from the definition, which is the only way to be sure that agreement
 between two programs is not agreement between two copies of the same mistake.
@@ -622,10 +599,10 @@ between two programs is not agreement between two copies of the same mistake.
   \centering
   \includegraphics[width=\textwidth]{xi_toy.pdf}
   \caption{An $8\times16$ toy grid with the $x$ axis cut (zero-padded to
-    $16$) and the $y$ axis periodic (not padded). Left and centre: the
+    $16$) and the $y$ axis periodic (not padded).  Left and centre: the
     correlation function evaluated at every lag by the direct sum and by the
-    padded FFT. The two panels are the same picture. Right: the base-10
-    logarithm of their absolute difference. It sits between $10^{-16}$ and
+    padded FFT.  The two panels are the same picture.  Right: the base-10
+    logarithm of their absolute difference.  It sits between $10^{-16}$ and
     $10^{-14}$ everywhere, so the two evaluations differ only in the last few
     digits a double carries --- the residue \S\ref{sec:roundoff} accounts for.
     Produced by \texttt{figures/xi\_estimators/plot\_xi\_toy.py}, which also
@@ -639,28 +616,28 @@ between two programs is not agreement between two copies of the same mistake.
 
 Nothing in \S\ref{sec:wraparound} or \S\ref{sec:denominator} requires all
 three axes to be treated alike, and a pencil beam is precisely the case where
-they are not. The region spans the full periodic box along one axis and is
+they are not.  The region spans the full periodic box along one axis and is
 cut on the other two.
 
-The recipe follows directly. For each axis independently:
+The recipe follows directly.  For each axis independently:
 \begin{itemize}
-  \item \textbf{Periodic axis.} Do not pad. The circular autocorrelation that
+  \item \textbf{Periodic axis.} Do not pad.  The circular autocorrelation that
         the unpadded FFT returns is the physically correct one, because
-        wrapping pairs are real. Use $n = N$ on that axis.
+        wrapping pairs are real.  Use $n = N$ on that axis.
   \item \textbf{Non-periodic axis.} Pad by at least $d_{\max}$, and to $2N$
-        if every available lag is wanted. The zeros suppress the wrap terms,
-        so the FFT returns the linear autocorrelation. Use $n = N - d$ on
+        if every available lag is wanted.  The zeros suppress the wrap terms,
+        so the FFT returns the linear autocorrelation.  Use $n = N - d$ on
         that axis.
 \end{itemize}
 The padded array for a $16\times16\times128$ pencil with $z$ periodic is
-therefore $32\times32\times128$, not $32\times32\times256$. Not padding the
+therefore $32\times32\times128$, not $32\times32\times256$.  Not padding the
 long axis is a saving as well as a physical statement: the wrap along $z$
 carries genuine information about pairs separated by more than half the
 region, which is what lets a pencil beam reach separations far beyond half
 its transverse width.
 
 The direct lag sum makes the same distinction by choosing, per axis, whether
-its index arithmetic wraps. Because both methods make the choice the same way
+its index arithmetic wraps.  Because both methods make the choice the same way
 and use the same $n(\bd)$, they agree axis by axis.
 Figure~\ref{fig:pencil} shows the outcome at a realistic size.
 
@@ -669,44 +646,46 @@ Figure~\ref{fig:pencil} shows the outcome at a realistic size.
   \includegraphics[width=\textwidth]{xi_identity.pdf}
   \caption{A $16\times16\times128$ cell pencil
     ($125\times125\times1000\ \mathrm{Mpc}/h$) cut from a $128^3$ periodic
-    box, with $x$ and $y$ non-periodic and $z$ periodic. \emph{Left:} the
-    power spectrum. The full box recovers the input spectrum, as it must.
+    box, with $x$ and $y$ non-periodic and $z$ periodic.  \emph{Left:} the
+    power spectrum.  The full box recovers the input spectrum, as it must.
     The pencil's $|\mathrm{FFT}(\delta_{\rm pad})|^2$ --- the intermediate the
     padded-FFT estimator forms on the way to $\xi$ --- is the true $P(k)$
     convolved with the mask window, so it is suppressed and scattered at low
     $k$ and converges to the input only well inside the region scale.
-    \emph{Right:} the correlation function from both estimators. The circles
+    \emph{Right:} the correlation function from both estimators.  The circles
     lie on the line at every point, and the lower panel shows the residual
-    relative difference. The departure of both from linear
+    relative difference.  The departure of both from linear
     theory beyond $r \sim 80\ \mathrm{Mpc}/h$ is cosmic variance in a single
     pencil together with the integral constraint of
     \S\ref{sec:integral-constraint}, and it affects the two estimators
-    identically. Produced by
+    identically.  Produced by
     \texttt{figures/xi\_estimators/plot\_xi\_identity.py}.}
   \label{fig:pencil}
 \end{figure}
 
-\section{Rounding: why the agreement is not exact}\label{sec:roundoff}
+\section{Rounding error}\label{sec:roundoff}
 
 If the two computations are the same expression, why do they not agree
 bit-for-bit?
 
-Because floating-point addition is not associative. Both methods add up the
+Because floating-point addition is not associative.  Both methods add up the
 same set of products, but in different orders, and each ordering commits a
-different sequence of rounding errors. The exact answer is the same; the two
+different sequence of rounding errors.  The exact answer is the same; the two
 computed answers straddle it.
 
-The two orderings have different error growth. Write $\epsilon$ for the
+The two orderings have different error growth.  Write $\epsilon$ for the
 machine epsilon, the spacing between representable numbers near unity, which
-is $2.2\times10^{-16}$ in double precision. A naive sequential sum of $M$
-terms accumulates a relative error bounded by roughly $M\epsilon$, and in
-practice, with errors of random sign, of order $\sqrt{M}\,\epsilon$. An FFT
-of length $P$ performs $\log_2 P$ butterfly stages, and its error grows like
-$\sqrt{\log_2 P}\,\epsilon$ \citep{Frigo2005}. For large arrays the FFT is
+is $2.2\times10^{-16}$ in double precision.  The direct sum at a given lag adds
+$n(\bd)$ products, one per valid pair.  Summing them sequentially
+accumulates a relative error bounded by roughly $n(\bd)\,\epsilon$, and
+in practice, with errors of random sign, of order
+$\sqrt{n(\bd)}\,\epsilon$.  An FFT
+of length $M$ performs $\log_2 M$ butterfly stages, and its error grows like
+$\sqrt{\log_2 M}\,\epsilon$ \citep{Frigo2005}.  For large arrays the FFT is
 therefore the \emph{better}-conditioned of the two, which is worth knowing:
 the direct sum is the conceptual reference, not the numerically superior one.
 
-This also makes the comparison a useful diagnostic. A difference far above
+This also makes the comparison a useful diagnostic.  A difference far above
 the rounding level means one of the two programs is not evaluating the
 estimator that was derived above, and the cause is essentially always one of
 a short list: insufficient padding on a cut axis
@@ -716,35 +695,35 @@ than the lag-dependent $n(\bd)$ (\S\ref{sec:denominator},
 not the other; or two different choices of mean density
 (\S\ref{sec:integral-constraint}).
 
-\section{Cost: when the Fourier route wins}\label{sec:cost}
+\section{Computational cost}\label{sec:cost}
 
 The identity of \S\S\ref{sec:direct}--\ref{sec:fft} says the two methods give
-the same answer. It says nothing about which to run, and that is decided
+the same answer.  It says nothing about which to run, and that is decided
 entirely by cost.
 
 Direct pair counting scales as the square of the number of objects within the
-maximum separation of interest. For a catalogue of $N$ objects with number
+maximum separation of interest.  For a catalogue of $N$ objects with number
 density $n$, counting all pairs out to a radius enclosing volume $V_{\max}$
 costs $\mathcal{O}(N n V_{\max})$, which for a survey is
-$\mathcal{O}\big((nV)^2\big)$ in the worst case \citep{Slepian2016}. Trees
+$\mathcal{O}\big((nV)^2\big)$ in the worst case \citep{Slepian2016}.  Trees
 and grids reduce the constant by avoiding pairs far beyond the scale of
 interest, but they do not change the scaling, and they help least when the
 binning is coarse compared with the interparticle spacing --- which is the
 usual situation.
 
-The Fourier route costs $\mathcal{O}(N_g \log N_g)$ in the number of grid
+The Fourier method costs $\mathcal{O}(N_g \log N_g)$ in the number of grid
 cells $N_g$, plus a term linear in the number of objects for the mass
-assignment itself. The two costs are therefore controlled by different
+assignment itself.  The two costs are therefore controlled by different
 things: pair counting by how many objects and how large a separation, the
-Fourier route by how fine a grid.
+Fourier method by how fine a grid.
 
 Three regimes follow, and they are worth stating because they say when the
-work of implementing the Fourier route pays for itself
+work of implementing the Fourier method pays for itself
 \citep{Slepian2016}:
 \begin{itemize}
   \item \textbf{Large separations.} Pair counting cost grows with
         $V_{\max}$; FFT cost does not depend on the separation range at all.
-        The larger the scales of interest, the more the Fourier route wins.
+        The larger the scales of interest, the more the Fourier method wins.
   \item \textbf{High number density.} Pair counting cost grows quadratically
         with density; the FFT cost is fixed by the grid, so it is unchanged
         when the same volume holds ten times as many objects.
@@ -756,43 +735,43 @@ Conversely, if you want small separations in a sparse catalogue at high
 spatial resolution, pair counting may well be the cheaper option, and it
 avoids the artefacts of the next section entirely.
 
-There is a second, more mundane reason the scaling matters. Modern analyses
+There is a second, more mundane reason the scaling matters.  Modern analyses
 compute covariance matrices from hundreds or thousands of mock catalogues,
 and that repetition, not the single measurement on real data, dominates the
-total cost. A method that is somewhat less accurate but far faster is often
+total cost.  A method that is somewhat less accurate but far faster is often
 the right trade for the mocks even when the real data are analysed with an
 explicit pair count \citep{Slepian2016}.
 
-\section{What the Fourier route gives up}\label{sec:gives-up}
+\section{Errors introduced by the grid}\label{sec:gives-up}
 
-The identity proved above is exact \emph{given the gridded field}. It says
-nothing about the step before that, and it is there that the Fourier route
-concedes something real. Three concessions are worth knowing
+The identity proved above is exact \emph{given the gridded field}.  It says
+nothing about the step before that, and it is there that the Fourier method
+concedes something real.  Three concessions are worth knowing
 \citep{Slepian2016}.
 
 \textbf{Gridding displaces the objects.} Assigning particles to cells moves
-each one to a nearby cell centre, or spreads it over neighbouring cells. The
+each one to a nearby cell centre, or spreads it over neighbouring cells.  The
 measured correlation function is therefore a smoothed version of the truth,
 with the smoothing set by the assignment scheme and the cell size
-\citep{Jing2005}. Pair counting uses the exact positions and has no such
-error. The size of the effect is governed by the ratio of the grid spacing to
+\citep{Jing2005}.  Pair counting uses the exact positions and has no such
+error.  The size of the effect is governed by the ratio of the grid spacing to
 the width of the radial bins: if the bins are much wider than a cell, the
 smoothing is buried inside the bin and does not matter.
 
-A worked figure makes this concrete. A baryon acoustic oscillation analysis
+A worked figure makes this concrete.  A baryon acoustic oscillation analysis
 using separation bins of $8\,h^{-1}$~Mpc wants a grid comfortably finer than
-that. \citet{Slepian2016} suggest tuning the bins so that they have
+that.  \citet{Slepian2016} suggest tuning the bins so that they have
 negligible support beyond $k \approx 0.4\,h\,\mathrm{Mpc}^{-1}$ and then
 choosing a grid scale of $3$--$4\,h^{-1}$~Mpc, which places the Nyquist
 frequency safely above the smoothing scale.
 
 \textbf{A Cartesian grid does not align with spherical bins.} Our lags live
 on a cubic lattice, but $\xi(r)$ is a function of $|r|$, so each radial bin
-is assembled from whichever lattice vectors happen to fall inside it. At
+is assembled from whichever lattice vectors happen to fall inside it.  At
 small $r$ there are few such vectors and the binning is visibly ragged; this
 is why the innermost bins in Fig.~\ref{fig:pencil} are built from as few as
-one or three lags. Pair counting in spherical coordinates has no analogue of
-this. One partial remedy is to use radial bins with smooth edges rather than
+one or three lags.  Pair counting in spherical coordinates has no analogue of
+this.  One partial remedy is to use radial bins with smooth edges rather than
 top hats, which both reduces the artefacts and is numerically better behaved
 when the result is to be compared against a theoretical spectrum through a
 spherical Bessel transform.
@@ -801,14 +780,14 @@ spherical Bessel transform.
 point already made in \S\ref{sec:ls-general}, and it belongs on any list of
 what can go wrong: transforming a padded $\delta$ field and dividing by a
 constant gives a misnormalised answer, because the padding was never
-accounted for. Dividing instead by the matching pair count, whether the
+accounted for.  Dividing instead by the matching pair count, whether the
 analytic $n(\bd)$ of Eq.~\eqref{eq:nd-3d} or a transformed $R$ field,
 is what makes the padding cancel.
 
 The reassuring statement to hold onto is that all three concessions are
 controlled by the grid, and all vanish as the grid is refined: the FFT
 estimate converges to the pair-counting answer as $N_g$ grows
-\citep{Slepian2016}. They are a resolution choice, not a bias that cannot be
+\citep{Slepian2016}.  They are a resolution choice, not a bias that cannot be
 removed.
 
 \section{The mean density and the integral constraint}\label{sec:integral-constraint}
@@ -819,55 +798,55 @@ and because it does not announce itself as an error.
 The field $\delta$ depends on the mean density $\bar\rho$ chosen in
 Eq.~\eqref{eq:delta-def}, and $\hat\xi$ depends on $\delta$ quadratically.
 The mean must be taken over the \emph{region}, that is over cells with
-$\W_x = 1$, and not over the padded array. The padded array contains the
+$\W_x = 1$, and not over the padded array.  The padded array contains the
 zeros we inserted, and its mean is smaller by the volume ratio
-$V_{\rm region}/V_{\rm padded}$. Using it would rescale the field and shift
+$V_{\rm region}/V_{\rm padded}$.  Using it would rescale the field and shift
 $\xi$ by an amount that is not a rounding error.
 
 With the mean taken over the region, $\sum_x \W_x\delta_x = 0$ by
 construction, so the padded field has zero total sum and its $k=0$ Fourier
-mode vanishes. This is the discrete statement of the \emph{integral
+mode vanishes.  This is the discrete statement of the \emph{integral
 constraint}: because the mean was estimated from the same data, the measured
 $\xi$ is forced to integrate to zero over the region, and it is therefore
 biased low relative to the true $\xi$ by an amount of order the variance of
-the region's mean density \citep{Peebles1980}. That bias is a property of
+the region's mean density \citep{Peebles1980}.  That bias is a property of
 the estimator, shared identically by both methods, and it does not affect
-their agreement with each other. It does affect comparison with theory, which
+their agreement with each other.  It does affect comparison with theory, which
 is why a measured $\xi$ from a small region should not be expected to sit on
 a linear-theory curve at separations approaching the region size --- the
 effect visible at large $r$ in Fig.~\ref{fig:pencil}.
 
 Because the integral constraint is a property of the Landy--Szalay estimator
 rather than of how its sums are evaluated, it is unchanged by moving to the
-Fourier route \citep{Slepian2016}. Whatever was true of the pair-counted
+Fourier method \citep{Slepian2016}.  Whatever was true of the pair-counted
 monopole remains true of the transformed one.
 
-\section{What a two-method test does and does not validate}\label{sec:validates}
+\section{What a comparison of the two methods tests}\label{sec:validates}
 
-Suppose you run both estimators on the same data and they agree. What have
+Suppose you run both estimators on the same data and they agree.  What have
 you learned?
 
 You have learned that the fast implementation faithfully reproduces the
 reference implementation of the correlation step: the transform, the padding,
-the lag indexing, the denominator lookup, and the binning. Given how many
+the lag indexing, the denominator lookup, and the binning.  Given how many
 sign and index conventions are involved, this is a genuinely strong check,
 and it is the right check to run before trusting the fast path.
 
-You have \emph{not} learned that the estimator is correct. If the two
+You have \emph{not} learned that the estimator is correct.  If the two
 programs share their upstream code --- the same mass assignment, the same
 mean-density normalisation, the same buffer-cell handling, the same $r$-bin
 edges --- then any error in that shared code appears identically in both
-outputs and cancels exactly out of the comparison. A comparison can only test
+outputs and cancels exactly out of the comparison.  A comparison can only test
 what differs between the two things being compared.
 
-Nor does it test anything in \S\ref{sec:gives-up}. The gridding artefacts are
+Nor does it test anything in \S\ref{sec:gives-up}.  The gridding artefacts are
 present in both methods by construction, because both start from the same
-gridded field. Detecting those requires either refining the grid and watching
+gridded field.  Detecting those requires either refining the grid and watching
 the answer move, or comparing against a genuine pair count on the ungridded
 positions.
 
 Validating the shared part therefore requires a different test with an
-external reference. Useful options are: run on a field with an analytically
+external reference.  Useful options are: run on a field with an analytically
 known correlation function and compare; run on a full periodic box, where the
 answer can be checked against an independent full-box estimator; refine the
 grid and confirm convergence; or compare against linear theory at separations
@@ -879,39 +858,39 @@ well inside the region, where the integral constraint of
 \begin{enumerate}
   \item A grid of $\delta$ with a lag-dependent pair-count denominator is the
         Landy--Szalay estimator in the infinite-random limit
-        (Eq.~\ref{eq:ls-equals-ours}). The $RR$ term has been evaluated in
-        closed form, not neglected. The general form for non-uniform
+        (Eq.~\ref{eq:ls-equals-ours}).  The $RR$ term has been evaluated in
+        closed form, not neglected.  The general form for non-uniform
         selection is Eq.~\eqref{eq:ls-convolution}: a ratio of two
         correlations, both computable by FFT \citep{Slepian2016}.
   \item Transforming, squaring the modulus, and transforming back returns the
-        autocorrelation exactly (Eq.~\ref{eq:wk-step3}). This is a finite
+        autocorrelation exactly (Eq.~\ref{eq:wk-step3}).  This is a finite
         algebraic identity following from DFT orthogonality, not a numerical
-        approximation. Squaring discards the phases, which are needed to
+        approximation.  Squaring discards the phases, which are needed to
         reconstruct the field but not its correlation function.
-  \item The FFT returns the \emph{circular} autocorrelation. Zero-padding a
+  \item The FFT returns the \emph{circular} autocorrelation.  Zero-padding a
         cut axis removes the wrap terms exactly, because each such term
-        contains a factor drawn from the padded zone. The requirement is
-        $d \le P-N$ (Eq.~\ref{eq:pad-condition}): pad by the largest
-        separation wanted, not necessarily by the size of the region. A
+        contains a factor drawn from the padded zone.  The requirement is
+        $d \le M-N$ (Eq.~\ref{eq:pad-condition}): pad by the largest
+        separation wanted, not necessarily by the size of the region.  A
         genuinely periodic axis is left unpadded, because there the wrap is
         physical.
   \item For a rectangular region the pair count factorises per axis into
         $N$ or $N-d$ (Eq.~\ref{eq:nd-3d}), so both methods can divide by the
-        same analytic denominator. An irregular mask loses the closed form
-        but not the identity. Dividing by a constant volume instead is the
+        same analytic denominator.  An irregular mask loses the closed form
+        but not the identity.  Dividing by a constant volume instead is the
         standard way to get a misnormalised answer.
   \item The two methods therefore compute the same expression and differ only
-        in summation order, so they agree to rounding. A discrepancy above
+        in summation order, so they agree to rounding.  A discrepancy above
         that level points to padding, denominator, window, or mean-density
         mismatch.
   \item Which method to \emph{run} is a question of cost, not correctness.
-        The Fourier route wins for large separations, high number density and
+        The Fourier method wins for large separations, high number density and
         coarse grids; pair counting wins for small separations in sparse
         catalogues, and avoids gridding artefacts entirely.
-  \item What the Fourier route concedes is all upstream of the identity:
+  \item What the Fourier method concedes is all upstream of the identity:
         gridding smooths the measured $\xi$, a Cartesian lattice bins
         awkwardly into spherical shells, and the normalisation is only
-        correct if the denominator matches the numerator. All three are
+        correct if the denominator matches the numerator.  All three are
         controlled by the grid and vanish as it is refined.
   \item Agreement between the two methods validates the correlation
         machinery and says nothing about code shared by both paths, nor
