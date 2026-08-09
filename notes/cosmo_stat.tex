@@ -34,6 +34,8 @@
 \newcommand{\br}{\mathbf{r}}
 \newcommand{\bz}{\mathbf{z}}
 \newcommand{\bu}{\mathbf{u}}
+\newcommand{\bs}{\mathbf{s}}
+\newcommand{\bv}{\mathbf{v}}
 \newcommand{\bff}{\mathbf{f}}
 \newcommand{\avg}[1]{\left\langle #1 \right\rangle}
 \newcommand{\code}[1]{\texttt{#1}}
@@ -171,6 +173,7 @@ Section~\ref{sec:ergodic} explains how we nonetheless estimate them
 from our single realisation.
 
 \subsection{The mean and why we can set it to zero}
+\label{sec:mean}
 
 The first statistic is the mean, $\avg{\delta(\bx)}$.  For the density
 contrast it is zero everywhere by the definition
@@ -257,18 +260,35 @@ two-point content of the field is a single function of a single scalar,
 $\xi(r)$.  That enormous compression --- from ``a value at every pair of
 points'' to ``one curve'' --- is why these statistics are so useful.
 
-Isotropy can be broken in real observations (redshift-space distortions
-pick out the line of sight; a bulk flow picks out a direction), and then
-one keeps the direction dependence.  For the initial conditions we care
-about here, isotropy holds to excellent accuracy and we use it freely.
+Isotropy is broken in real observations, for two separate reasons, and
+both of them make the line of sight special.  A galaxy's peculiar
+velocity changes its redshift, but only the component along the line of
+sight does, so the inferred position is displaced in that one direction
+and in no other (\S\ref{sec:rsd}).  A separation along the line of sight is
+inferred from a redshift difference using the Hubble parameter $H(z)$,
+while a separation across the line of sight is inferred from an angle
+using the comoving angular diameter distance $D_M(z)$.  These are
+different functions of the cosmology, so assuming the wrong cosmology
+stretches radial separations by a different factor from transverse ones
+(\S\ref{sec:ap}).  In both cases
+the measured correlation function depends on the angle between the pair
+separation and the line of sight, and that angle is kept as a second
+argument rather than averaged over.
+Section~\ref{sec:observational} treats both, together with the other
+differences between this idealised field and a real survey.  For the initial
+conditions we care about here, isotropy holds to excellent accuracy and
+we use it freely.
 
 \subsection{Ergodicity: measuring an ensemble from one realisation}
 \label{sec:ergodic}
 
 Here is the twist promised in \S\ref{sec:why}.  Every statistic defined
 so far is an ensemble average --- an average over universes we do not
-have.  We have one universe.  How can we possibly measure
-$\avg{\delta\,\delta}$?
+have.  We have one universe.  The angle brackets in the definition of
+the correlation function, $\xi(\br) = \avg{\delta(\bx)\,\delta(\bx+\br)}$
+in Eq.~(\ref{eq:xi-def-box}), instruct us to hold the pair of points
+fixed and average over the ensemble.  There is no second universe to
+average with, so as written the definition cannot be evaluated at all.
 
 The resolution is \emph{ergodicity}: the assumption that widely separated
 regions of a single realisation are statistically independent, so that
@@ -324,8 +344,20 @@ clusters.  If $\xi(r) < 0$, they are anti-correlated: an overdensity
 here is compensated by an underdensity there.  If $\xi(r) = 0$, the two
 points are statistically independent.
 
-There is a clean interpretation in terms of counting pairs.  For a
-point process (galaxies, particles) of mean number density $\bar n$, the
+There is a clean interpretation in terms of counting pairs.  A
+\emph{point process} is a random set of points --- galaxies, or simulation
+particles --- where what varies between realisations is where the points
+fall and how many there are, rather than a value attached to each fixed
+position.  That is the difference from a random field.
+
+The word \emph{process} here does not mean a procedure, and nothing is
+happening in time.  It is inherited from \emph{stochastic process}, which
+is a family of random variables indexed by something.  The index was
+originally time, as for a noisy voltage $V(t)$, and the name stayed on when
+the index became position instead, giving a random field, or dropped away
+altogether, giving a point process.
+
+For a point process of mean number density $\bar n$, the
 probability of finding a particle in a small volume $\mathrm dV_1$ and
 another in $\mathrm dV_2$ separated by $r$ is
 \begin{equation}
@@ -370,8 +402,24 @@ independent.
 \label{sec:xi-covariance}
 
 It helps to write $\xi$ in the language of ordinary statistics.  For two
-random variables $X$ and $Y$ with zero mean, the \emph{covariance} is
-$\mathrm{Cov}(X, Y) = \avg{XY}$.  Comparing with
+random variables $X$ and $Y$, the \emph{covariance} is
+$\mathrm{Cov}(X, Y) = \avg{(X - \avg{X})(Y - \avg{Y})}$, which reduces to
+$\avg{XY}$ when both means vanish.
+
+The two random variables here are the field values at two fixed points.
+Hold $\bx$ and $\bx'$ still and set $X = \delta(\bx)$ and
+$Y = \delta(\bx')$.  Each is a number that changes from one member of the
+ensemble to the next, so the probability space is the ensemble of
+\S\ref{sec:ensemble-avg}, not the space the field lives on: the
+randomness is over universes, not over position.  Both means vanish by
+\S\ref{sec:mean}, so the reduced form applies.
+
+There is a second reading, and most readers supply it without noticing:
+that $X$ and $Y$ are random because the pair of points is slid around
+inside a single universe, with the average running over placements.  That
+is a different quantity.  It is the one that can actually be computed from
+data, and \S\ref{sec:ergodic} gives the assumption under which the two
+agree.  Equation~(\ref{eq:xi-def-box}) is not it.  Comparing with
 Eq.~(\ref{eq:xi-def-box}), the correlation function is nothing but the
 covariance between the field values at two points:
 \begin{equation}
@@ -392,7 +440,207 @@ the starting point for actually generating a field on a computer
 (\S\ref{sec:generate}).  Homogeneity, in this language, says that $C_{ij}$
 depends only on the offset $i - j$; a matrix with that property is called
 \emph{Toeplitz}, or, on a periodic grid, \emph{circulant}, and circulant
-matrices have a magical diagonalisation that we will exploit.
+matrices have a diagonalisation that \S\ref{sec:cov-diag} puts to work.
+
+%======================================================================
+\section{Why moments, and what they leave out}
+\label{sec:whymoments}
+
+Section~\ref{sec:xi} introduced $\xi(\br) = \avg{\delta(\bx)\,\delta(\bx+\br)}$
+without saying why an average of a \emph{product of field values} is the
+right thing to look at.  Many other numbers could be computed from a map
+of the density: the fraction of the volume that is empty, the number of
+peaks above some threshold, the length of the boundary between
+overdense and underdense regions.  This section says why the products
+$\avg{\delta\delta\cdots\delta}$ are the systematic choice, and where
+that choice stops being enough.  \citet{Peebles1980} \S II is the
+original systematic treatment; \citet{Bernardeau2002} \S\S4--5 develop
+the hierarchy and its generating functionals in full;
+\citet{MartinezSaar2002} is a book-length treatment of the alternatives
+collected in \S\ref{sec:nonmoments}.
+
+\subsection{The object we actually want}
+\label{sec:pfunctional}
+
+The complete description of a random field is the \emph{probability
+functional} $\mathcal P[\delta]$: a rule that assigns a probability to
+every possible configuration of the field.  Every statistical question
+about $\delta$ is some integral over $\mathcal P$.
+
+The obstacle is its size.  On a grid of $N^3$ cells the field is a list
+of $N^3$ numbers, so $\mathcal P$ is a probability density on
+$\mathbb R^{N^3}$.  For $N = 512$ that is a density on a space of
+$1.3\times 10^{8}$ dimensions, and in the continuum limit the space is
+infinite-dimensional.  Such an object cannot be written down, plotted,
+or measured.
+
+The practical question is therefore not ``what is $\mathcal P$'' but
+``what is a usable set of coordinates for $\mathcal P$''.
+
+\subsection{Moments are those coordinates}
+\label{sec:momentcoords}
+
+Start with one ordinary random variable $X$ to see the structure.  Its
+\emph{characteristic function} is $\phi(J) = \avg{e^{iJX}}$.  Expanding
+the exponential,
+\begin{equation}
+  \phi(J) \;=\; \sum_{n=0}^{\infty} \frac{(iJ)^n}{n!}\,\avg{X^n},
+  \label{eq:charfn}
+\end{equation}
+so the moments $\avg{X^n}$ are the Taylor coefficients of $\phi$.  Since
+$\phi$ is the Fourier transform of the probability density, it carries
+exactly the same information the density does.  The moments are that
+information, written in a different basis.
+
+The field version replaces the single number $J$ by a function
+$J(\bx)$, and the product $JX$ by an integral:
+\begin{equation}
+  Z[J] \;\equiv\;
+  \avg{\exp\!\Bigl(i\!\int J(\bx)\,\delta(\bx)\,\mathrm d^d x\Bigr)} .
+  \label{eq:Zgeneral}
+\end{equation}
+This is the \emph{generating functional}.  Expanding the exponential the
+same way gives
+\begin{equation}
+  Z[J] \;=\; \sum_{n=0}^{\infty} \frac{i^n}{n!}
+  \int\!\!\cdots\!\!\int
+  J(\bx_1)\cdots J(\bx_n)\,
+  \avg{\delta(\bx_1)\cdots\delta(\bx_n)}\,
+  \mathrm d^d x_1 \cdots \mathrm d^d x_n .
+  \label{eq:Zexpand}
+\end{equation}
+Read Eq.~(\ref{eq:Zexpand}) as a statement about coordinates.  The
+$n$-point moments $\avg{\delta(\bx_1)\cdots\delta(\bx_n)}$ are the
+Taylor coefficients of $Z[J]$.  Knowing all of them is knowing $Z[J]$,
+and $Z[J]$ carries the same information as $\mathcal P[\delta]$, because
+the two are Fourier transforms of one another.
+
+That is the answer to the question in the section title.  The products
+$\avg{\delta\delta\cdots\delta}$ are not one family of statistics chosen
+from many.  The full set of them is a coordinate system for the
+probability distribution itself.  Section~\ref{sec:wick} uses this same
+functional again, specialised to the Gaussian case.  The cosmological
+literature usually works with $\ln Z[J]$ instead, whose coefficients are
+the \emph{connected} correlators, or cumulants; \citet{Bernardeau2002}
+\S4 sets out that machinery.
+
+\subsection{Every analytic statistic is a combination of moments}
+\label{sec:analytic}
+
+Suppose you propose a different statistic: some functional $F[\delta]$,
+with $\avg{F}$ the number you intend to measure.  If $F$ is analytic in
+$\delta$, expand it in a Taylor series about $\delta = 0$.  Each term is
+a product of field values at some set of points, multiplied by a fixed
+coefficient.  Taking the ensemble average term by term turns each into
+an $n$-point moment.  So $\avg{F}$ is a linear combination of the
+moments, and the statistic tells you nothing the moments did not already
+contain.
+
+This is why the hierarchy is the standard framework.  Within the class of
+analytic statistics there is nothing outside it to find.
+
+\subsection{Why the two-point function carries most of the weight}
+\label{sec:whytwopoint}
+
+The hierarchy has infinitely many members, yet this note spends nearly
+all of its length on the first non-trivial one.  Three separate reasons
+support that, and it is worth keeping them apart, because they fail under
+different circumstances.
+
+\begin{enumerate}
+  \item \textbf{Symmetry removes everything below it.}  The mean is zero
+        by the definition of $\delta$ (\S\ref{sec:ensemble-avg}).
+        Homogeneity reduces the two-point moment to a function of the
+        separation alone (\S\ref{sec:homogeneity}), and isotropy reduces
+        it further to a function of the single number $r = |\br|$
+        (\S\ref{sec:isotropy}).  So $\xi(r)$ is both the lowest
+        non-trivial moment and a function of one variable.
+  \item \textbf{Gaussianity makes it complete.}  For a Gaussian field,
+        Wick's theorem (\S\ref{sec:wick}) writes every higher moment as a
+        sum of products of $\xi$.  Nothing in the hierarchy above $n = 2$
+        is independent.  For a Gaussian field $\xi$ is not the leading
+        term of the description; it is the entire description.  This is
+        the reason a note about $\xi$ and $P(k)$ can claim to be a note
+        about the initial conditions.
+  \item \textbf{Higher moments cost more to measure.}  An $n$-point
+        estimator needs configurations of $n$ points rather than pairs,
+        and its variance grows with $n$.  Even where higher moments carry
+        real information, extracting it needs far more data than
+        measuring $\xi$ does.
+\end{enumerate}
+
+Reason 2 is the strong one, and it is also the one that fails first:
+gravitational evolution makes the late-time field non-Gaussian
+(\S\ref{sec:grf-fail}), at which point the higher moments become
+independent observables and the three-point function starts to carry
+information that $\xi$ does not.
+
+\subsection{Statistics that are not moments}
+\label{sec:nonmoments}
+
+The argument of \S\ref{sec:analytic} assumed $F$ was analytic.  Several
+statistics in common use are not, and they are genuinely different
+handles on the field rather than repackagings of $\xi$:
+
+\begin{itemize}
+  \item \textbf{Void probability function and counts-in-cells.}  The
+        probability that a randomly placed sphere contains no galaxies at
+        all.  A probability of ``exactly zero objects'' is not a
+        polynomial in the density.
+  \item \textbf{Minkowski functionals and the genus.}  Volume, surface
+        area, curvature and topology of the regions above a density
+        threshold.  These describe the shape and connectivity of
+        structure, which no finite set of moments states directly.
+        \citet{AdlerTaylor2007} is the rigorous treatment of excursion
+        sets of random fields.
+  \item \textbf{Peak statistics.}  The number density of local maxima
+        above a threshold, and the clustering of those maxima.  Peaks are
+        where haloes form, so this is closer to the observable than
+        $\xi$ is.  \citet{BBKS1986} is the standard reference.
+  \item \textbf{Nearest-neighbour distributions.}  The distribution
+        of the distance from a random point to the $k$th nearest
+        object.
+  \item \textbf{Wavelet and scattering transforms.}  Constructed to
+        capture non-Gaussian information with fewer numbers than the
+        bispectrum requires.
+  \item \textbf{Field-level inference.}  Compare simulated fields with
+        the observed field directly and use no summary statistic at all.
+\end{itemize}
+
+Each of these can be written formally as an infinite sum over moments,
+so the framework of \S\ref{sec:momentcoords} still covers them in
+principle.  They are used because the sums converge slowly, and a
+statistic that packages the same information into fewer numbers is
+easier to measure and easier to compare with theory.
+
+\subsection{When the moment hierarchy is not enough}
+\label{sec:momentproblem}
+
+One caveat belongs here, because the statement ``all the moments
+determine the distribution'' is often repeated as though it were a
+theorem, and it is not.
+
+Reconstructing a distribution from its moments requires that the moments
+not grow too quickly with $n$.  The precise statement is Carleman's
+condition; a distribution whose moments grow fast enough can share every
+moment with a different distribution.  This is called an indeterminate
+moment problem.
+
+The standard example is the \emph{lognormal} distribution
+\citep{Heyde1963}.  There exist distributions that are not lognormal and
+that have identical moments of every order.  No amount of moment
+measurement separates them.
+
+That example is not a curiosity here.  The lognormal is a common model
+for the nonlinear matter density field, chosen because $\delta$ is
+bounded below by $-1$ while its high-density tail is long.  So in exactly
+the regime where the hierarchy would have to be truncated anyway, it is
+also not guaranteed to be a faithful coordinate system.
+
+For the Gaussian initial conditions this note is about, none of this
+applies.  A Gaussian distribution is determined by its moments, and Wick's
+theorem stops the hierarchy at $n = 2$.  The caveat matters when the same
+language is carried forward to the evolved, nonlinear field.
 
 %======================================================================
 \section{Interlude: the Fourier transform and its conventions}
@@ -1268,9 +1516,11 @@ To FFT a set of particles you must first paint them onto a grid.  The
 common ``cloud-in-cell'' (CIC) scheme spreads each particle over its
 eight nearest cells, which is a convolution of the true field with a
 small assignment kernel.  Convolution in real space is multiplication in
-Fourier space, so the measured $\hat\delta_\bk$ is the true one times a
-\emph{window function} $W(\bk)$ that must be divided back out
-(``deconvolved'') before reading off $P(k)$.  The assignment also
+Fourier space, so the measured $\hat\delta_\bk$ is the true one times an
+\emph{assignment window} $W_{\rm cell}(\bk)$ that must be divided back
+out (``deconvolved'') before reading off $P(k)$.  The subscript
+distinguishes it from the survey selection $W(\bx)$ of
+\S\ref{sec:window}, which is a different object.  The assignment also
 introduces \emph{shot noise} --- a flat $1/\bar n$ floor from the
 discreteness of the particles --- that must be subtracted, and
 \emph{aliasing} of power from above the grid Nyquist frequency.  These
@@ -1281,6 +1531,204 @@ worth flagging: lattice initial conditions have \emph{sub-Poissonian}
 shot noise (the particles start on a regular grid, not at random
 positions), so the naive $1/\bar n$ subtraction is wrong at early times
 --- see the same appendix.
+
+%======================================================================
+\section{Caveats for real observations}
+\label{sec:observational}
+
+Everything up to this point assumed a statistically homogeneous,
+isotropic, Gaussian field, observed in its entirety, in real space, and
+made of matter.  A galaxy survey violates every one of those assumptions.
+None of the violations invalidates the machinery, but each one changes
+what the measured $\xi$ or $P$ actually is, and a measurement compared
+against the wrong prediction is worse than no measurement.  This section
+names the main ones and says what each does.
+
+For the initial conditions this repository generates, almost none of this
+applies: the field is the matter field, in real space, in a periodic box,
+with the cosmology known exactly.  That is worth stating plainly, because
+it explains why the note has been able to ignore all of it until now.
+
+\subsection{Redshift-space distortions}
+\label{sec:rsd}
+
+We do not measure the distance to a galaxy.  We measure its redshift, and
+convert that to a distance by assuming the redshift comes entirely from
+the expansion.  It does not.  A galaxy also has a peculiar velocity, and
+the component of that velocity along the line of sight adds to the
+observed redshift.  The inferred position is therefore displaced along
+the line of sight,
+\begin{equation}
+  \bs \;=\; \br \;+\; \frac{\bv\cdot\hat{\bn}}{a H}\,\hat{\bn},
+  \label{eq:rsd-map}
+\end{equation}
+where $\hat{\bn}$ is the unit vector towards the galaxy and $\bs$ is the
+position in \emph{redshift space}.
+
+Equation~(\ref{eq:rsd-map}) singles out one direction, so the observed
+field is not isotropic even when the true field is.  Two effects appear,
+on different scales and with opposite signs:
+
+\begin{itemize}
+  \item \textbf{Coherent infall (the Kaiser effect).}  On large scales
+        matter flows towards overdensities.  Galaxies on the far side of
+        an overdensity move towards us and galaxies on the near side move
+        away, so the structure is compressed along the line of sight.
+        Clustering measured along the line of sight is boosted
+        \citep{Kaiser1987}.
+  \item \textbf{Virial motions (fingers of God).}  Inside a collapsed
+        halo, velocities are random and large.  The halo is stretched
+        along the line of sight into an elongated feature.  Clustering
+        measured along the line of sight is suppressed on small scales.
+\end{itemize}
+
+Because isotropy is gone, $\xi$ depends on two variables: the separation
+$s = |\bs|$ and the angle between the separation and the line of sight,
+usually written $\mu = \cos\theta$.  The standard treatment expands in
+Legendre polynomials,
+\begin{equation}
+  \xi(s,\mu) \;=\; \sum_{\ell} \xi_\ell(s)\,\mathcal L_\ell(\mu),
+  \qquad
+  P(k,\mu) \;=\; \sum_{\ell} P_\ell(k)\,\mathcal L_\ell(\mu),
+  \label{eq:multipoles}
+\end{equation}
+and keeps the first few multipoles.  Only even $\ell$ survive for an
+autocorrelation, because exchanging the two points in a pair sends
+$\mu \to -\mu$ and the pair is unordered.  The monopole $\xi_0$ is the
+direction-averaged clustering, the quadrupole $\xi_2$ carries most of the
+distortion signal, and the hexadecapole $\xi_4$ is usually as far as one
+goes.  \citet{Hamilton1998} is the standard review.
+
+The distortion is a nuisance and a signal at once.  The amplitude of the
+quadrupole measures the growth rate of structure, which is why redshift
+surveys are built to measure it.
+
+\subsection{We observe galaxies, not matter}
+\label{sec:bias}
+
+The field in this note is the matter density contrast.  A survey counts
+galaxies, and galaxies are not a fair sample of the matter.  They form in
+the peaks of the density field, and peaks are more clustered than the
+field they sit in (\S\ref{sec:nonmoments}; \citealt{BBKS1986}).
+
+On scales large enough for the relation to be linear,
+\begin{equation}
+  \delta_{\rm g}(\bx) \;\simeq\; b\,\delta_{\rm m}(\bx),
+  \qquad\text{so}\qquad
+  P_{\rm g}(k) \;\simeq\; b^2 P_{\rm m}(k),
+  \label{eq:bias}
+\end{equation}
+with $b$ the linear bias.  Two consequences follow.  The measured
+amplitude constrains the product $b\,\sigma_8$ rather than $\sigma_8$
+alone, and separating them needs additional information.  On smaller
+scales the relation stops being linear or local, and the expansion needs
+more terms.  \citet{Desjacques2018} is the systematic treatment.
+
+\subsection{Discreteness and shot noise}
+\label{sec:shotnoise}
+
+A galaxy catalogue is a set of points, not a continuous field.  Even if
+the galaxies traced the matter exactly, counting a finite number of them
+in cells adds a Poisson term.  For a mean number density $\bar n$ the
+measured spectrum is
+\begin{equation}
+  P_{\rm measured}(k) \;=\; P_{\rm signal}(k) \;+\; \frac{1}{\bar n},
+  \label{eq:shot}
+\end{equation}
+a constant that must be subtracted.  It sets the small-scale limit of any
+survey: once $P_{\rm signal}$ falls below $1/\bar n$, more integration
+time does not help, and only more galaxies do.  The same term appears in
+simulations, where it limits how far a measured $P(k)$ can be trusted at
+high $k$ for a given particle count.
+
+\subsection{The survey window and the selection function}
+\label{sec:window}
+
+A survey covers part of the sky, out to a depth that depends on how
+bright the galaxies are.  Write $W(\bx)$ for the resulting selection:
+the expected number of observed galaxies per unit volume, relative to
+what a complete survey would find.
+
+Two things follow.  The measured field is $W\delta$ rather than $\delta$,
+so the measured power spectrum is the true one convolved with
+$|\widetilde W(\bk)|^2$, which mixes neighbouring $k$ and smooths sharp
+features.  This is the same convolution met in
+\S\ref{sec:estimate}, now with a survey-shaped window rather than a
+cubic box.  And because $W$ falls with distance, the observed field is
+not statistically homogeneous even if the underlying one is: the number
+of galaxies per unit volume drops with depth for a reason that has
+nothing to do with clustering.  Estimators handle this by weighting
+\citep{FKP1994}, and the geometry enters exactly as the $RR$ term of
+\S\ref{sec:estimate}.
+
+\subsection{The cosmology assumed in the analysis}
+\label{sec:ap}
+
+What a survey records for each galaxy is a redshift and a position on the
+sky.  Turning those into a separation between two galaxies takes two
+different conversions.  Along the line of sight, a redshift difference
+$\Delta z$ becomes a comoving separation through the Hubble parameter,
+\begin{equation}
+  \Delta r_\parallel \;=\; \frac{c\,\Delta z}{H(z)} ,
+  \label{eq:ap-radial}
+\end{equation}
+while across the line of sight an angular separation $\Delta\theta$
+becomes a comoving separation through the comoving angular diameter
+distance,
+\begin{equation}
+  \Delta r_\perp \;=\; D_M(z)\,\Delta\theta .
+  \label{eq:ap-transverse}
+\end{equation}
+Both $H(z)$ and $D_M(z)$ depend on the cosmological parameters, and they
+depend on them differently: $D_M$ is an integral of $1/H$ out to the
+redshift in question, so it responds to the whole expansion history
+rather than to its value at one epoch.  Assuming the wrong cosmology
+therefore rescales $\Delta r_\parallel$ and $\Delta r_\perp$ by two
+different factors.
+
+A spherical feature in the true field is therefore measured as an
+ellipsoid.  This is the Alcock--Paczy\'nski effect
+\citep{AlcockPaczynski1979}.  It is another source of anisotropy in the
+measured $\xi$, and it is degenerate with redshift-space distortions,
+which is why the two are usually fitted together.  It is also a signal:
+requiring that a known-spherical feature come out spherical constrains
+the cosmology.
+
+\subsection{The light cone}
+\label{sec:lightcone}
+
+A simulation snapshot is the field at one instant.  A survey is not.
+Objects at greater distance are seen at earlier times, so the observed
+field mixes epochs, and the clustering amplitude varies with distance
+because structure grows.  Statistical homogeneity fails along the radial
+direction for this reason alone.  Analyses handle it by splitting the
+survey into redshift shells narrow enough that evolution within a shell
+can be neglected, and by comparing each shell against theory at its own
+effective redshift.
+
+\subsection{Which of these break which assumption}
+\label{sec:caveat-summary}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Effect & Assumption broken & Where \\
+\midrule
+Redshift-space distortions & isotropy      & \S\ref{sec:rsd} \\
+Galaxy bias                & field is matter & \S\ref{sec:bias} \\
+Shot noise                 & field is continuous & \S\ref{sec:shotnoise} \\
+Survey window              & homogeneity, full sky & \S\ref{sec:window} \\
+Alcock--Paczy\'nski        & isotropy      & \S\ref{sec:ap} \\
+Light cone                 & homogeneity in time & \S\ref{sec:lightcone} \\
+Nonlinear growth           & Gaussianity   & \S\ref{sec:grf-fail} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+\citet{MartinezSaar2002} treats the estimator side of these at book
+length, and \citet{Peacock1999} Chapter~16 gives the observational
+context.
 
 %======================================================================
 \section{Summary and where to go next}
@@ -1368,13 +1816,44 @@ then \citet{Pen1997}.
 \bibitem[{Angulo~\& Pontzen(2016)}]{AnguloPontzen2016}
 Angulo, R.~E.\ \& Pontzen, A. 2016, MNRAS, 462, L1.
 
+\bibitem[{Alcock~\& Paczy\'nski(1979)}]{AlcockPaczynski1979}
+Alcock, C.\ \& Paczy\'nski, B. 1979, Nature, 281, 358.
+
+\bibitem[{Adler~\& Taylor(2007)}]{AdlerTaylor2007}
+Adler, R.~J.\ \& Taylor, J.~E. 2007, ``Random Fields and Geometry''
+(Springer).
+
 \bibitem[{Bardeen et al.(1986)}]{BBKS1986}
 Bardeen, J.~M., Bond, J.~R., Kaiser, N., \& Szalay, A.~S. 1986,
 ApJ, 304, 15.
 
+\bibitem[{Bernardeau et al.(2002)}]{Bernardeau2002}
+Bernardeau, F., Colombi, S., Gazta\~naga, E., \& Scoccimarro, R. 2002,
+Phys.\ Rep., 367, 1.
+
+\bibitem[{Desjacques et al.(2018)}]{Desjacques2018}
+Desjacques, V., Jeong, D., \& Schmidt, F. 2018, Phys.\ Rep., 733, 1.
+
 \bibitem[{Dodelson~\& Schmidt(2020)}]{DodelsonSchmidt2020}
 Dodelson, S.\ \& Schmidt, F. 2020, ``Modern Cosmology'' 2nd ed.\
 (Academic Press).
+
+\bibitem[{Feldman et al.(1994)}]{FKP1994}
+Feldman, H.~A., Kaiser, N., \& Peacock, J.~A. 1994, ApJ, 426, 23.
+
+\bibitem[{Hamilton(1998)}]{Hamilton1998}
+Hamilton, A.~J.~S. 1998, in ``The Evolving Universe'', ed.\ D.~Hamilton,
+ASSL 231 (Kluwer), 185.
+
+\bibitem[{Heyde(1963)}]{Heyde1963}
+Heyde, C.~C. 1963, J.~R.\ Stat.\ Soc.\ B, 25, 392.
+
+\bibitem[{Kaiser(1987)}]{Kaiser1987}
+Kaiser, N. 1987, MNRAS, 227, 1.
+
+\bibitem[{Mart\'inez~\& Saar(2002)}]{MartinezSaar2002}
+Mart\'inez, V.~J.\ \& Saar, E. 2002, ``Statistics of the Galaxy
+Distribution'' (Chapman \& Hall/CRC).
 
 \bibitem[{Mo et al.(2010)}]{MoBoschWhite2010}
 Mo, H., van den Bosch, F., \& White, S. 2010, ``Galaxy Formation
@@ -1383,6 +1862,10 @@ and Evolution'' (Cambridge University Press).
 \bibitem[{Peacock(1999)}]{Peacock1999}
 Peacock, J.~A. 1999, ``Cosmological Physics'' (Cambridge
 University Press).
+
+\bibitem[{Peebles(1980)}]{Peebles1980}
+Peebles, P.~J.~E. 1980, ``The Large-Scale Structure of the Universe''
+(Princeton University Press).
 
 \bibitem[{Pen(1997)}]{Pen1997}
 Pen, U.-L. 1997, ApJS, 109, 1.
