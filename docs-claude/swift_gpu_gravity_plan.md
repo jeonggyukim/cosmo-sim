@@ -59,6 +59,13 @@ Line counts of *existing* code are measured; these projections are not, and are 
 numbers most likely to be wrong. Calibration: the fork's authors needed a funded
 multi-year effort for three hydro loops and no gravity.
 
+**Expected gain, added 2026-07-30 — decide whether it justifies the effort before
+starting.** On our own 25 Mpc/h run, the distribution of active particles per step
+caps a gravity offload at 1.6–2.0x whole-run before any pack cost is counted, and the
+SPH-side evidence bounds any "offload from CPU SWIFT" strategy below roughly 2.4x.
+Both sections are below. The one number that would change this picture — the
+short-range P2P share of a step on our own problem — is not yet measured.
+
 ## Measured line counts (2026-07-27, raw `wc -l`)
 
 | Component | SWIFT | pkdgrav3 3.5 | cuGOTPM |
@@ -89,9 +96,100 @@ This is why the port direction is engine-design-into-SWIFT, not physics-into-pkd
   backend (~8,700 lines) re-implementing the CUDA path.
 - Extension points for a gravity subtype: `task_subtype_gpu_density/gradient/force`
   and `enum gpu_task_type` in `src/task.h`.
-- Paper numbers: 3.5–7.5x on offloaded kernels, 1.8x full-sim on one GH200
-  (~8M → ~15M particle updates/s), up to **80% of an offload cycle in CPU-side
-  pack/unpack**. That 80% is an *SPH* figure — see the intensity estimate below.
+
+## Nasar 2026 performance numbers, corrected 2026-07-30
+
+The earlier summary in this file — "3.5–7.5x on offloaded kernels, 1.8x full-sim" —
+was wrong twice, and the wrong version reached the collaborator artifact.
+
+- **3.5 and 7.5 are not a range.** Abstract, verbatim: "up to ∼3.5 and ∼7.5 speedups
+  for the offloaded computations when *including* and *excluding* the time required
+  to prepare and post-process data transfers on the CPU side, respectively." One
+  measurement quoted twice. The difference between the two is the pack/unpack cost.
+- **The 1.8x does not transfer to a run with gravity.** The benchmark is the 3-D
+  Gresho–Chan vortex at 256³, which contains no gravity. In the paper's own test
+  descriptions the word "gravity" does not appear. The three offloaded SPH loops are
+  1903 of 2032 ms, **94% of the step**.
+
+Measured breakdown (§4.1, §4.2, Table 4), one step, 256³, one GH200:
+
+| | CPU, 72 Grace threads | With H100 |
+|---|---|---|
+| Whole step | 2032 ms | 1132 ms |
+| The three SPH loops | 1903 ms | 929 ms |
+| Everything else, plus time outside task execution | 129 ms | 203 ms |
+
+- Whole step 2032/1132 = **1.8x**. The SPH loops alone 1903/929 = **2.05x**.
+- Coverage was never their limit. With 94% offloaded, a free GPU would have given
+  ~16x.
+- Of the 929 ms, **~80% is CPU-side pack/unpack** (~743 ms), leaving ~186 ms for
+  everything else including the kernels. Physics against the CPU's 1903 ms is ~10x.
+  Removing the pack entirely puts the step near 389 ms, **~5.2x**.
+- Time outside task execution rose 129 → 203 ms. Their §4.2: "the tasks dependent on
+  these N leaf computations must wait until the results are copied back onto the CPU
+  memory before they are unlocked and then enqueued." Batching for the GPU delays the
+  dependency releases that CPU tasking performs as each task finishes.
+- Their fork applied unchanged to a run where SPH is ~40% of the step gives
+  1/(0.60 + 0.40/2.05) = **~1.26x**.
+
+**Upper bound on the offload strategy itself.** Nasar §4.2 cites SHAMROCK
+(David-Cléris 2025), which holds all particle data on the GPU and does no CPU task
+scheduling: 20M updates/s on the same H100, against SWIFT's 8.26M CPU baseline,
+2.4x. Their offload reaches 14.8M, 1.8x. So "keep CPU SWIFT, offload pieces" is
+bounded below roughly 2.4x for SPH and they are most of the way to it. Not a
+controlled comparison — different code, different test problem — but it bounds the
+ambition. Gravity's higher flop/byte is the reason to expect better than SPH. That
+expectation is what this project would test, and nobody has tested it.
+
+## Coverage ceiling on our own problem, measured 2026-07-30
+
+Source: `~/Documents/timesteps.txt`, a SWIFT `timesteps.txt` from a 25 Mpc/h
+uniresolution run — 256³ gas + 256³ DM, EAGLE-XL subgrid, SPHENIX with Wendland C2,
+4 MPI ranks × 16 threads, z = 127 → 0. 220,577 usable steps, 53.17 h wall, 9.32 h
+(17.5%) dead time. Five lines spliced by concurrent MPI writes were dropped.
+
+**The median step updates 18 gas particles out of 16,777,216.**
+
+| active gravity particles | steps | share of steps | share of wall |
+|---|---|---|---|
+| < 10 | 89,765 | 40.7% | 14.3% |
+| 10 – 100 | 58,254 | 26.4% | 9.9% |
+| 100 – 10³ | 34,216 | 15.5% | 6.9% |
+| 10³ – 10⁴ | 20,068 | 9.1% | 6.0% |
+| 10⁴ – 10⁵ | 9,637 | 4.4% | 5.7% |
+| 10⁵ – 10⁶ | 4,768 | 2.2% | 8.9% |
+| 10⁶ – 10⁷ | 2,660 | 1.2% | 13.5% |
+| > 10⁷ | 1,209 | 0.55% | 34.8% |
+
+**42.8% of the wall clock is in steps updating fewer than 10⁵ particles**, below the
+work needed to pay for a handover. Coverage and Amdahl against the minimum active
+count at which offloading is worth doing:
+
+| offload threshold | max coverage f | ceiling 1/(1−f) | with 5x on f |
+|---|---|---|---|
+| 10⁴ (optimistic) | 63.0% | 2.70x | 2.01x |
+| 10⁵ (reasonable) | 57.2% | 2.34x | 1.84x |
+| 10⁶ (conservative) | 48.3% | 1.94x | 1.63x |
+
+Upper bounds, not predictions: inside a large step only part of the time is
+short-range P2P. The true f is lower by the P2P share, which this file cannot give.
+
+**What this file cannot show.** It has no gravity-versus-hydro cost split. Three
+routes to one all fail. (1) Regression of step time on gas- and gravity-update
+counts: the two counts correlate at 0.9956, condition number 1.4e7, and the fit
+returns a negative cost per gravity update. (2) The long-range mesh flag (Props bit
+256): all 644 mesh steps are also rebuild steps, so the mesh and tree-build costs
+are inseparable here. (3) Steps with gravity active and gas inactive: 42 of 220,577.
+
+So "gravity is the dominant component" rests on Schaller 2024 Fig. 20 and that
+sentence in its §9.4, measured on their weak-scaling setup, not on this run. **To
+measure it here: a task-debugging build, a few dozen steps, then
+`tools/task_plots/analyse_tasks.py`.** Cheapest decisive measurement available, not
+yet done.
+
+Also from this file: 27.4% of the wall clock is in the 644 combined mesh-and-rebuild
+steps — long-range gravity and tree construction, neither of which is the
+short-range P2P work a GPU would take.
 
 ## What the SWIFT-GPU fork is building right now (checked 2026-07-28)
 
@@ -258,8 +356,11 @@ with gravity computed in the same pass as SPH forces.
 - Strong scaling @ 256M: >80% only to 64 nodes, 56% at 256, 20% at 1,024; best 218 at 512.
 - Weak scaling: >50% at 2M particles/node, >75% at 8M.
 
-No particles/second figure. Nasar quotes theirs that way (~15M updates/s on one GH200 vs
-~8M CPU baseline, 1.8x), so the two papers cannot be compared directly.
+No particles/second figure. Nasar quotes theirs that way (~14.8M updates/s on one
+GH200 vs 8.26M CPU baseline, 1.8x) on a gravity-free Gresho–Chan vortex, while
+Meier's benchmark is a self-gravitating Mars-sized body with gravity in the same pass
+as the SPH forces. Neither the units nor the physics content match, so the two papers
+cannot be compared.
 
 ## The force-table question (revised 2026-07-27 — earlier version was wrong)
 
@@ -342,6 +443,12 @@ Effort: ramp-up 3–4wk (2–3 assisted), kernel+pack 3–4wk (1.5–2), task ma
 
 ## Phase order
 
+0. **Measure the P2P share of a step on our own problem** (added 2026-07-30).
+   Task-debugging build, a few dozen steps of the 25 Mpc/h setup at several points in
+   the step hierarchy, then `tools/task_plots/analyse_tasks.py`. Days, no GPU, and it
+   sets the ceiling for everything after it. If short-range P2P is half or more of a
+   large step, offload it alone; if it is a quarter, M2L/M2P have to go too or the
+   whole split does not repay its maintenance.
 1. Build the fork on GH200, reproduce published hydro numbers. **Contact Nasar,
    Ivkovic, Schaller about their gravity roadmap** — `EAGLE_w_gravity` suggests
    it is planned. Blocking.
@@ -350,17 +457,26 @@ Effort: ramp-up 3–4wk (2–3 assisted), kernel+pack 3–4wk (1.5–2), task ma
    structural value; worth doing even if the rest stalls.
 3. Offload path with a naive one-thread-per-sink kernel. Structs, leaf-pair
    collection, `task_subtype_gpu_grav_pp`, CPU fallback behind a runtime flag.
-   Dependency wiring is the real work.
+   Dependency wiring is the real work. **Write the transfer buffer directly in GPU
+   layout during leaf collection — do not add a separate pack step and plan to remove
+   it later** (moved up from phase 6, 2026-07-30). On Nasar's own measurement the pack
+   step is the difference between 1.8x and ~5.2x, and it is cheaper to avoid than to
+   retrofit. Also decide per step whether to offload at all, with the CPU fallback, in
+   this first version rather than in phase 6: 42.8% of our wall clock is in steps too
+   small to offload.
 4. **Validate before optimising.** Exact-force → energy conservation → P(k) vs CPU.
 5. Hopper-shaped kernel (warp-per-source, shared-mem tile, warp reduce), then
    pkdgrav3's branchless softening. **Then profile** before considering any table.
-6. Slot pool with CPU fallback (cuGOTPM pattern: GPU *availability*), plus a
-   worth-offloading test (pkdgrav3 pattern: work *suitability*, per interaction list).
-   Start from the fork's `runner_GPU_offload_switch` since it exists, then refine — their
-   per-step active-cell count is too coarse for gravity's occupancy spread. Then reduce
-   staging: their hash-table cell deduplication, and/or writing the transfer buffer
-   directly during leaf collection. Retest reading `gravity_cache` in place over C2C
-   against Ivkovic's negative result.
+6. Refine the offload decision from the crude per-step version in phase 3. Slot pool
+   with CPU fallback (cuGOTPM pattern: GPU *availability*), plus a worth-offloading
+   test (pkdgrav3 pattern: work *suitability*, per interaction list). Start from the
+   fork's `runner_GPU_offload_switch` since it exists, then refine — their per-step
+   active-cell count is too coarse for gravity's occupancy spread. Their hash-table
+   cell deduplication is the remaining staging reduction once the buffer is already
+   written directly. Retest reading `gravity_cache` in place over C2C against
+   Ivkovic's negative result. Measure the effect of batch size on the dependency
+   releases: Nasar's time outside task execution rose 129 → 203 ms from batching
+   alone.
 7. Optional: M2P on device; cuGOTPM's flattened `int2` tree if a device walk is
    ever wanted.
 
@@ -388,7 +504,16 @@ benefits the whole code. pkdgrav3 has this covered via `core/sse2neon.h`.
 - Ho Seong, Gain and Jie looped in; Zoom call being scheduled via when2meet. Da to
   summarise MPI-enabled monofonIC + particle-merging zoom-in ICs and production cost
   estimates.
-- **Not yet asked of Manchester**: the `gpart` accessor question above.
+- **Not yet asked of Manchester**: the `gpart` accessor question above, and whether they have
+  tried writing the transfer buffer directly during task collection rather than packing
+  afterwards. Their newest branch attacks the pack cost by deduplicating repeated cells
+  instead, which suggests they have not.
+- 2026-07-30: artifact republished at the same URL with the corrected performance numbers
+  (gravity-free benchmark, 3.5-vs-7.5 meaning, our own step-size ceiling) and a new
+  "What speedup to expect" section. BK's existing link resolves to the corrected version.
+  BK's reply — agreeing on the CPU base, and warning that SWIFT's gain comes from task
+  delegation so the GPU inherits the same task shapes — is the point this correction
+  confirms. Reply to BK not yet sent.
 
 ## Risks
 
