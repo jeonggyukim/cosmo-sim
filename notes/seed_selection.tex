@@ -1,0 +1,625 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\graphicspath{{figures/}{figures/seed_selection/}}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tcolorbox}
+\tcbuselibrary{breakable,skins}
+\usepackage{natbib}
+\bibliographystyle{aasjournal}
+
+\newcommand{\bk}{\mathbf{k}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\br}{\mathbf{r}}
+\newcommand{\avg}[1]{\left\langle #1 \right\rangle}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\Cov}{\mathrm{Cov}}
+\newcommand{\Mpch}{\ \mathrm{Mpc}/h}
+
+\title{Selecting a Random Seed on the Correlation Function\\
+       of a Subvolume}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{tcolorbox}[colback=yellow!10!white, colframe=orange!75!black,
+                  title={\bfseries Disclaimer}]
+These notes were compiled by an AI assistant (Claude, Anthropic) and have
+\textbf{not been reviewed by a human domain expert}.  Cross-check key
+equations and conclusions before relying on them.
+\end{tcolorbox}
+
+\begin{abstract}
+\noindent
+The correlation function $\xi(r)$ measured in a $125 \times 125 \times
+1000\Mpch$ subvolume of a $1\ \mathrm{Gpc}/h$ box departs from linear theory at
+separations beyond a few tens of $\mathrm{Mpc}/h$.  One proposed remedy is to
+search over random seeds and adopt the one whose subvolume $\xi$ follows theory
+most closely.  We show that this replaces the intended ensemble by the
+conditional ensemble given the search criterion, and we quantify the
+consequences with 600 Gaussian realizations of the same volume and shape.
+Retaining the best fifth of seeds reduces the realization-to-realization
+scatter of $\xi$ to $0.38$--$0.64$ of its correct value within the matched
+range, and to $0.67$--$0.94$ at separations excluded from the match; ensemble
+means at excluded separations move by up to $2.8$ times their own standard
+error.  The reduction has no threshold: rejecting only the worst fifth of seeds
+already removes $22\%$ of the scatter.  Two further results limit the
+usefulness of the procedure.  First, the target is displaced: the integral
+constraint places the expectation of the subvolume estimator $0.22\sigma$ below
+linear theory at $r = 92\Mpch$, so a seed matching raw theory is atypical by
+construction.  Second, the objective is not attainable in practice: the closest
+of 600 seeds still departs from theory by $0.19\sigma$ per separation, while an
+estimator biased low by $10\%$ would displace the measurement by only
+$0.068\sigma$, so the search neither reproduces theory closely nor
+distinguishes a correct pipeline from a faulty one.  We recommend comparing
+against the expectation of the estimator rather than against raw theory,
+reporting the sample-variance band, and, where a variance-reduced realization
+is genuinely required, using fixed-amplitude or constrained initial conditions.
+Where a seed must be rejected, rejection on the mean density of the subvolume
+alone accepts $96\%$ of seeds and removes none of the scatter of $\xi$.
+\end{abstract}
+
+\tableofcontents
+
+\section{Introduction}\label{sec:intro}
+
+A cosmological box of side $L = 1000\Mpch$ contains a subvolume of
+$125 \times 125 \times 1000\Mpch$, one sixty-fourth of the total volume, which
+is to be resimulated at higher resolution.  The two-point correlation function
+$\xi(r)$ measured within the subvolume departs from the linear-theory
+prediction at separations beyond about $30\Mpch$, while the same measurement
+over the full box follows it.
+
+The proposal under examination is to generate initial conditions from many
+random seeds and to adopt the seed whose subvolume $\xi(r)$ reproduces the
+theoretical curve most closely.  The motivation is that a simulation should
+represent the cosmology whose parameters it was given, and that a subvolume
+whose clustering disagrees with that cosmology is a poor starting point for a
+resimulation.
+
+Section~\ref{sec:conditioning} establishes what such a selection does, first
+through an example that can be evaluated exactly and then through the
+conditional moments of a Gaussian pair.  Section~\ref{sec:application} applies
+the result to the correlation function of a subvolume and identifies a
+systematic displacement of the target.  Section~\ref{sec:experiment} quantifies
+the effect with 600 realizations.  Sections~\ref{sec:tolerance}
+and~\ref{sec:circular} address the dependence on the tolerance and the
+circularity of validating a pipeline on a selected seed.
+Section~\ref{sec:recommendations} states the alternatives.
+
+Throughout, a \emph{realization} denotes one seed and the field generated from
+it; $\avg{\cdot}$ denotes an average over realizations; the \emph{scatter}
+$\sigma_Q$ of a quantity $Q$ is the root-mean-square deviation of $Q$ over
+realizations; and \emph{theory} denotes the prediction for $\avg{\cdot}$, not
+for any individual realization.
+
+\section{Selection as conditioning}\label{sec:conditioning}
+
+\subsection{An exact example}\label{sec:dice}
+
+Let $X_1$ and $X_2$ be the outcomes of two fair dice and $S = X_1 + X_2$.  For
+a single die,
+\begin{equation}
+  \avg{X} = \frac{1}{6}\sum_{i=1}^{6} i = \frac{7}{2}, \qquad
+  \Var[X]  = \frac{1}{6}\sum_{i=1}^{6}\Bigl(i - \frac{7}{2}\Bigr)^{2}
+           = \frac{35}{12},
+  \label{eq:die}
+\end{equation}
+so $\sigma_X = \sqrt{35/12} = 1.708$.  The dice are independent, hence
+$\avg{S} = 7$ and $\Var[S] = 35/6$.
+
+Retain only the rolls with $S = 7$, the value of $\avg{S}$.  Six of the
+thirty-six equally likely outcomes satisfy this, and each admits exactly one
+value of $X_1$, so
+\begin{equation}
+  P(X_1 = i \mid S = 7)
+    = \frac{P(X_1 = i,\, X_2 = 7-i)}{P(S = 7)}
+    = \frac{1/36}{6/36} = \frac{1}{6}.
+\end{equation}
+The marginal distribution of $X_1$ is therefore unaltered: its mean remains
+$7/2$ and its scatter remains $1.708$.  Examined alone, the retained rolls are
+indistinguishable from unselected ones.
+
+The joint distribution is altered, and this is where the whole effect
+originates, so we set it out in full.  The covariance of two quantities is the
+average of the product of their deviations from their own means,
+\begin{equation}
+  \Cov[A, B] = \avg{(A - \avg{A})(B - \avg{B})},
+  \label{eq:cov}
+\end{equation}
+and the correlation coefficient is that quantity rescaled to a fixed range,
+\begin{equation}
+  \rho = \frac{\Cov[A, B]}{\sigma_A\,\sigma_B}, \qquad -1 \leq \rho \leq 1 .
+  \label{eq:rho}
+\end{equation}
+A value $\rho = 0$ indicates that one quantity carries no information about the
+other; $|\rho| = 1$ indicates that one is an exact linear function of the other.
+
+Before selection the dice are independent: whatever $X_1$ shows, $X_2$ is
+equally likely to fall above or below $7/2$, so the product in
+equation~\eqref{eq:cov} is positive as often as negative and averages to zero.
+After selection $X_2 = 7 - X_1$, so subtracting $7/2$ from both sides gives
+\begin{equation}
+  X_2 - \frac{7}{2} = -\Bigl(X_1 - \frac{7}{2}\Bigr),
+\end{equation}
+that is, the second deviation is the negative of the first.  Every product is
+then $-(X_1 - 7/2)^2$, negative for every retained roll:
+\begin{center}
+\begin{tabular}{lccccccc}
+  \toprule
+  roll & $(1,6)$ & $(2,5)$ & $(3,4)$ & $(4,3)$ & $(5,2)$ & $(6,1)$ & average\\
+  \midrule
+  $X_1 - 7/2$ & $-2.5$ & $-1.5$ & $-0.5$ & $+0.5$ & $+1.5$ & $+2.5$ & \\
+  $X_2 - 7/2$ & $+2.5$ & $+1.5$ & $+0.5$ & $-0.5$ & $-1.5$ & $-2.5$ & \\
+  product     & $-6.25$ & $-2.25$ & $-0.25$ & $-0.25$ & $-2.25$ & $-6.25$
+              & $-35/12$\\
+  \bottomrule
+\end{tabular}
+\end{center}
+The average of the products is $-17.5/6 = -35/12$, which is $-\Var[X_1]$ by
+equation~\eqref{eq:die}, and equation~\eqref{eq:rho} then gives $\rho = -1$.
+The selection has moved the pair from independence to exact opposition, the
+furthest it can go: every unit by which one die runs high, the other runs
+equally low.  Any quantity depending on both dice inherits the constraint.  For $Y = X_1 + 2X_2$, independence gives
+\begin{equation}
+  \avg{Y} = 3\avg{X} = \frac{21}{2}, \qquad
+  \Var[Y] = \Var[X_1] + 4\Var[X_2] = \frac{175}{12},
+\end{equation}
+so $\sigma_Y = 3.819$, whereas substituting $X_2 = 7 - X_1$ gives $Y = 14 -
+X_1$ and
+\begin{equation}
+  \avg{Y \mid S = 7} = \frac{21}{2}, \qquad
+  \Var[Y \mid S = 7] = \Var[X_1] = \frac{35}{12},
+\end{equation}
+so $\sigma_Y$ falls by a factor $\sqrt{5}$, from $3.819$ to $1.708$, at
+unchanged mean.  The rule defining the selection was stated in terms of $S$
+alone and made no reference to $Y$; the scatter of $Y$ nevertheless fell by more
+than half.  The reason is that $Y$ and $S$ are not independent.  Both are built
+from the same two dice, and equation~\eqref{eq:rho} gives
+$\rho(Y, S) = 3/\sqrt{10} = 0.949$, so constraining $S$ constrains $Y$ with it.
+A quantity uncorrelated with $S$ would pass through the selection unaffected.
+
+Selecting on a value other than $\avg{S}$ moves the individual dice as well, and
+not only their scatter.  Retaining $S = 7$ left the average of $X_1$ at $7/2$,
+because $7$ is the average of $S$.  Retaining the rolls with $S \geq 10$ aims at
+a value above the average of $S$, and leaves $(4,6)$, $(5,5)$, $(6,4)$, $(5,6)$,
+$(6,5)$, $(6,6)$, for which
+\begin{equation}
+  \avg{X_1 \mid S \geq 10} = \frac{16}{3} = 5.333, \qquad
+  \Var[X_1 \mid S \geq 10] = 29 - \Bigl(\frac{16}{3}\Bigr)^{2}
+                           = \frac{5}{9},
+\end{equation}
+using $\Var[Q] = \avg{Q^2} - \avg{Q}^2$.  The mean of $X_1$ has moved by
+$11/6 = 1.07\,\sigma_X$ and its scatter has fallen to $0.44\,\sigma_X$, for a
+die that was never examined individually.  Figure~\ref{fig:dice} displays both
+selections.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{seed_dice.pdf}
+  \caption{Selection applied to two fair dice.  \emph{(a)} The thirty-six
+    equally likely outcomes, with the six satisfying $S = 7$ marked.
+    \emph{(b)} Distribution of $Y = X_1 + 2X_2$ before and after retaining
+    $S = 7$: the mean is unchanged and the scatter falls by a factor $\sqrt5$,
+    although the rule defining the selection made no reference to $Y$.  The two
+    are correlated, $\rho(Y,S) = 0.949$, which is why constraining one
+    constrains the other.  \emph{(c)} Distribution of
+    $X_1$ before and after retaining $S \geq 10$: selecting on a value other
+    than $\avg{S}$ displaces the mean of $X_1$ by $1.07\,\sigma_X$ and reduces
+    its scatter to $0.44\,\sigma_X$.  Produced by
+    \texttt{figures/seed\_selection/plot\_seed\_dice.py}.}
+  \label{fig:dice}
+\end{figure}
+
+\subsection{Conditional moments of a Gaussian pair}\label{sec:gaussian}
+
+The dice could be counted outcome by outcome.  A density field cannot, so we
+carry out the same computation once for a pair of Gaussian quantities, which is
+a good approximation for the large scales at issue here.
+
+Let $T$ and $S$ be jointly Gaussian with correlation coefficient $\rho$ as
+defined in equation~\eqref{eq:rho}.  It is convenient to measure each in units
+of its own scatter, relative to its own mean:
+\begin{equation}
+  t = \frac{T - \avg{T}}{\sigma_T}, \qquad
+  u = \frac{S - \avg{S}}{\sigma_S},
+  \label{eq:standardize}
+\end{equation}
+so that $t$ and $u$ have zero mean and unit scatter, and $\rho = \avg{tu}$.
+Their joint probability density is then the standard bivariate normal,
+\begin{equation}
+  p(t, u) = \frac{1}{2\pi\sqrt{1-\rho^{2}}}
+            \exp\left[-\,\frac{t^{2} - 2\rho\,t u + u^{2}}
+                              {2\,(1-\rho^{2})}\right].
+  \label{eq:bivariate}
+\end{equation}
+Selecting on $T$ means fixing $t$ and asking what is left of the distribution of
+$u$.  That is the conditional density $p(u \mid t) = p(t,u)/p(t)$, where
+$p(t) = (2\pi)^{-1/2} e^{-t^{2}/2}$ is the density of $t$ alone.
+
+The quadratic form in equation~\eqref{eq:bivariate} can be rearranged so that
+$u$ appears in one place only:
+\begin{equation}
+  t^{2} - 2\rho\, t u + u^{2}
+    = (u - \rho t)^{2} + t^{2}\,(1 - \rho^{2}),
+  \label{eq:complete-square}
+\end{equation}
+which is verified by expanding $(u - \rho t)^{2} = u^{2} - 2\rho t u +
+\rho^{2}t^{2}$ and adding $t^{2} - \rho^{2}t^{2}$.  Substituting
+equation~\eqref{eq:complete-square} into equation~\eqref{eq:bivariate} splits
+the exponential into a factor containing $u$ and a factor containing $t$ alone,
+\begin{equation}
+  p(t, u) = \underbrace{\frac{1}{\sqrt{2\pi(1-\rho^{2})}}
+            \exp\left[-\,\frac{(u - \rho t)^{2}}{2(1-\rho^{2})}\right]}
+            _{\textstyle p(u \mid t)}
+            \;\times\;
+            \underbrace{\frac{1}{\sqrt{2\pi}}\,e^{-t^{2}/2}}_{\textstyle p(t)} ,
+\end{equation}
+and dividing by $p(t)$ leaves the first factor.  It is a Gaussian in $u$ with
+mean $\rho t$ and variance $1 - \rho^{2}$.
+
+Two features of that result are the substance of this note.  The mean of $u$ is
+displaced from zero whenever $t \neq 0$, that is whenever the selected value
+differs from $\avg{T}$; and the variance is reduced from $1$ to $1-\rho^{2}$
+whatever value is selected, including $t = 0$.  Restoring the original units
+through equation~\eqref{eq:standardize},
+\begin{align}
+  \avg{S \mid T = t_0} &= \avg{S}
+      + \rho\, \frac{\sigma_S}{\sigma_T}\,\bigl(t_0 - \avg{T}\bigr),
+      \label{eq:cond-mean}\\[2pt]
+  \Var\bigl[S \mid T = t_0\bigr] &= \sigma_S^{2}\,(1 - \rho^{2}).
+      \label{eq:cond-var}
+\end{align}
+Equation~\eqref{eq:cond-var} states that the scatter of any $S$ correlated with
+$T$ is reduced by $\sqrt{1-\rho^2}$ regardless of the value selected;
+equation~\eqref{eq:cond-mean} states that a target displaced from $\avg{T}$
+displaces $\avg{S}$ in proportion to $\rho$.  These are the two effects
+exhibited by the dice.
+
+The dice do not satisfy equations~\eqref{eq:cond-mean}
+and~\eqref{eq:cond-var} pointwise, and the discrepancy is instructive.  For $Y$
+and $S$ above, $\rho = 3/\sqrt{10}$ and $\sigma_Y^{2}(1 - \rho^{2}) = 1.458$,
+whereas the exact conditional variance at $S = 7$ is $35/12 = 2.917$.  For a
+Gaussian pair the conditional variance is independent of the conditioning
+value; for the dice it is not, ranging from $\Var[Y \mid S = 2] = 0$ to
+$\Var[Y \mid S = 7] = 35/12$.  Averaging over $S$ recovers
+equation~\eqref{eq:cond-var} exactly, since $\avg{Y \mid S = s}$ is linear in
+$s$.  The Gaussian expressions therefore serve below as a description of the
+mechanism, and every number quoted is obtained by direct measurement rather
+than from them.
+
+\section{Application to the correlation function of a subvolume}
+\label{sec:application}
+
+\subsection{$\xi$ as a sum of squared mode amplitudes}\label{sec:xi-sum}
+
+Expand the density contrast in the box as
+\begin{equation}
+  \delta(\bx) = \sum_{\bk} \delta_{\bk}\, e^{i \bk \cdot \bx},
+\end{equation}
+the sum running over wavevectors commensurate with the box.  Substituting twice
+into the definition of $\xi$ and averaging over the box,
+\begin{equation}
+  \xi(r) = \frac{1}{V}\int \delta(\bx)\,\delta(\bx + \br)\, d^3x
+         = \sum_{\bk}\sum_{\bk'} \delta_{\bk}\,\delta_{\bk'}\,
+           e^{i \bk' \cdot \br}\,
+           \frac{1}{V}\int e^{i(\bk + \bk')\cdot \bx}\, d^3x .
+\end{equation}
+The final integral is unity for $\bk' = -\bk$ and zero otherwise, by
+orthogonality of the box modes.  Reality of $\delta$ gives $\delta_{-\bk} =
+\delta_{\bk}^{*}$, so
+\begin{equation}
+  \xi(r) = \sum_{\bk} |\delta_{\bk}|^{2}\, e^{-i \bk \cdot \br}
+         = \sum_{\bk} |\delta_{\bk}|^{2} \cos(\bk \cdot \br),
+  \label{eq:xi-sum}
+\end{equation}
+the imaginary parts cancelling between $+\bk$ and $-\bk$.  The correlation
+function is therefore a weighted sum of the squared mode amplitudes, with
+weights $\cos(\bk\cdot\br)$ that suppress modes of wavelength much shorter than
+$r$.  Restricting the average to a subvolume alters the weights, through the
+pairs of cells the subvolume contains, but not the form of the sum.
+
+The subvolume spans $125\Mpch$ transverse to its long axis, so the longest
+transverse mode it admits has $k = 2\pi/125 \approx 0.05\ h/\mathrm{Mpc}$.
+Below that wavenumber the subvolume admits only modes directed along its
+length, with $k_z$ a multiple of $2\pi/1000 \approx 0.006\ h/\mathrm{Mpc}$:
+approximately ten modes.  The measurement of $\xi$ near $r \sim 100\Mpch$ is
+thus a sum over of order ten squared amplitudes, and matching it is the
+selection of \S\ref{sec:dice} applied to those ten.  The same counting shows
+why increased resolution does not help: finer sampling adds short-wavelength
+modes, whereas the number of long-wavelength modes is fixed by the subvolume
+size.
+
+\subsection{The integral constraint displaces the target}\label{sec:target}
+
+The subvolume estimator uses the mean density of the subvolume itself, as an
+analysis of observational data must.  Subtracting a mean estimated from the
+same data forces the volume-averaged density contrast to vanish identically,
+and hence forces the integral of the measured $\xi$ over the separations the
+subvolume contains to be close to zero.  An excess of pairs at small
+separations is then compensated by a deficit at large separations
+\citep{Peebles1980}.  The deficit is systematic: it is present in every
+realization and does not diminish with the number of realizations.
+
+Section~\ref{sec:experiment} measures it as $0.22\sigma$ at $r = 92\Mpch$.
+Selecting on agreement with raw linear theory therefore requires a realization
+lying $0.22\sigma$ above its own expectation in every matched bin
+simultaneously, which is atypical by construction and independent of any
+question of chance.
+
+\section{Numerical experiment}\label{sec:experiment}
+
+\subsection{Method}\label{sec:method}
+
+We generate 600 Gaussian realizations of a $1000\Mpch$ box on a $256^3$ grid,
+using the linear power spectrum from CLASS (Cosmic Linear Anisotropy Solving
+System) renormalized to $\sigma_8 = 0.8$.  Only linear fields are required,
+since the modes responsible for the effect grow linearly.  From each
+realization we measure $\xi(r)$ in bins of $5\Mpch$ twice: over the full box,
+and over the $125 \times 125 \times 1000\Mpch$ subvolume with the mean density
+taken from the subvolume itself.  The ensemble mean of the full-box measurement
+serves as the theoretical reference, which removes gridding and binning
+differences from the comparison.
+
+The seed search is imitated as follows.  We designate $r = 60$--$130\Mpch$,
+comprising fourteen bins, as the \emph{matched range}.  For each realization we
+form the sum of squared residuals between the subvolume measurement and theory
+over those bins, each residual normalized by the scatter of its bin over all
+600 realizations, and refer to the result as the \emph{search score}.  The
+imitated search retains the $20\%$ of seeds with the lowest score, that is 120
+of 600.  The procedure is implemented in
+\texttt{figures/seed\_selection/plot\_seed\_conditioning.py}.
+
+\subsection{Results}\label{sec:results}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{seed_conditioning.pdf}
+  \caption{600 realizations of the $125 \times 125 \times 1000\Mpch$ subvolume.
+    \emph{(a)} All realizations, without selection: individual measurements in
+    grey, the $16$--$84$ percentile band shaded, and the ensemble mean as the
+    solid curve.  The ensemble mean lies below linear theory for the reason
+    given in \S\ref{sec:target}.  \emph{(b)} The realization of 600 with the
+    lowest search score, plotted over the matched range and a margin of
+    $10\Mpch$; it departs from theory by $0.19\sigma$ per separation.
+    \emph{(c)} Scatter retained within the matched range as a function of the
+    accepted fraction, together with the corresponding point for rejection on
+    the mean density of the subvolume alone.  \emph{(d)} Distribution of $\xi$
+    at $r = 42\Mpch$, outside the matched range, before and after selection.
+    Produced by
+    \texttt{figures/seed\_selection/plot\_seed\_conditioning.py}.}
+  \label{fig:conditioning}
+\end{figure}
+
+\paragraph{Sample variance.}  At $r = 92\Mpch$ the subvolume measurement
+scatters by $4.3\times10^{-3}$ across realizations, against $4.0\times10^{-4}$
+for the full box, a ratio of $10.8$.  The volume ratio alone predicts
+$\sqrt{64} = 8$; the remainder arises from the anisotropic shape of the
+subvolume, which is narrow in two directions.  A survey volume of the same size
+and shape is subject to the same scatter.
+
+\paragraph{Reduction of scatter within the matched range.}
+Table~\ref{tab:ratios} lists the scatter of the retained seeds divided by that
+of all seeds.  Within the matched range it falls to $0.38$--$0.64$.  Any
+uncertainty estimated internally from such a realization, by subvolume
+splitting or an equivalent method, is correspondingly underestimated by a
+factor of about two in $\sigma$, and is underestimated precisely at the
+separations that were matched.
+
+\paragraph{Propagation outside the matched range.}  The reduction extends
+beyond the matched bins: the scatter is $0.67$ at $r = 58\Mpch$, $0.79$ at
+$52\Mpch$ and $0.86$ at $48\Mpch$ below the range, and $0.70$ at $132\Mpch$
+above it.  Ensemble means also move at separations excluded from the match, by
+$-0.26\sigma$ at $r = 28\Mpch$ and $-0.24\sigma$ at $32\Mpch$, corresponding to
+$2.8$ and $2.6$ times the standard error on those means.
+Figure~\ref{fig:conditioning}(d) shows the distribution at $r = 42\Mpch$.
+
+\paragraph{Displacement of the target.}  The ensemble mean of the subvolume
+measurement lies $9.7\times10^{-4}$ below theory at $r = 92\Mpch$, that is
+$0.22\sigma$, as anticipated in \S\ref{sec:target}.
+
+\paragraph{The modes that are constrained.}  The combined power of the
+subvolume modes with $k \leq 0.05\ h/\mathrm{Mpc}$ correlates with the search
+score at $\rho = +0.38$; among the retained seeds its scatter falls to $0.67$
+and its mean moves by $-0.10\sigma$.  These are the modes that set the growth
+of structure within the subvolume, so the selection acts on the formation
+history of the region and not only on the measured curve.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Effect of retaining the 120 of 600 seeds with the lowest search
+    score.  Column 2 is the scatter of the retained seeds divided by that of
+    all seeds; column 3 is the displacement of the ensemble mean in units of
+    the scatter of all seeds; column 4 is the same displacement in units of its
+    own standard error.  Values are listed at every second bin for compactness.}
+  \label{tab:ratios}
+  \begin{tabular}{cccc}
+    \toprule
+    $r$ [Mpc/$h$] & scatter retained & mean displaced & in units of its error\\
+    \midrule
+    \multicolumn{4}{c}{\emph{below the matched range}}\\
+     28 & 1.02 & $-0.26$ & $-2.8$\\
+     38 & 0.94 & $-0.19$ & $-2.1$\\
+     48 & 0.86 & $-0.11$ & $-1.2$\\
+     58 & 0.67 & $-0.04$ & $-0.4$\\
+    \midrule
+    \multicolumn{4}{c}{\emph{within the matched range}}\\
+     62 & 0.56 & $+0.01$ & $+0.2$\\
+     72 & 0.43 & $+0.06$ & $+0.7$\\
+     82 & 0.38 & $+0.10$ & $+1.1$\\
+     92 & 0.42 & $+0.13$ & $+1.4$\\
+    102 & 0.41 & $+0.22$ & $+2.4$\\
+    112 & 0.39 & $+0.30$ & $+3.3$\\
+    122 & 0.54 & $+0.28$ & $+3.1$\\
+    128 & 0.64 & $+0.23$ & $+2.5$\\
+    \midrule
+    \multicolumn{4}{c}{\emph{above the matched range}}\\
+    132 & 0.70 & $+0.20$ & $+2.2$\\
+    142 & 0.79 & $+0.09$ & $+1.0$\\
+    152 & 0.83 & $+0.03$ & $+0.4$\\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Dependence on the tolerance}\label{sec:tolerance}
+
+Figure~\ref{fig:conditioning}(c) varies the accepted fraction.  The scatter
+retained within the matched range is
+
+\begin{center}
+\begin{tabular}{lccccccc}
+  \toprule
+  accepted fraction & 100\% & 80\% & 60\% & 40\% & 20\% & 10\% & 5\%\\
+  scatter retained  & 1.00 & 0.76 & 0.65 & 0.55 & 0.45 & 0.37 & 0.32\\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+No threshold exists below which the selection is inconsequential.  Expressed as
+a rejection rule rather than as a quantile: rejecting any seed whose $\xi$
+departs from theory by more than $2\sigma$ at any matched separation accepts
+$80.7\%$ of seeds, leaves the ensemble mean displaced by $-0.03\sigma$, and
+still removes $22\%$ of the scatter.
+
+One rule behaves differently.  Rejecting seeds whose subvolume mean density
+departs from its ensemble mean by more than $2\sigma$ accepts $95.8\%$ of
+seeds, displaces the mean of $\xi$ by less than $0.01\sigma$, and leaves the
+scatter of $\xi$ unchanged to within the precision of 600 realizations
+(measured ratio $1.01$).  The difference follows from
+equation~\eqref{eq:xi-sum}: $\xi$ is a sum of squared amplitudes, whereas the
+subvolume mean density is a weighted sum of the amplitudes themselves and
+therefore depends on their phases.  The same set of squared amplitudes admits
+both an overdense and an underdense subvolume, so constraining the mean density
+within a wide interval leaves the squares nearly unconstrained.
+
+\section{Circularity of validation by recovery}\label{sec:circular}
+
+Consider a correlation-function estimator biased low by $10\%$, and a seed
+search conducted with it.  The search will identify seeds whose reported $\xi$
+lies on theory, since the distribution it samples is wide enough to contain
+them, and the resulting figure will appear correct.
+
+The relevant widths are as follows.  A $10\%$ multiplicative bias displaces the
+measurement at $r = 62\Mpch$ by $0.068\sigma$, whereas the retained seeds
+themselves depart from theory by $0.46\sigma$ per separation, a factor of seven
+larger.  A search of this kind cannot resolve the bias.
+
+The conclusion is a matter of inference rather than of precision.  If the seed
+was chosen so that the subvolume $\xi$ agrees with theory, the observation that
+the subvolume $\xi$ agrees with theory carries no information about the
+estimator, the pipeline, or the simulation.  Validation of this kind requires
+unselected seeds, or the full box.
+
+A related limit applies to the procedure itself.  The closest of 600 seeds
+departs from theory by $0.19\sigma$ per matched separation
+(Figure~\ref{fig:conditioning}b), and the scatter within the matched range is
+comparable to or larger than $\xi$ itself.  Agreement close enough to appear
+exact on a figure therefore requires a search far larger than 600 seeds, at
+which point \S\ref{sec:tolerance} applies with correspondingly greater force.
+
+\section{Recommendations}\label{sec:recommendations}
+
+\paragraph{Compare against the expectation of the estimator.}  Three
+calculable effects separate the subvolume measurement from linear theory: the
+window of the subvolume, the use of its own mean density (\S\ref{sec:target}),
+and the grid and bin widths.  Together they place the expectation $0.22\sigma$
+below theory at $r = 92\Mpch$.  Comparison against raw theory therefore
+misrepresents every seed, and a search initiated from such a comparison selects
+a fluctuation that compensates a systematic.  The comparison should be made
+against $\avg{\hat\xi}$ for the estimator actually used.
+
+The same consideration settles a related question.  The mean density of the
+full box is available in a simulation and is not available in a survey.  If the
+subvolume is used to characterize the field, normalization by the box mean
+removes the effect of \S\ref{sec:target} entirely; if it represents a survey,
+the subvolume mean is appropriate and the resulting suppression belongs in the
+comparison curve.
+
+\paragraph{Report the sample-variance band.}  Presenting the measurement
+together with the band of Figure~\ref{fig:conditioning}(a) is sufficient
+whenever the measurement lies within it.  For a subvolume representing a survey
+this is also the more faithful presentation, since a survey of the same size is
+subject to the same scatter, and a mock catalogue lying on theory understates
+the uncertainty of a real analysis.
+
+\paragraph{Where variance reduction is required, use a documented method.}
+The objective of a realization behaving like the ensemble mean is legitimate;
+the seed search is what fails.  In decreasing order of suitability for a
+subvolume of this size and shape:
+\begin{itemize}
+  \item Fixed-amplitude initial conditions \citep{Angulo2016}, setting
+        $|\delta_{\bk}| = \sqrt{P(k)}$ with random phases, optionally in
+        sign-inverted pairs.  The modification is explicit and identical across
+        realizations, and its effect on standard statistics has been measured
+        \citep{VillaescusaNavarro2018}.  For a subvolume of this size the
+        procedure removes the amplitude contribution to the scatter but not the
+        contribution from the phase arrangement within the subvolume, which is
+        substantial at one sixty-fourth of the volume.
+  \item Constrained realizations \citep{HoffmanRibak1991}, imposing the desired
+        large-scale modes directly, so that the conditioning is explicit and
+        its consequences calculable.
+  \item Averaging the 64 disjoint subvolumes of this shape contained in the
+        box, which attains full-box precision and imposes no constraint, and
+        which addresses the ensemble mean rather than an individual subvolume.
+\end{itemize}
+
+\paragraph{Where a seed must be rejected, reject on a single physical
+quantity.}  If the concern is that the subvolume may be anomalously overdense
+or underdense, and therefore unrepresentative for the galaxy population that
+forms within it, that concern is addressed directly by rejecting on the
+subvolume mean density, for which \S\ref{sec:tolerance} measures no reduction
+in the scatter of $\xi$.  Rejection on the full $\xi$ curve provides the same
+assurance and removes $22\%$ of the scatter.  Whichever rule is adopted, the
+quantity, the tolerance, and the numbers of seeds examined and rejected should
+be stated.
+
+\paragraph{Restrict the use of a selected realization.}  Uncertainties
+estimated internally at large separations, and claims that the pipeline
+recovers theory (\S\ref{sec:circular}), are both compromised.  A selected
+realization remains suitable for code development and timing, for figures, and
+for resolution comparisons at fixed seed, in which both resolutions carry the
+same selection.
+
+\section{Conclusions}\label{sec:conclusions}
+
+Retaining the seeds whose subvolume $\xi$ reproduces linear theory is the
+selection of \S\ref{sec:dice} applied to approximately ten mode amplitudes.
+Every retained realization remains a valid solution; the retained set is not a
+representative sample.  For the $125 \times 125 \times 1000\Mpch$ subvolume
+examined here:
+
+\begin{enumerate}
+  \item Retaining the best fifth of 600 seeds reduces the scatter of $\xi$ to
+        $0.38$--$0.64$ within the matched range and to $0.67$--$0.94$ outside
+        it, and displaces ensemble means at unmatched separations by up to
+        $2.8$ standard errors.
+  \item The reduction has no threshold.  Rejecting only the worst fifth of
+        seeds removes $22\%$ of the scatter.  Rejection on the subvolume mean
+        density alone removes none.
+  \item The target is displaced.  The integral constraint places
+        $\avg{\hat\xi}$ at $0.22\sigma$ below linear theory at $r = 92\Mpch$,
+        so agreement with raw theory selects an atypical realization by
+        construction.
+  \item The objective is not attained.  The closest of 600 seeds departs from
+        theory by $0.19\sigma$ per separation, and an estimator biased low by
+        $10\%$ would be displaced by only $0.068\sigma$, so the search neither
+        reproduces theory closely nor distinguishes a correct pipeline from a
+        faulty one.
+\end{enumerate}
+
+The departure that motivated the proposal is in part a calculable systematic,
+which belongs in the comparison curve, and in part the sample variance of a
+subvolume of this size, which should be reported rather than removed.
+
+\bibliography{references}
+
+\end{document}

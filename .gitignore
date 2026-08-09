@@ -34,6 +34,7 @@ notes/*.png
 notes/*.pdf
 notes/figures/**/*.pdf
 notes/figures/**/*.png
+notes/figures/**/*.npz
 
 # LaTeX auxiliary files (never version these)
 *.aux

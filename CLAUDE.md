@@ -152,6 +152,7 @@ LaTeX write-ups in `notes/`; full list and reading order in `notes/README.md`.
 | `restriction_lpt.tex` | Restriction of δ and Ψ⁽¹⁾; why restricting the displacement potential is Poisson-inconsistent |
 | `music2_internals.tex` | File-and-line walkthrough of MUSIC2's δ construction and zoom noise hierarchy |
 | `cosmo_stat.tex` | Statistics of cosmological fields: ensembles, ergodicity, ξ(r), P(k), covariance, Gaussian random fields, generating and measuring them |
+| `seed_selection.tex` | Why adopting the seed whose subvolume ξ(r) best matches theory makes the run unrepresentative: two-dice example, ξ as a sum of ~10 squared mode amplitudes, Gaussian conditioning, integral-constraint displacement of the target; 600 realisations at 256³; what to do instead. Written in journal register (abstract + numbered sections), not the textbook register of the other notes |
 | `xi_estimators.tex` | Why a direct lag sum and a zero-padded FFT are the same estimator: grid Landy–Szalay in the infinite-random limit and Slepian & Eisenstein's N = D−R convolution form, Wiener–Khinchin as a finite identity, circular vs linear autocorrelation and the padding condition d ≤ P−N, the separable N−d pair count, per-axis boundaries for pencil beams, cost scaling, and the gridding artefacts the FFT route concedes |
 
 Planning docs in `docs-claude/`: `CLAUDE_MUSIC2.md` (MUSIC2 code structure,
@@ -178,6 +179,12 @@ data", "for free", "the whole game", "the price of a finite box", "the rescue
 is ergodicity", "through the lens of ordinary statistics", "each cell knows
 nothing about its neighbours", "the right-hand side mentions x nowhere",
 "even though it looked as though it might".
+
+The money-and-injury family for "a method removes something" — cost, price,
+buys, pays, damage, penalty, free — recurred six times in a first draft of
+`notes/seed_selection.tex` after being corrected once in `cosmo_stat.tex`.
+Name the quantity: "removes 21% of the scatter", not "costs a fifth of the
+scatter".
 
 ### Writing style for the notes
 

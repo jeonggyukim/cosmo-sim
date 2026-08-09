@@ -1,4 +1,5 @@
-NOTES  = cosmo_stat ic_sampling cosmo_ic restriction_lpt music2_internals xi_estimators
+NOTES  = cosmo_stat ic_sampling cosmo_ic restriction_lpt music2_internals xi_estimators \
+         seed_selection
 PYTHON = conda run -n cosmo python
 
 # Absolute path to this Makefile's directory — pdflatex is always run from here
@@ -52,7 +53,9 @@ FIGURES = \
     figures/restriction/zoom_ic_pk_full.pdf \
     figures/music2/meyer.pdf \
     figures/xi_estimators/xi_toy.pdf \
-    figures/xi_estimators/xi_identity.pdf
+    figures/xi_estimators/xi_identity.pdf \
+    figures/seed_selection/seed_dice.pdf \
+    figures/seed_selection/seed_conditioning.pdf
 
 all : figures notes
 
@@ -148,6 +151,12 @@ figures/xi_estimators/xi_toy.pdf : figures/xi_estimators/plot_xi_toy.py
 figures/xi_estimators/xi_identity.pdf : figures/xi_estimators/plot_xi_identity.py
 	cd figures/xi_estimators && $(PYTHON) plot_xi_identity.py
 
+figures/seed_selection/seed_dice.pdf : figures/seed_selection/plot_seed_dice.py
+	cd figures/seed_selection && $(PYTHON) plot_seed_dice.py
+
+figures/seed_selection/seed_conditioning.pdf : figures/seed_selection/plot_seed_conditioning.py ../data/class_pk_z200_pk.dat
+	cd figures/seed_selection && $(PYTHON) plot_seed_conditioning.py
+
 # --- LaTeX ---
 notes : $(FIGURES) $(addsuffix .pdf, $(NOTES))
 
@@ -164,4 +173,5 @@ clean :
 	rm -f figures/*.png figures/*.pdf $(FIGURES) $(addsuffix .pdf, $(NOTES))
 	rm -f figures/ic_sampling/*.png figures/cosmo_ic/*.png \
 	      figures/fft/*.png figures/restriction/*.png figures/music2/*.png \
+	      figures/seed_selection/*.png \
 	
