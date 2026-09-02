@@ -1429,6 +1429,117 @@ distribution of $\{\delta_n\}$ matches the target.  Matching the two
 lines of second-moment algebra has matched every higher
 correlator as well.  That is the whole content of Gaussianity, made arithmetic.
 
+%----------------------------------------------------------------------
+\subsection{The tidal field of a region, and how much of it is shear}
+\label{sec:tidal}
+
+Everything so far has described a field by its density alone.  When one
+asks what will \emph{happen} to a region, the density is not enough.  A
+region collapses under the gravity of its surroundings, and the
+surroundings pull differently along different directions.  This
+subsection introduces the object that carries that information and works
+out one statistic of it, because that statistic turns out to be fixed
+once $\sigma$ is fixed.
+
+\paragraph{The tidal tensor.}  Let $\Phi$ be the peculiar gravitational
+potential, defined so that
+\begin{equation}
+  \nabla^2 \Phi = \delta .
+\end{equation}
+The quantity that describes how a region is being pulled is not $\Phi$
+itself, and not the force $-\nabla\Phi$ either, since a uniform force
+merely translates the region without deforming it.  What deforms it is
+how the force \emph{changes} across the region, that is the second
+derivative
+\begin{equation}
+  T_{ij} \;=\; \partial_i \partial_j \Phi ,
+\end{equation}
+called the \emph{tidal tensor}.  It is symmetric, so it has three real
+eigenvalues, and its trace is $T_{ii} = \nabla^2\Phi = \delta$.
+
+In Fourier space the two derivatives bring down $-\mathrm ik_i$ and
+$-\mathrm ik_j$, giving $-k_ik_j$, and the Laplacian likewise gives
+$-k^2$, so $\tilde\Phi(\bk) = -\tilde\delta(\bk)/k^2$ and
+\begin{equation}
+  \tilde T_{ij}(\bk) \;=\; \frac{k_i k_j}{k^2}\,\tilde\delta(\bk)
+                     \;=\; \hat k_i \hat k_j\, \tilde\delta(\bk),
+  \label{eq:tidal-fourier}
+\end{equation}
+with $\hat\bk$ the unit vector along $\bk$.  Setting $i = j$ and summing
+recovers $\hat k_i\hat k_i = 1$ and hence the trace $\tilde\delta$, as it
+must.
+
+\paragraph{Splitting off the part that changes shape.}  Write the tensor
+as a trace piece plus a remainder with no trace,
+\begin{equation}
+  T_{ij} \;=\; \underbrace{\tfrac13 \delta_{ij}\,\delta}_{\text{isotropic}}
+             \;+\; \underbrace{s_{ij}}_{\text{shear}},
+  \qquad
+  \tilde s_{ij}(\bk) = \Bigl(\hat k_i\hat k_j - \tfrac13\delta_{ij}\Bigr)
+                        \tilde\delta(\bk).
+\end{equation}
+The two pieces do different physical work.  The trace part is the same
+in every direction: it compresses the region uniformly, and by itself it
+would produce spherical collapse.  The shear $s_{ij}$ has zero trace, so
+it changes shape at fixed volume, stretching along one axis while
+squeezing along another.  It is the shear that makes collapse
+anisotropic, and in Zel'dovich's description a region collapses first
+along the axis of the largest eigenvalue, producing a sheet rather than
+a ball (see \code{cosmo\_ic.pdf}).
+
+\paragraph{How much of the tidal field is shear.}  A natural question is
+how strong the shear typically is.  Define its amplitude by
+$s^2 = s_{ij}s_{ij}$, summing over both indices.  For a Gaussian field
+the answer is remarkably simple, and the reason is that the angular
+factor in Eq.~(\ref{eq:tidal-fourier}) does not depend on $|\bk|$.
+Summing that factor over both indices,
+\begin{align}
+  \sum_{ij}\Bigl(\hat k_i\hat k_j - \tfrac13\delta_{ij}\Bigr)^{2}
+  &= \sum_{ij}\hat k_i^2\hat k_j^2
+     - \tfrac23\sum_{ij}\hat k_i \hat k_j \delta_{ij}
+     + \tfrac19\sum_{ij}\delta_{ij}^2 \notag\\
+  &= \Bigl(\sum_i \hat k_i^2\Bigr)\Bigl(\sum_j \hat k_j^2\Bigr)
+     - \tfrac23 \sum_i \hat k_i^2 + \tfrac13
+   \;=\; 1 - \tfrac23 + \tfrac13 \;=\; \tfrac23 ,
+\end{align}
+where each sum $\sum_i \hat k_i^2 = 1$ because $\hat\bk$ is a unit
+vector, and $\sum_{ij}\delta_{ij}^2 = 3$.  The result is a pure number.
+It is the same for every direction and every wavenumber, so it comes
+straight out of the integral over modes:
+\begin{equation}
+  \bigl\langle s^2 \bigr\rangle \;=\; \tfrac23\,\sigma^2 ,
+  \qquad
+  \bigl\langle T_{ij}T_{ij} \bigr\rangle \;=\; \sigma^2 ,
+  \label{eq:shear-variance}
+\end{equation}
+with $\sigma^2 = \langle\delta^2\rangle$ the variance of the same
+smoothed field.  The trace part carries the remaining third.
+
+Equation~(\ref{eq:shear-variance}) says something worth pausing on.  For
+a Gaussian field the typical strength of the shear is not an independent
+property of the region: fix $\sigma$ and you have fixed
+$\langle s^2\rangle$.  What distinguishes one region from another is not
+how much shear it has on average but the \emph{configuration} --- the
+three eigenvalues and their ordering --- which decides whether the
+region becomes a sheet, a filament, or a knot.
+
+This also gives a cheap and sharp test of any code that computes a tidal
+field: measure $\langle s^2\rangle/\sigma^2$ on a Gaussian realisation
+and check that it returns $2/3$.  Measured on \texttt{monofonIC}
+$\delta(q)$ fields the ratio came out $0.6667$, which confirms both the
+operator and the smoothing.
+
+\paragraph{Why this appears in the seed-selection question.}  A
+simulation of one region is often chosen by some criterion applied to
+that region's measured clustering.  Because the shear is built from the
+same modes as the density, it is correlated with any such criterion, and
+\code{seed\_selection.pdf} gives the rule for what conditioning then
+does, in its section on the conditional moments of a Gaussian pair: a statistic correlated at $\rho$ with the
+one being selected on has its mean displaced and its variance reduced by
+$1-\rho^2$.  The tidal shear of a region is exactly such a statistic,
+which is why it moves when one selects on the region's power spectrum
+without ever mentioning the shear.
+
 %======================================================================
 \section{Measuring $\xi$ and $P$ from one realisation}
 \label{sec:estimate}
@@ -1660,6 +1771,113 @@ of galaxies per unit volume drops with depth for a reason that has
 nothing to do with clustering.  Estimators handle this by weighting
 \citep{FKP1994}, and the geometry enters exactly as the $RR$ term of
 \S\ref{sec:estimate}.
+
+
+\subsection{What the window does to the acoustic wiggles}
+\label{sec:bao-smoothing}
+
+The previous subsection said that convolving with $|\widetilde W(\bk)|^2$
+``smooths sharp features''.  That is worth making concrete, because the
+sharpest feature in $P(k)$ is the one cosmologists most want to measure.
+This subsection identifies the feature, works out how much of it survives
+the convolution, and gives the numbers for one specific subvolume.
+
+\paragraph{The feature in question.}
+Before recombination, baryons and photons were tightly coupled, and
+pressure waves travelled through that fluid at close to $c/\sqrt3$.  At
+recombination the photons decoupled and the waves stopped.  The distance a
+wave had travelled by then is the \emph{sound horizon}, written $r_s$; in
+our cosmology $r_s \approx 103\,\mathrm{Mpc}/h$.  That one length is
+stamped into the matter distribution, and in Fourier space a single
+preferred separation appears as a series of oscillations in $P(k)$ spaced
+by
+\begin{equation}
+  \Delta k_{\rm BAO} \;=\; \frac{2\pi}{r_s}
+  \;\approx\; 0.061 \; h\,\mathrm{Mpc}^{-1} .
+\end{equation}
+These are the \emph{baryon acoustic oscillations}, or BAO.  They are small:
+in the linear spectrum used here they modulate $P(k)$ by about $1.8\%$ rms
+over $k = 0.216$--$0.395\,h\,\mathrm{Mpc}^{-1}$.
+
+It is useful to name the comparison spectrum too.  A \emph{de-wiggled}, or
+no-wiggle, spectrum is $P(k)$ with the oscillations removed but the
+broadband shape kept: the same slope, the same turnover, no ripples.  The
+ratio of the true spectrum to the de-wiggled one isolates the BAO, and
+oscillates about $1$.
+
+\paragraph{Why a window damps them.}
+Convolution replaces the value at each $k$ by a weighted average of the
+values at nearby $k$, with the weights given by $|\widetilde W(\bk)|^2$.
+The width of that averaging kernel is set by the size of the region: a
+region of extent $\ell$ in some direction has a kernel of width
+$\Delta k \approx 2\pi/\ell$ in the matching direction.  This is the
+uncertainty relation between a length and a wavenumber, and nothing more.
+
+Now compare the two widths.  If $\Delta k \ll \Delta k_{\rm BAO}$, the
+average is taken over a small part of one oscillation, and the wiggles come
+through nearly intact.  If $\Delta k \gtrsim \Delta k_{\rm BAO}$, the
+average covers a whole oscillation or more, so peaks and troughs are mixed
+together and largely cancel.  The measured wiggles are then shallower than
+the true ones.
+
+This also fixes the \emph{sign} of the effect at each $k$, which is what
+makes it recognisable.  Averaging pulls every value toward the local mean.
+At a wiggle peak the neighbours are lower, so the average sits below the
+true value.  At a trough the neighbours are higher, so the average sits
+above it.  The ratio of the convolved spectrum to the true one therefore
+dips exactly where the true spectrum peaks and rises where it dips: the
+ratio oscillates \emph{in antiphase} with the BAO.
+
+\paragraph{A worked example: the pencil subvolume.}
+Take the region used in the subvolume experiments of this repository: a
+box of side $L = 700\,\mathrm{Mpc}/h$, and inside it a ``pencil'' occupying
+one eighth of the box in two directions and its full length in the third,
+so $87.5 \times 87.5 \times 700\,(\mathrm{Mpc}/h)^3$.  The transverse
+extent gives
+\begin{equation}
+  \Delta k_\perp \;=\; \frac{2\pi}{87.5\,\mathrm{Mpc}/h}
+  \;=\; 0.072 \; h\,\mathrm{Mpc}^{-1},
+\end{equation}
+which is slightly \emph{larger} than $\Delta k_{\rm BAO} = 0.061\,h\,
+\mathrm{Mpc}^{-1}$.  Transversely, the averaging kernel is wider than one
+full acoustic oscillation, so the prediction is that the wiggles are
+heavily damped in such a region, not merely softened.
+
+Two measurements confirm this.  First, the ratio of the convolved theory to
+the raw theory oscillates in antiphase with the BAO, with a correlation
+coefficient between $-0.63$ and $-0.70$ over
+$k = 0.216$--$0.395\,h\,\mathrm{Mpc}^{-1}$, and with a matching amplitude
+($1.4\%$ rms in the ratio against $1.8\%$ rms in the BAO).  Second, and
+more directly, one can put a de-wiggled spectrum through the identical
+convolution and see what is left.  The ripple in the ratio falls from
+$3.13\%$ to $0.27\%$ rms over $k = 0.02$--$0.15\,h\,\mathrm{Mpc}^{-1}$,
+and from $0.71\%$ to $0.02\%$ over $k = 0.216$--$0.395\,h\,
+\mathrm{Mpc}^{-1}$.  Removing the wiggles from the input removes the
+ripple from the output, so the ripple was the wiggles.
+
+\paragraph{What this means when comparing to theory.}
+A spectrum measured in a subvolume should be compared with the theory
+convolved with that subvolume's window, and the comparison should be made
+in that basis rather than by trying to undo the convolution.  The reason
+is now visible in the wiggles specifically.  The convolved curve carries
+damped BAO, and the raw curve carries full-amplitude BAO.  These are two
+different curves, and the estimator is unbiased for the first one only.
+Asking a measured subvolume spectrum to match the raw theory therefore asks
+it to reproduce, in one realisation, acoustic wiggles at an amplitude that
+its own ensemble average does not have.  A realisation can be found that
+does so, by chance, but it has been chosen for a fluctuation rather than
+for being typical, which is the subject of \texttt{seed\_selection.tex}.
+
+Note finally that this has nothing to do with which species is used.  Under
+the back-scaling convention that MUSIC2 and monofonIC use for initial
+conditions, described in the companion note \texttt{cosmo\_ic.tex}, the
+baryon and cold dark matter fields are both built from the same
+total-matter field and differ
+only by a smooth relative mode, so they carry the same acoustic wiggles to
+within a few tenths of a percent.  Measured on the same subvolume, the
+ripple amplitudes are $1.40\%$ for total matter, $1.39\%$ for cold dark
+matter and $1.43\%$ for baryons.  Choosing the gas rather than the matter
+does not avoid the damping.
 
 \subsection{The cosmology assumed in the analysis}
 \label{sec:ap}

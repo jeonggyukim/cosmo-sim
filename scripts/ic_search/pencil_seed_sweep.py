@@ -22,7 +22,7 @@ Outputs under OUT/:
                            (species axis: matter, cdm, baryon -- see the "species" attr)
   summary.hdf5             per-(seed, pencil) deviation metrics vs both curves
 """
-import glob, os, re, subprocess, time
+import glob, os, random, re, subprocess, time
 import numpy as np, h5py
 import paths
 
@@ -54,6 +54,16 @@ _ap.add_argument("--smooth", type=float, nargs="+", default=[20.0, 40.0],
 _ap.add_argument("--nthreads", type=int, default=None,
                  help="OpenMP threads for monofonIC. Deliberately has no default: the "
                       "right value depends on how many sweeps you intend to run at once")
+_ap.add_argument("--seed-list", default=None, metavar="FILE",
+                 help="run the seeds listed in FILE (one integer per line) instead of a "
+                      "contiguous range. Used to rerun seeds an earlier sweep skipped; "
+                      "--list-start and --nseeds select the slice this task takes")
+_ap.add_argument("--list-start", type=int, default=0,
+                 help="index into --seed-list at which this task starts")
+_ap.add_argument("--nretry", type=int, default=6,
+                 help="attempts per seed before it is skipped. CLASS segfaults on "
+                      "some startup reads when many tasks contend for its data "
+                      "files, and most such seeds succeed on a later try")
 _ap.add_argument("--compact", action="store_true",
                  help="write one file for the whole chunk instead of a directory per "
                       "seed. Required at large N_seed: per-seed directories put hundreds "
@@ -84,7 +94,15 @@ if ARGS.nthreads is None:
         f"  one sweep alone      : --nthreads {ncpu}\n"
         f"  k sweeps in parallel : --nthreads {max(1, ncpu//4)}  (for k = 4)\n")
 NTHREADS = ARGS.nthreads
-SEEDS = list(range(ARGS.seed0, ARGS.seed0 + ARGS.nseeds))
+NRETRY = ARGS.nretry
+if ARGS.seed_list:
+    _all = [int(x) for x in open(ARGS.seed_list).read().split()]
+    SEEDS = _all[ARGS.list_start:ARGS.list_start + ARGS.nseeds]
+    if not SEEDS:
+        raise SystemExit(f"--list-start {ARGS.list_start} is past the end of "
+                         f"{ARGS.seed_list} ({len(_all)} seeds)")
+else:
+    SEEDS = list(range(ARGS.seed0, ARGS.seed0 + ARGS.nseeds))
 NGRID, LBOX, FRAC = ARGS.ngrid, 700.0, 8   # pencil = 1/FRAC of the box in two axes
 SPECIES = ARGS.species                          # dataset / theory column pairs below
 DSET = {"matter": "delta_q", "cdm": "delta_q_cdm", "baryon": "delta_q_baryon"}
@@ -121,16 +139,22 @@ def run_ic(seed, rundir):
     c = re.sub(r"^DoFixing.*$", f"DoFixing        = {ARGS.dofixing}", c, flags=re.M)
     c = re.sub(r"^filename.*$", f"filename        = {out}", c, flags=re.M)
     open(conf, "w").write(c)
-    # CLASS occasionally faults inside its spline interpolation on startup (SIGBUS
-    # in array_interpolate_spline). It is intermittent and a rerun clears it, so a
-    # long sweep should not die on one bad draw.
-    for attempt in range(3):
+    # CLASS faults on startup often enough to matter, before the seed is used for
+    # anything, so a failure says nothing about the realization. A rerun usually
+    # clears it.
+    for attempt in range(NRETRY):
         with open(f"{rundir}/run.log", "w") as log:
             r = subprocess.run([BIN, conf], cwd=rundir, stdout=log, stderr=subprocess.STDOUT)
         if r.returncode == 0 and os.path.exists(out):
             return out
         print(f"   seed {seed}: monofonIC exited {r.returncode}, retrying "
-              f"({attempt+1}/3)", flush=True)
+              f"({attempt+1}/{NRETRY})", flush=True)
+        # Hundreds of tasks starting at once contend for the CLASS and HyRec data
+        # files, and CLASS segfaults on some of those reads. Tasks run in near
+        # lockstep, so a retry after a fixed delay collides again; a random wait
+        # spreads them out. Measured skip rate rose from 0.5% at 4 concurrent
+        # processes to 4.4% at 500.
+        time.sleep(random.uniform(1.0, 5.0*(attempt + 1)))
     raise ICFailure(f"monofonIC failed three times for seed {seed}; see {rundir}/run.log")
 
 
