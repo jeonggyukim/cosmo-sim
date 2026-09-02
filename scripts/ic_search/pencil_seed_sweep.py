@@ -505,6 +505,15 @@ if SKIPPED:
 if not rows:
     raise SystemExit("every seed in this chunk failed; no summary written")
 
+if ARGS.compact:
+    # Every task in an array shares --out, and they finish at about the same
+    # time, so writing one summary file from all of them collides on the HDF5
+    # lock. One task in a few hundred died here after completing all its seeds.
+    # The chunk files already hold everything this file would, so in compact
+    # mode it is redundant as well as unsafe.
+    print(f"wrote {len(SEEDS)} seeds to chunk files under {OUT}", flush=True)
+    raise SystemExit(0)
+
 rows = np.array(rows)
 with h5py.File(f"{OUT}/summary.hdf5", "w") as f:
     for n, key in enumerate(["seed", "species", "axis", "i", "j",
