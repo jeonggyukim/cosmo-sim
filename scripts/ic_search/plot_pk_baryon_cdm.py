@@ -70,7 +70,9 @@ def measure(rundir):
     # only one or two of them below k = 0.03 while crowding the small scales.
     nb = 70
     kfund = 2*np.pi/L
-    edges = np.logspace(np.log10(0.9*kfund), np.log10(kny), nb+1)
+    # Start half a fundamental below k_fund so the first shell falls inside a bin
+    # rather than on its edge.
+    edges = np.logspace(np.log10(0.5*kfund), np.log10(kny), nb+1)
     idx = np.digitize(kk[g].ravel(), edges) - 1
     inb = (idx >= 0) & (idx < nb)
     idx = idx[inb]
@@ -95,10 +97,11 @@ def measure(rundir):
                                  np.log(th[:, THCOL[s]]*(2*np.pi)**3)))
         Pth[s] = np.bincount(idx, weights=P3[g].ravel()[inb],
                              minlength=nb)[:nb]/np.maximum(cnt, 1)
-    # A bin needs enough modes for its average to mean anything. At the fundamental
-    # there are only six modes in the whole box, so the first bins are dropped
-    # rather than plotted as noise.
-    ok = (cnt >= 20) & (kbin > 0)
+    # Keep every populated bin, down to the fundamental. The lowest ones hold
+    # only a handful of modes -- six in the shell at k_fund -- so they scatter by
+    # tens of per cent, which the band in the ratio panel makes explicit rather
+    # than the plot hiding by dropping them.
+    ok = (cnt >= 1) & (kbin > 0)
     # The raw table too, for drawing the theory at its own resolution rather than
     # at the resolution of the measurement's bins.
     fine = {s: (th[:, 0], th[:, THCOL[s]]*(2*np.pi)**3) for s in d}
