@@ -147,6 +147,102 @@ cosmology; the search manufactures precisely that and treats it as a match.
 \section{What this does to every other property}
 \label{sec:conditioning}
 
+\subsection{The quantities measured}
+\label{sec:quantities}
+
+Each is a single number per subvolume, so that a selection can be asked what it
+does to it. Angle brackets $\avg{\cdot}_V$ denote an average over the cells of
+the subvolume, and $\delta_R$ is the density contrast smoothed with a Gaussian of
+radius $R$. The transverse width of the subvolume is $\ell_\perp = L/8 =
+87.5\Mpch$, which sets the smallest wavenumber it can resolve across itself,
+$\Delta k_\perp = 2\pi/\ell_\perp = 0.072\ h\,\mathrm{Mpc}^{-1}$. The Nyquist
+wavenumber of the grid is $k_{\rm Ny} = \pi N / L$.
+
+\begin{description}
+\item[The criterion.] The distance of a measured subvolume spectrum
+  $\hat P(k)$ from a reference curve $P_{\rm ref}(k)$, over the band the
+  selection uses:
+  \begin{equation}
+    \label{eq:criterion}
+    D \;=\; \left[ \frac{1}{N_{\rm bins}}
+      \sum_{k \,\le\, 2\Delta k_\perp}
+      \ln^2 \frac{\hat P(k)}{P_{\rm ref}(k)} \right]^{1/2} .
+  \end{equation}
+  The proposal takes $P_{\rm ref} = P_{\rm th}$, the raw linear theory. The
+  control of \S\ref{sec:controls} takes
+  $P_{\rm ref} = P_{\rm th} \ast |\widetilde W|^2$ instead. A smaller $D$ is a
+  closer match, and a selection keeps the subvolumes with the smallest $D$.
+
+\item[Large-scale power.] The mean ratio of the measured spectrum to the
+  convolved theory over the same band the criterion uses,
+  $\avg{\hat P / (P_{\rm th} \ast |\widetilde W|^2)}_{k \le 2\Delta k_\perp}$.
+  It is quoted against the convolved curve so that a value of one means an
+  ordinary region, not a matching one.
+
+\item[Small-scale power.] The same ratio over
+  $2\Delta k_\perp < k \le 0.9\,k_{\rm Ny}$, that is, the scales the criterion
+  does not look at.
+
+\item[Tidal tensor.] $T_{ij} = \partial_i \partial_j \Phi$ with
+  $\nabla^2 \Phi = \delta_R$, so in Fourier space
+  \begin{equation}
+    \label{eq:tidal}
+    T_{ij}(\bk) \;=\; \frac{k_i k_j}{k^2}\, \delta_R(\bk) .
+  \end{equation}
+  Its trace is $\delta_R$, and its eigenvalues $\lambda_1 \ge \lambda_2 \ge
+  \lambda_3$ describe how the region is being stretched or compressed along
+  three orthogonal axes.
+
+\item[Tidal shear.] The part of the tidal tensor that changes a region's shape
+  rather than its volume, obtained by removing the trace,
+  $s_{ij} = T_{ij} - \tfrac{1}{3}\delta_R \delta_{ij}$. The number quoted is its
+  amplitude within the subvolume,
+  \begin{equation}
+    \label{eq:shear}
+    s \;=\; \Big\langle s_{ij}s_{ij} \Big\rangle_V^{1/2}
+      \;=\; \Big\langle T_{ij}T_{ij} - \tfrac{1}{3}\delta_R^2 \Big\rangle_V^{1/2}.
+  \end{equation}
+  For a Gaussian field $\avg{s_{ij}s_{ij}} = \tfrac{2}{3}\avg{\delta_R^2}$,
+  which the measurement reproduces as $0.6667$.
+
+\item[Mean density.] $\bar\delta_R = \avg{\delta_R}_V$, the smoothed density
+  contrast averaged over the subvolume.
+
+\item[Cosmic-web fractions.] Each cell is classified by how many eigenvalues of
+  $T_{ij}$ are positive, a positive eigenvalue meaning collapse along that axis:
+  three is a knot, two a filament, one a sheet, none a void. The four numbers
+  quoted are the fractions of the subvolume's cells in each class, and they sum
+  to one by construction. For a Gaussian field the expected fractions are
+  $0.08$, $0.42$, $0.42$, $0.08$, and the measurement gives $0.0799$, $0.4198$,
+  $0.4202$, $0.0801$.
+
+\item[Ellipticity.] The shape of the tidal ellipsoid,
+  $e = (\lambda_1 - \lambda_3)/2L$ with $L = (\sum_i \lambda_i^2)^{1/2}$. The
+  usual definition divides by the trace $\delta_R$, which passes through zero
+  for a region of average density and makes the ratio diverge; dividing by the
+  norm keeps the same meaning and stays finite.
+
+\item[Bulk flow.] The mean displacement of the subvolume, from the
+  Zel'dovich relation $\boldsymbol{\Psi}(\bk) = i\,\bk\,\delta(\bk)/k^2$. The
+  number quoted is $|\avg{\boldsymbol{\Psi}}_V|$, a vector average and then a
+  magnitude, so it depends on the phases of the modes and not only on their
+  amplitudes.
+
+\item[Environment contrast.] The subvolume's mean density minus that of the
+  eight subvolumes surrounding it, which asks whether the region sits in an
+  overdense neighbourhood rather than whether it is overdense relative to the
+  whole box.
+\end{description}
+
+Smoothing radii of $R = 20$ and $40\Mpch$ are used throughout. The first is
+comfortably inside the subvolume, which is $87.5\Mpch$ across; the second is
+half that width, so the smoothed field near the subvolume's faces is built
+partly from material outside it, and the $R = 40\Mpch$ numbers describe the
+region together with its surroundings rather than the region alone.
+
+\subsection{The effect of selection on each}
+\label{sec:each}
+
 A region has many properties besides its power spectrum, and the criterion
 mentions none of them. They move regardless, and by an amount fixed in advance.
 
@@ -428,9 +524,11 @@ modes. At the one per cent tolerance the retained subvolumes come from
 $17\,835$ distinct realisations, $1.12$ per realisation, so they are close to
 independent draws in any case.
 
+{\sloppy
 Code, run provenance and the analysis are in the \texttt{cosmo-sim} repository
 under \texttt{scripts/ic\_search/}; the seed ranges and configuration of each
 production run are recorded in \texttt{scripts/ic\_search/RUNS.md}.
+\par}
 
 \begin{thebibliography}{9}
 \bibitem[Park et al.(1994)]{Park1994} Park, C., Vogeley, M.~S., Geller, M.~J.,
