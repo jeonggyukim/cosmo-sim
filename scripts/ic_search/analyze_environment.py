@@ -148,7 +148,8 @@ def shift_in_sd(c, T, idx=None):
     """Mean of the kept minus mean of all, in units of the population scatter."""
     if idx is not None:
         c, T = c[idx], T[idx]
-    keep = np.argsort(c)[:max(1, int(round(A.keep*len(c))))]
+    n = max(1, int(round(A.keep*len(c))))
+    keep = np.argpartition(c, n)[:n]  # partial: the order inside does not matter
     return (T[keep].mean() - T.mean())/T.std(), T[keep].std()/T.std()
 
 

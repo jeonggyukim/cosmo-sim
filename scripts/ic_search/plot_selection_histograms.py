@@ -45,39 +45,20 @@ def shape_params(lam):
     return (l1 - l3)/(2*Lnorm), (l1 - 2*l2 + l3)/(2*Lnorm)
 
 
-P, C, nseed = [], {}, 0
-for fn in sorted(glob.glob(f"{A.data}/seed_*/pk.hdf5")):
-    with h5py.File(fn) as f:
-        p = f["P_pencil"][SP]
-        P.append(p)
-        RS = f["smooth_R"][:]
-        C.setdefault("large-scale power", []).append((p[:, lo]/P_win[lo]).mean(1))
-        C.setdefault("small-scale power", []).append((p[:, hi]/P_win[hi]).mean(1))
-        for r, R in enumerate(RS):
-            C.setdefault(f"tidal shear, R = {R:g}", []).append(f["shear"][r])
-            C.setdefault(f"mean overdensity, R = {R:g}", []).append(f["dbar"][r])
-            lam = f["lambda"][r]
-            e, pr = shape_params(lam)
-            C.setdefault(f"largest eigenvalue, R = {R:g}", []).append(lam[..., 0])
-            C.setdefault(f"ellipticity, R = {R:g}", []).append(e)
-            for w, wn in enumerate(("knot", "filament", "sheet", "void")):
-                C.setdefault(f"{wn} fraction, R = {R:g}", []).append(f["webtype"][r][:, w])
-        nseed += 1
-P = np.concatenate(P)
-C = {n: np.concatenate(v) for n, v in C.items()}
+import chunkio
 
-crit_th = np.sqrt((np.log(P[:, lo]/P_th[lo])**2).mean(1))
-crit_wn = np.sqrt((np.log(P[:, lo]/P_win[lo])**2).mean(1))
+crit_th, crit_wn, C, meta, _ = chunkio.load(A.data, "matter")
+nseed, npen = crit_th.shape
+C = {n: v.ravel() for n, v in C.items()}
+crit_th, crit_wn = crit_th.ravel(), crit_wn.ravel()
+N, L = meta["N"], meta["L"]
 nk = max(1, int(round(A.keep*len(crit_th))))
 kth, kwn = np.argsort(crit_th)[:nk], np.argsort(crit_wn)[:nk]
 
-SHOW = ["large-scale power", "small-scale power",
-        "tidal shear, R = 20", "tidal shear, R = 40",
-        "largest eigenvalue, R = 20", "ellipticity, R = 20",
-        "knot fraction, R = 40", "filament fraction, R = 40",
-        "sheet fraction, R = 40", "void fraction, R = 40",
-        "mean overdensity, R = 20", "mean overdensity, R = 40"]
-SHOW = [s for s in SHOW if s in C]
+PREFER = ["large-scale power", "small-scale power", "tidal shear", "ellipticity",
+          "knot fraction", "filament fraction", "sheet fraction", "void fraction",
+          "bulk flow", "env contrast", "mean overdensity"]
+SHOW = [n for stem in PREFER for n in C if n.startswith(stem)][:12]
 
 ncol = 4
 nrow = int(np.ceil(len(SHOW)/ncol))

@@ -526,6 +526,91 @@ comparable to or larger than $\xi$ itself.  Agreement close enough to appear
 exact on a figure therefore requires a search far larger than 600 seeds, at
 which point \S\ref{sec:tolerance} applies with correspondingly greater force.
 
+\section{What a selection does to every other property}
+\label{sec:conditioning-all}
+
+The preceding sections treat one criterion and the properties it was
+measured against.  The result generalises, and the generalisation is
+the practical content of this note for anyone choosing a region to
+resimulate.
+
+Let $x$ be the quantity a selection acts on, and $y$ any other property
+of the region.  For jointly Gaussian variables the conditional mean is
+$\mathbb{E}[y \mid x] = \bar y + \rho\,(\sigma_y/\sigma_x)(x - \bar x)$,
+with $\rho$ the correlation between them.  Dividing by $\sigma_y$, a
+selection that displaces $x$ by $\Delta$ standard deviations displaces
+$y$ by
+\begin{equation}
+  \label{eq:rho-delta}
+  \Delta_y \;=\; \rho \, \Delta_x
+\end{equation}
+standard deviations, and by nothing else.  No property of the selection
+enters beyond the displacement it produces in the quantity it acts on.
+
+We tested this on $83\,542$ realisations at $N = 128^3$,
+$L = 700\;\mathrm{Mpc}/h$, selecting the closest one per cent of pencil
+subvolumes to the unwindowed linear theory.  The selection displaces the
+large-scale power by $\Delta_x = 1.26\sigma$.  Table~\ref{tab:rho} lists
+the measured correlations and compares $\rho\,\Delta_x$ against the
+shifts actually observed.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Correlation with the selected quantity, the shift it predicts,
+  and the shift measured.  Quantities uncorrelated with the criterion are
+  left alone.}
+  \label{tab:rho}
+  \begin{tabular}{lrrr}
+    \hline
+    property & $\rho$ & $\rho\,\Delta_x$ & measured \\
+    \hline
+    tidal shear, $R = 20$    & $+0.451$ & $+0.568$ & $+0.617$ \\
+    knot fraction, $R = 40$  & $+0.291$ & $+0.367$ & $+0.353$ \\
+    void fraction, $R = 40$  & $+0.288$ & $+0.363$ & $+0.350$ \\
+    tidal shear, $R = 40$    & $+0.251$ & $+0.316$ & $+0.241$ \\
+    filament fraction, $R = 40$ & $-0.171$ & $-0.215$ & $-0.205$ \\
+    small-scale power        & $+0.069$ & $+0.087$ & $+0.168$ \\
+    bulk flow                & $+0.024$ & $+0.030$ & $+0.048$ \\
+    mean overdensity, $R = 20$ & $+0.001$ & $+0.001$ & $-0.002$ \\
+    \hline
+  \end{tabular}
+\end{table}
+
+Three things follow.
+
+First, the bias is bounded.  The displacement in the selected quantity
+saturates: searching more seeds cannot push the pencil's power past what
+the realisation scatter allows, which is $1.3\sigma$ here.  Measured as a
+function of the number of seeds searched, the shift in the tidal shear
+rises from $0.26\sigma$ at three seeds to $0.64\sigma$ by a few hundred
+and then stops.  A search of a million seeds is no worse than a search of
+a thousand.
+
+Second, the bias is predictable before any search is run.  The
+correlations in Table~\ref{tab:rho} are properties of the field and the
+geometry, not of the selection, and a few hundred realisations measure
+them.  Anyone proposing a criterion can therefore be told in advance
+which properties of the resimulated region it will distort and by how
+much, without performing the search.
+
+Third, and most general: this is not specific to matching a power
+spectrum.  Any rule for choosing which region to resimulate conditions
+the field, and Eq.~\eqref{eq:rho-delta} governs the outcome whatever the
+rule is.  A region chosen for a quiet merger history, for a particular
+halo mass, for an isolated environment, or for resembling an observed
+system, is a region on which a condition has been imposed, and every
+property correlated with that condition is displaced.  The choice of
+region is part of the numerical experiment and enters its
+interpretation, in the same way a sample selection function enters the
+interpretation of a survey.
+
+The converse is the useful half.  A property uncorrelated with the
+criterion is untouched: the mean overdensity of the region has
+$\rho = 0.001$ with the pencil's large-scale power and shows no shift at
+all, at any search size.  A criterion is safe for exactly those
+quantities it does not correlate with, and the correlation matrix says
+which those are.
+
 \section{Recommendations}\label{sec:recommendations}
 
 \paragraph{Compare against the expectation of the estimator.}  Three
