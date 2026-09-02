@@ -1778,40 +1778,59 @@ nothing to do with clustering.  Estimators handle this by weighting
 
 The previous subsection said that convolving with $|\widetilde W(\bk)|^2$
 ``smooths sharp features''.  That is worth making concrete, because the
-sharpest feature in $P(k)$ is the one cosmologists most want to measure.
-This subsection identifies the feature, works out how much of it survives
-the convolution, and gives the numbers for one specific subvolume.
+sharpest feature in $P(k)$ is one that cosmologists particularly want to
+measure.  This subsection identifies the feature, explains why a window
+reduces it, and gives the numbers for one specific subvolume.
 
 \paragraph{The feature in question.}
 Before recombination, baryons and photons were tightly coupled, and
 pressure waves travelled through that fluid at close to $c/\sqrt3$.  At
 recombination the photons decoupled and the waves stopped.  The distance a
 wave had travelled by then is the \emph{sound horizon}, written $r_s$; in
-our cosmology $r_s \approx 103\,\mathrm{Mpc}/h$.  That one length is
-stamped into the matter distribution, and in Fourier space a single
-preferred separation appears as a series of oscillations in $P(k)$ spaced
-by
+the cosmology used here $r_s \approx 103\,\mathrm{Mpc}/h$.
+
+That one length leaves a signature in the late-time matter distribution.
+Pairs of points separated by $r_s$ are slightly more likely than pairs
+separated by a nearby distance, so $\xi(r)$ has a small bump at
+$r = r_s$.  The power spectrum is the Fourier transform of $\xi$, and it is
+worth seeing why a bump at one radius becomes an oscillation in $k$.  For
+an isotropic field the transform of a thin spherical shell of radius $r_s$
+is the spherical Bessel function
+\begin{equation}
+  j_0(k r_s) \;=\; \frac{\sin (k r_s)}{k r_s},
+\end{equation}
+which oscillates in $k$ with period $2\pi/r_s$.  A bump in $\xi$ at one
+radius therefore contributes a ripple to $P(k)$, and the spacing of that
+ripple is set by the radius:
 \begin{equation}
   \Delta k_{\rm BAO} \;=\; \frac{2\pi}{r_s}
   \;\approx\; 0.061 \; h\,\mathrm{Mpc}^{-1} .
 \end{equation}
-These are the \emph{baryon acoustic oscillations}, or BAO.  They are small:
-in the linear spectrum used here they modulate $P(k)$ by about $1.8\%$ rms
-over $k = 0.216$--$0.395\,h\,\mathrm{Mpc}^{-1}$.
+These ripples are the \emph{baryon acoustic oscillations}, or BAO.  They
+are small, a few percent of $P(k)$, with numbers given below.
 
-It is useful to name the comparison spectrum too.  A \emph{de-wiggled}, or
-no-wiggle, spectrum is $P(k)$ with the oscillations removed but the
-broadband shape kept: the same slope, the same turnover, no ripples.  The
-ratio of the true spectrum to the de-wiggled one isolates the BAO, and
-oscillates about $1$.
+Two more definitions are needed before those numbers mean anything.  A
+\emph{de-wiggled}, or no-wiggle, spectrum is $P(k)$ with the oscillations
+removed but the broadband shape kept: the same slope, the same turnover, no
+ripples.  Here it is built by fitting a polynomial of degree eight to
+$\ln P$ against $\ln k$, which is flexible enough to follow the broadband
+curvature and too stiff to bend into oscillations of period
+$0.061\,h\,\mathrm{Mpc}^{-1}$.  Second, whenever an oscillation amplitude
+is quoted below, it is obtained the same way for every curve: take the
+ratio in question, divide it by a cubic in $\ln k$ fitted over the same
+band, subtract one, and take the rms.  Removing a smooth trend first
+matters, because the ratios also vary slowly across the band for reasons
+that have nothing to do with the wiggles.  Amplitudes obtained by different
+recipes are not comparable, so one recipe is used throughout.
 
-\paragraph{Why a window damps them.}
+\paragraph{Why a window reduces them.}
 Convolution replaces the value at each $k$ by a weighted average of the
 values at nearby $k$, with the weights given by $|\widetilde W(\bk)|^2$.
-The width of that averaging kernel is set by the size of the region: a
+The width of that averaging kernel is set by the size of the region.  A
 region of extent $\ell$ in some direction has a kernel of width
-$\Delta k \approx 2\pi/\ell$ in the matching direction.  This is the
-uncertainty relation between a length and a wavenumber, and nothing more.
+$\Delta k \approx 2\pi/\ell$ in the matching direction, which is the same
+reciprocal relation between a length and a wavenumber used above for
+$r_s$.
 
 Now compare the two widths.  If $\Delta k \ll \Delta k_{\rm BAO}$, the
 average is taken over a small part of one oscillation, and the wiggles come
@@ -1820,64 +1839,78 @@ average covers a whole oscillation or more, so peaks and troughs are mixed
 together and largely cancel.  The measured wiggles are then shallower than
 the true ones.
 
-This also fixes the \emph{sign} of the effect at each $k$, which is what
-makes it recognisable.  Averaging pulls every value toward the local mean.
-At a wiggle peak the neighbours are lower, so the average sits below the
-true value.  At a trough the neighbours are higher, so the average sits
-above it.  The ratio of the convolved spectrum to the true one therefore
-dips exactly where the true spectrum peaks and rises where it dips: the
-ratio oscillates \emph{in antiphase} with the BAO.
+This also fixes the sign of the effect at each $k$, which is what makes it
+recognisable.  Averaging pulls every value toward the local mean.  At a
+wiggle peak the neighbours are lower, so the average sits below the true
+value.  At a trough the neighbours are higher, so the average sits above
+it.  The ratio of the convolved spectrum to the true one therefore dips
+where the true spectrum peaks, and rises where it dips.  The ratio
+oscillates in antiphase with the BAO, and a correlation coefficient between
+the two should come out close to $-1$.
 
 \paragraph{A worked example: the pencil subvolume.}
-Take the region used in the subvolume experiments of this repository: a
-box of side $L = 700\,\mathrm{Mpc}/h$, and inside it a ``pencil'' occupying
-one eighth of the box in two directions and its full length in the third,
-so $87.5 \times 87.5 \times 700\,(\mathrm{Mpc}/h)^3$.  The transverse
-extent gives
+Take the pencil-shaped subvolume used elsewhere in this repository, in the
+seed search whose statistics are the subject of \texttt{seed\_selection.tex}:
+a box of side $L = 700\,\mathrm{Mpc}/h$ at $N = 128^3$, and inside it a
+region occupying one eighth of the box in two directions and its full length
+in the third, so $87.5 \times 87.5 \times 700\,(\mathrm{Mpc}/h)^3$.  The
+transverse extent gives
 \begin{equation}
   \Delta k_\perp \;=\; \frac{2\pi}{87.5\,\mathrm{Mpc}/h}
   \;=\; 0.072 \; h\,\mathrm{Mpc}^{-1},
 \end{equation}
-which is slightly \emph{larger} than $\Delta k_{\rm BAO} = 0.061\,h\,
-\mathrm{Mpc}^{-1}$.  Transversely, the averaging kernel is wider than one
-full acoustic oscillation, so the prediction is that the wiggles are
-heavily damped in such a region, not merely softened.
+which is larger than $\Delta k_{\rm BAO} = 0.061\,h\,\mathrm{Mpc}^{-1}$.
+Transversely, the averaging kernel is wider than one full acoustic
+oscillation, so the wiggles should be heavily reduced in such a region
+rather than merely softened.
 
-Two measurements confirm this.  First, the ratio of the convolved theory to
-the raw theory oscillates in antiphase with the BAO, with a correlation
-coefficient between $-0.63$ and $-0.70$ over
-$k = 0.216$--$0.395\,h\,\mathrm{Mpc}^{-1}$, and with a matching amplitude
-($1.4\%$ rms in the ratio against $1.8\%$ rms in the BAO).  Second, and
-more directly, one can put a de-wiggled spectrum through the identical
-convolution and see what is left.  The ripple in the ratio falls from
-$3.13\%$ to $0.27\%$ rms over $k = 0.02$--$0.15\,h\,\mathrm{Mpc}^{-1}$,
-and from $0.71\%$ to $0.02\%$ over $k = 0.216$--$0.395\,h\,
-\mathrm{Mpc}^{-1}$.  Removing the wiggles from the input removes the
-ripple from the output, so the ripple was the wiggles.
+Two measurements confirm this, both for the total-matter field, both using
+the single amplitude recipe defined above.  The first compares the ripple in
+the ratio of convolved to raw theory against the BAO in the theory itself.
+Over $k = 0.02$--$0.15\,h\,\mathrm{Mpc}^{-1}$ the theory's own wiggles have
+an amplitude of $3.79\%$, the ripple in the ratio has an amplitude of
+$3.13\%$, and the correlation coefficient between the two is $-0.990$.
+Over $k = 0.216$--$0.395\,h\,\mathrm{Mpc}^{-1}$ the same three numbers are
+$0.83\%$, $0.71\%$ and $-0.996$.  The ripple is close to the full BAO
+amplitude and almost exactly in antiphase with it, which is what the
+argument above predicts.
+
+The second measurement removes the wiggles from the input and repeats the
+convolution.  If the ripple is the wiggles being averaged, a de-wiggled
+spectrum put through the identical window must produce almost no ripple.
+Its amplitude falls to $0.27\%$ over $k = 0.02$--$0.15\,h\,\mathrm{Mpc}^{-1}$
+and to $0.02\%$ over $k = 0.216$--$0.395\,h\,\mathrm{Mpc}^{-1}$, against
+$3.13\%$ and $0.71\%$ with the wiggles present.  Taking the wiggles out of
+the input takes the ripple out of the output, so the ripple was the wiggles.
+
+\paragraph{The species makes no difference.}
+It is natural to ask whether measuring the gas rather than the total matter
+avoids this, since baryons are what oscillated.  It does not.  Under the
+back-scaling convention that MUSIC2 and monofonIC use for initial
+conditions, described in the companion note \texttt{cosmo\_ic.tex}, the
+baryon and cold dark matter fields are both constructed from the same
+total-matter field.  They differ only by the difference field
+$\delta_b - \delta_c$, which varies slowly with $k$ and has no acoustic
+ripple of its own, so all three fields inherit nearly the same wiggles.
+Measured on the same subvolume over
+$k = 0.02$--$0.15\,h\,\mathrm{Mpc}^{-1}$, the ripple amplitude is $3.13\%$
+for total matter, $3.10\%$ for cold dark matter and $3.26\%$ for baryons.
+Choosing to measure the baryon field instead of the total-matter field does
+not avoid the reduction.
 
 \paragraph{What this means when comparing to theory.}
 A spectrum measured in a subvolume should be compared with the theory
 convolved with that subvolume's window, and the comparison should be made
-in that basis rather than by trying to undo the convolution.  The reason
-is now visible in the wiggles specifically.  The convolved curve carries
-damped BAO, and the raw curve carries full-amplitude BAO.  These are two
-different curves, and the estimator is unbiased for the first one only.
-Asking a measured subvolume spectrum to match the raw theory therefore asks
-it to reproduce, in one realisation, acoustic wiggles at an amplitude that
-its own ensemble average does not have.  A realisation can be found that
-does so, by chance, but it has been chosen for a fluctuation rather than
-for being typical, which is the subject of \texttt{seed\_selection.tex}.
-
-Note finally that this has nothing to do with which species is used.  Under
-the back-scaling convention that MUSIC2 and monofonIC use for initial
-conditions, described in the companion note \texttt{cosmo\_ic.tex}, the
-baryon and cold dark matter fields are both built from the same
-total-matter field and differ
-only by a smooth relative mode, so they carry the same acoustic wiggles to
-within a few tenths of a percent.  Measured on the same subvolume, the
-ripple amplitudes are $1.40\%$ for total matter, $1.39\%$ for cold dark
-matter and $1.43\%$ for baryons.  Choosing the gas rather than the matter
-does not avoid the damping.
+against that convolved theory directly, rather than against a raw theory
+recovered by attempting to undo the convolution.  The wiggles show why in a
+particular way.  The convolved curve shows reduced BAO and the raw curve
+shows full-amplitude BAO, so they are two different curves, and the
+estimator is unbiased for the convolved one only.  Asking a measured
+subvolume spectrum to match the raw theory asks it to reproduce, in one
+realisation, acoustic wiggles at an amplitude its own ensemble average does
+not have.  A realisation that does so can be found by searching, but it has
+been chosen for a fluctuation rather than for being typical, which is the
+subject of \texttt{seed\_selection.tex}.
 
 \subsection{The cosmology assumed in the analysis}
 \label{sec:ap}

@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""Distribution of each region property, before and after selection.
+
+One panel per quantity. The filled grey histogram is every pencil measured. The
+two outlined histograms are the pencils a selection keeps: red for the proposed
+criterion, which asks the pencil to match the raw linear theory, and green for
+the same selection against the theory convolved with the pencil window.
+
+The summary figure reports each of these as a single number, the shift of the
+mean in units of the population scatter. That number hides whether the kept
+sample is a displaced copy of the parent distribution or a narrowed piece of it,
+and the two mean different things for a simulation drawn from it. These panels
+show which is happening.
+
+Usage:
+    python plot_selection_histograms.py [--data DIR] [--keep 0.05] [--out PNG]
+"""
+import argparse, glob, os
+import numpy as np, h5py
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+matplotlib.rcParams["savefig.dpi"] = 300
+import paths
+
+ap = argparse.ArgumentParser()
+ap.add_argument("--data", default=os.path.join(paths.DATA, "web_n128_all"))
+ap.add_argument("--keep", type=float, default=0.05)
+ap.add_argument("--out", default=os.path.join(paths.FIGS, "selection_histograms.png"))
+A = ap.parse_args()
+
+with h5py.File(f"{A.data}/theory.hdf5") as f:
+    names = [x.decode() if isinstance(x, bytes) else str(x) for x in f.attrs["species"]]
+    SP = names.index("matter")
+    k, P_th, P_win = f["k"][:], f["P_theory"][SP], f["P_win"][SP]
+    kny, dkperp, N, L = (f.attrs[x] for x in ("kny", "dkperp", "N", "L"))
+lo = k <= 2*dkperp
+hi = (k > 2*dkperp) & (k <= 0.9*kny)
+
+
+def shape_params(lam):
+    l1, l2, l3 = lam[..., 0], lam[..., 1], lam[..., 2]
+    Lnorm = np.sqrt((lam**2).sum(-1)) + 1e-30
+    return (l1 - l3)/(2*Lnorm), (l1 - 2*l2 + l3)/(2*Lnorm)
+
+
+P, C, nseed = [], {}, 0
+for fn in sorted(glob.glob(f"{A.data}/seed_*/pk.hdf5")):
+    with h5py.File(fn) as f:
+        p = f["P_pencil"][SP]
+        P.append(p)
+        RS = f["smooth_R"][:]
+        C.setdefault("large-scale power", []).append((p[:, lo]/P_win[lo]).mean(1))
+        C.setdefault("small-scale power", []).append((p[:, hi]/P_win[hi]).mean(1))
+        for r, R in enumerate(RS):
+            C.setdefault(f"tidal shear, R = {R:g}", []).append(f["shear"][r])
+            C.setdefault(f"mean overdensity, R = {R:g}", []).append(f["dbar"][r])
+            lam = f["lambda"][r]
+            e, pr = shape_params(lam)
+            C.setdefault(f"largest eigenvalue, R = {R:g}", []).append(lam[..., 0])
+            C.setdefault(f"ellipticity, R = {R:g}", []).append(e)
+            for w, wn in enumerate(("knot", "filament", "sheet", "void")):
+                C.setdefault(f"{wn} fraction, R = {R:g}", []).append(f["webtype"][r][:, w])
+        nseed += 1
+P = np.concatenate(P)
+C = {n: np.concatenate(v) for n, v in C.items()}
+
+crit_th = np.sqrt((np.log(P[:, lo]/P_th[lo])**2).mean(1))
+crit_wn = np.sqrt((np.log(P[:, lo]/P_win[lo])**2).mean(1))
+nk = max(1, int(round(A.keep*len(crit_th))))
+kth, kwn = np.argsort(crit_th)[:nk], np.argsort(crit_wn)[:nk]
+
+SHOW = ["large-scale power", "small-scale power",
+        "tidal shear, R = 20", "tidal shear, R = 40",
+        "largest eigenvalue, R = 20", "ellipticity, R = 20",
+        "knot fraction, R = 40", "filament fraction, R = 40",
+        "sheet fraction, R = 40", "void fraction, R = 40",
+        "mean overdensity, R = 20", "mean overdensity, R = 40"]
+SHOW = [s for s in SHOW if s in C]
+
+ncol = 4
+nrow = int(np.ceil(len(SHOW)/ncol))
+fig, axes = plt.subplots(nrow, ncol, figsize=(4.0*ncol, 2.9*nrow))
+axes = np.atleast_1d(axes).ravel()
+
+for ax, name in zip(axes, SHOW):
+    T = C[name]
+    sd = T.std()
+    bins = np.linspace(*np.percentile(T, [0.2, 99.8]), 46)
+    ax.hist(T, bins=bins, color="0.78", edgecolor="none",
+            label=f"all {len(T):,}", density=True)
+    for idx, col, lab in ((kwn, "C2", "match theory $\\ast$ window"),
+                          (kth, "C3", "match raw theory")):
+        ax.hist(T[idx], bins=bins, histtype="step", lw=1.7, color=col, density=True,
+                label=lab)
+        ax.axvline(T[idx].mean(), color=col, lw=1.1, ls="--")
+    ax.axvline(T.mean(), color="0.35", lw=1.1)
+    sh_th = (T[kth].mean() - T.mean())/sd
+    sh_wn = (T[kwn].mean() - T.mean())/sd
+    ax.set_title(name, fontsize=9.5)
+    # Put the label on whichever side carries less of the histogram, so it does
+    # not land on a peak. Several of these distributions are strongly one-sided.
+    counts, _ = np.histogram(T, bins=bins)
+    third = max(1, len(counts)//3)
+    left = counts[:third].sum() > counts[-third:].sum()
+    ax.text(0.97 if left else 0.03, 0.96,
+            f"shift  {sh_th:+.2f}$\\sigma$ / {sh_wn:+.2f}$\\sigma$",
+            transform=ax.transAxes, fontsize=8, va="top",
+            ha="right" if left else "left",
+            bbox=dict(fc="white", ec="0.8", alpha=0.9, pad=1.8))
+    ax.set_yticks([])
+    ax.tick_params(labelsize=8)
+    # Several of these quantities are of order 1e-4, and the default tick labels
+    # then overlap; four ticks with a shared exponent fit.
+    ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(4))
+    ax.ticklabel_format(axis="x", style="sci", scilimits=(-2, 3), useMathText=True)
+    ax.xaxis.get_offset_text().set_fontsize(7.5)
+
+for ax in axes[len(SHOW):]:
+    ax.axis("off")
+# A per-panel legend lands on the data in whichever panel it is put, so it goes
+# at figure level instead.
+handles, labels = axes[0].get_legend_handles_labels()
+fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.899),
+           ncol=3, fontsize=9, frameon=False)
+
+fig.suptitle(f"Region properties before and after keeping the closest {100*A.keep:g}% of "
+             f"pencils\n{nseed} realizations, $N={int(N)}^3$, $L={L:g}$ Mpc/$h$, 2LPT, "
+             f"$\\delta(q)$ matter, pencil $=(L/8)^2\\times L$",
+             fontsize=11, y=0.985)
+fig.text(0.5, 0.917, "Dashed lines mark the means. The label in each panel gives the shift "
+         "of the mean in units of the scatter over all pencils, as raw / window.",
+         ha="center", fontsize=8.5, color="0.35")
+fig.tight_layout(rect=(0, 0, 1, 0.858))
+fig.savefig(A.out, dpi=300)
+print(f"wrote {A.out}")
+for name in SHOW:
+    T = C[name]
+    print(f"{name:<30} shift raw {(T[kth].mean()-T.mean())/T.std():+.3f}  "
+          f"window {(T[kwn].mean()-T.mean())/T.std():+.3f}  "
+          f"width kept/all {T[kth].std()/T.std():.2f}")

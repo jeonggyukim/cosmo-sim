@@ -22,6 +22,8 @@ import numpy as np, h5py
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+matplotlib.rcParams["savefig.dpi"] = 300
 import paths
 
 ap = argparse.ArgumentParser()
