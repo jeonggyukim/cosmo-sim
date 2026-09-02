@@ -64,6 +64,11 @@ _ap.add_argument("--nretry", type=int, default=6,
                  help="attempts per seed before it is skipped. CLASS segfaults on "
                       "some startup reads when many tasks contend for its data "
                       "files, and most such seeds succeed on a later try")
+_ap.add_argument("--flush-every", type=int, default=0, metavar="N",
+                 help="with --compact, write a finished chunk file every N seeds "
+                      "instead of one file at the end. Each file is closed before "
+                      "the next is started, so a running sweep can be analysed and "
+                      "a killed task keeps what it already wrote. 0 writes once")
 _ap.add_argument("--compact", action="store_true",
                  help="write one file for the whole chunk instead of a directory per "
                       "seed. Required at large N_seed: per-seed directories put hundreds "
@@ -248,6 +253,44 @@ rows = []
 ACC = {k: [] for k in ("seed", "P_full", "P_pencil", "shear", "dbar", "lambda",
                        "webtype", "contrast", "bulk")}
 SKIPPED = []
+
+
+def write_chunk():
+    """Write everything accumulated so far as one finished file, and clear it.
+
+    Each call produces a complete, self-contained file that is never reopened,
+    which is what makes it safe to read while the sweep is still running. The
+    alternative, holding one file open and extending its datasets, would put a
+    reader in contention with the writer's lock and let it see half-written
+    arrays. It also means a task killed part way through keeps the batches it
+    has already written instead of losing all of its seeds.
+    """
+    if not ACC["seed"]:
+        return
+    tag = f"{ACC['seed'][0]:06d}_{len(ACC['seed']):05d}"
+    with h5py.File(f"{OUT}/chunk_{tag}.hdf5", "w") as f:
+        f["k"] = kbin
+        for key, v in ACC.items():
+            if v:
+                f[key] = np.array(v)
+        f["pencil_axis"] = np.array([p[0] for p in PENCILS])
+        f["pencil_i"] = np.array([p[1] for p in PENCILS])
+        f["pencil_j"] = np.array([p[2] for p in PENCILS])
+        f["P_theory"] = P_theory      # self-contained: no shared file needed
+        f["P_win"] = P_win
+        if ARGS.environment:
+            f["smooth_R"] = np.array(ARGS.smooth)
+        # Skipped seeds are recorded once, with the batch that was open when the
+        # skip happened, so the totals over all files still come out right.
+        f["skipped"] = np.array(SKIPPED, dtype=np.int64)
+        SKIPPED.clear()
+        f.attrs["species"] = np.array(SPECIES, dtype=h5py.string_dtype())
+        f.attrs.update(dict(N=NGRID, L=LBOX, frac=FRAC, fvol=fvol, kny=kny,
+                            dkperp=dkperp, dofixing=ARGS.dofixing,
+                            nseeds=len(ACC["seed"]), seed0=ACC["seed"][0]))
+    print(f"wrote {OUT}/chunk_{tag}.hdf5", flush=True)
+    for v in ACC.values():
+        v.clear()
 for s in SEEDS:
     t0 = time.time()
     # Unique per chunk: parallel array tasks share one --out directory, so a
@@ -367,32 +410,16 @@ for s in SEEDS:
                          np.sqrt((lr_win[n]**2).mean()), lr_win[n].mean()))
     if not ARGS.keep_fields and os.path.exists(fic):
         os.remove(fic)
+    if ARGS.compact and ARGS.flush_every and len(ACC["seed"]) >= ARGS.flush_every:
+        write_chunk()
     print(f"seed {s}: full-box P/theory median {np.median(P_full[0][fit]/P_theory[0][fit]):.4f}, "
           f"mean pencil/P_win {np.median(P_pen[0][:, fit].mean(0)/P_win[0][fit]):.4f}, "
           f"{time.time()-t0:.1f} s")
 
 if ARGS.compact:
-    tag = f"{SEEDS[0]:06d}_{len(SEEDS):05d}"
-    with h5py.File(f"{OUT}/chunk_{tag}.hdf5", "w") as f:
-        f["k"] = kbin
-        for key, v in ACC.items():
-            if v:
-                f[key] = np.array(v)
-        f["pencil_axis"] = np.array([p[0] for p in PENCILS])
-        f["pencil_i"] = np.array([p[1] for p in PENCILS])
-        f["pencil_j"] = np.array([p[2] for p in PENCILS])
-        f["P_theory"] = P_theory      # self-contained: no shared file needed
-        f["P_win"] = P_win
-        if ARGS.environment:
-            f["smooth_R"] = np.array(ARGS.smooth)
-        f["skipped"] = np.array(SKIPPED, dtype=np.int64)
-        f.attrs["species"] = np.array(SPECIES, dtype=h5py.string_dtype())
-        f.attrs.update(dict(N=NGRID, L=LBOX, frac=FRAC, fvol=fvol, kny=kny,
-                            dkperp=dkperp, dofixing=ARGS.dofixing,
-                            nseeds=len(SEEDS), seed0=SEEDS[0]))
+    write_chunk()
     import shutil
     shutil.rmtree(f"{OUT}/_work_{SEEDS[0]:07d}", ignore_errors=True)
-    print(f"wrote {OUT}/chunk_{tag}.hdf5")
 
 if SKIPPED:
     print(f"skipped {len(SKIPPED)} of {len(SEEDS)} seeds: "

@@ -35,6 +35,7 @@ module load gnu12/12.2.0 openmpi4/4.1.5 fftw/3.3.10 hdf5/1.14.0 gsl/2.7.1
 : "${PYTHON:=$HOME/miniconda3/envs/pyathena/bin/python}"
 : "${NPER:=100}"
 : "${NGRID:=128}"
+: "${FLUSH:=25}"
 : "${RUNTAG:=topup}"
 : "${SEEDFILE:?set SEEDFILE to the list written by collect_missing.py}"
 
@@ -52,4 +53,4 @@ cd "$WORKDIR/scripts"
 exec $PYTHON pencil_seed_sweep.py \
     --seed-list "$SEEDFILE" --list-start "$START" --nseeds "$NPER" --ngrid "$NGRID" \
     --species matter --npencils 24 --environment --smooth 20 40 \
-    --nthreads 1 --compact --out "$OUT"
+    --nthreads 1 --compact --flush-every "$FLUSH" --out "$OUT"
