@@ -178,7 +178,7 @@ a2.set_xlabel("$k$  [$h$ Mpc$^{-1}$]")
 a2.set_ylabel("$P(k)\\,/\\,P_{\\rm theory}(k) - 1$")
 a2.set_xlim(KLO, KHI)
 a2.set_ylim(-0.25, 0.25)
-a2.legend(framealpha=0.95, loc="upper left")
+a2.legend(framealpha=0.95, loc="upper right")
 a2.set_title("Each against the theory its own run wrote")
 a2.grid(alpha=0.25)
 
@@ -190,7 +190,7 @@ fig.suptitle("Taking the transfer functions at the starting redshift\n"
              f"monofonIC "
              + ", ".join(f"[cosmology] ztarget = {ZT[t]:g}" for t, _ in runs)
              + ", full box", fontsize=13)
-fig.tight_layout(rect=(0, 0, 1, 0.87))
+fig.tight_layout(rect=(0, 0, 1, 0.985))
 fig.savefig(A.out)
 print(f"wrote {A.out}\n")
 
