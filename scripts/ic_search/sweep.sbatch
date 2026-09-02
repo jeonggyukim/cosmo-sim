@@ -17,17 +17,17 @@
 #   SEEDBASE  first seed of task 0            (default 100000)
 #   NGRID     cells per side                  (default 128)
 #   FLUSH     seeds per chunk file            (default 25; 0 = one file at the end)
+#   BATCH     seeds per monofonIC call        (default 25; 1 = one call per seed)
 #   SMOOTHFRAC smoothing radii as fractions of the pencil width (default 0.1 0.25 0.5)
 #   MARGIN    interior margin in smoothing radii (default 1.0)
 #   RUNTAG    subdirectory under data/        (default run)
 #   WORKDIR   root holding scripts/ ref/ build/ data/ logs/
 #   PYTHON    interpreter with numpy and h5py
 #
-# Wall time is per task, not for the array. A task writes its chunk file only
-# after its last seed, so a task killed at the limit loses everything it did:
-# keep --time well above NPER x the per-seed cost. Measured 67 s/seed at
-# N = 128 on grammar, so NPER = 200 takes 3.7 h and --time=08:00:00 is a
-# factor of two of margin.
+# Wall time is per task, not for the array. With BATCH > 1 the transfer function
+# is computed once per batch rather than once per seed, which is most of the
+# cost: 67 s/seed at N = 128 on grammar with BATCH = 1, and roughly a third of
+# that above it. --time=08:00:00 leaves a wide margin for NPER = 200 either way.
 
 #SBATCH --job-name=pencil
 #SBATCH --partition=normal
@@ -49,6 +49,7 @@ module load gnu12/12.2.0 openmpi4/4.1.5 fftw/3.3.10 hdf5/1.14.0 gsl/2.7.1
 : "${SEEDBASE:=100000}"
 : "${NGRID:=128}"
 : "${FLUSH:=25}"
+: "${BATCH:=25}"
 : "${SMOOTHFRAC:=0.1 0.25 0.5}"
 : "${MARGIN:=1.0}"
 : "${RUNTAG:=run}"
@@ -72,4 +73,5 @@ exec $PYTHON pencil_seed_sweep.py \
     --seed0 "$SEED0" --nseeds "$NPER" --ngrid "$NGRID" \
     --species matter --npencils 24 --environment \
     --smooth-frac $SMOOTHFRAC --interior-margin "$MARGIN" \
-    --nthreads 1 --compact --flush-every "$FLUSH" --out "$OUT"
+    --nthreads 1 --compact --flush-every "$FLUSH" --batch-seeds "$BATCH" \
+    --out "$OUT"

@@ -71,6 +71,13 @@ _ap.add_argument("--seed-list", default=None, metavar="FILE",
                       "--list-start and --nseeds select the slice this task takes")
 _ap.add_argument("--list-start", type=int, default=0,
                  help="index into --seed-list at which this task starts")
+_ap.add_argument("--batch-seeds", type=int, default=1, metavar="B",
+                 help="generate B seeds per monofonIC call, using its SeedCount. "
+                      "The transfer function does not depend on the seed, so a batch "
+                      "costs one CLASS evaluation instead of B. Only consecutive seeds "
+                      "can share a call, so a --seed-list is batched over its runs of "
+                      "consecutive values. B fields exist at once, about 50 MB each at "
+                      "N = 128 with three species")
 _ap.add_argument("--nretry", type=int, default=6,
                  help="attempts per seed before it is skipped. CLASS segfaults on "
                       "some startup reads when many tasks contend for its data "
@@ -169,29 +176,42 @@ class ICFailure(RuntimeError):
     """
 
 
-def run_ic(seed, rundir):
-    """Generate delta(q) for one seed. Returns the path to the field file."""
-    out = f"{rundir}/deltaq.hdf5"
-    if os.path.exists(out):
-        return out
+def run_ic(seeds, rundir):
+    """Generate delta(q) for consecutive seeds in one monofonIC call.
+
+    Returns {seed: path}. monofonIC writes one file per seed and names it after
+    the seed once more than one is asked for, and leaves the configured name
+    alone for a single seed.
+    """
+    seeds = list(seeds)
+    base = f"{rundir}/deltaq.hdf5"
+    outs = ({s: f"{rundir}/deltaq_seed{s}.hdf5" for s in seeds}
+            if len(seeds) > 1 else {seeds[0]: base})
+    if all(os.path.exists(p) for p in outs.values()):
+        return outs
     conf = f"{rundir}/deltaq.conf"
     c = tpl
     c = re.sub(r"^GridRes.*$", f"GridRes         = {NGRID}", c, flags=re.M)
     c = re.sub(r"^BoxLength.*$", f"BoxLength       = {LBOX:g}", c, flags=re.M)
-    c = re.sub(r"^seed.*$", f"seed            = {seed}", c, flags=re.M)
+    c = re.sub(r"^seed.*$", f"seed            = {seeds[0]}", c, flags=re.M)
     c = re.sub(r"^NumThreads.*$", f"NumThreads      = {NTHREADS}", c, flags=re.M)
     c = re.sub(r"^DoFixing.*$", f"DoFixing        = {ARGS.dofixing}", c, flags=re.M)
-    c = re.sub(r"^filename.*$", f"filename        = {out}", c, flags=re.M)
+    c = re.sub(r"^filename.*$", f"filename        = {base}", c, flags=re.M)
+    if len(seeds) > 1:
+        c = re.sub(r"^\[setup\]", f"[setup]\nSeedCount       = {len(seeds)}",
+                   c, flags=re.M)
     open(conf, "w").write(c)
     # CLASS faults on startup often enough to matter, before the seed is used for
     # anything, so a failure says nothing about the realization. A rerun usually
     # clears it.
+    tag = (f"seed {seeds[0]}" if len(seeds) == 1
+           else f"seeds {seeds[0]}-{seeds[-1]}")
     for attempt in range(NRETRY):
         with open(f"{rundir}/run.log", "w") as log:
             r = subprocess.run([BIN, conf], cwd=rundir, stdout=log, stderr=subprocess.STDOUT)
-        if r.returncode == 0 and os.path.exists(out):
-            return out
-        print(f"   seed {seed}: monofonIC exited {r.returncode}, retrying "
+        if r.returncode == 0 and all(os.path.exists(p) for p in outs.values()):
+            return outs
+        print(f"   {tag}: monofonIC exited {r.returncode}, retrying "
               f"({attempt+1}/{NRETRY})", flush=True)
         # Hundreds of tasks starting at once contend for the CLASS and HyRec data
         # files, and CLASS segfaults on some of those reads. Tasks run in near
@@ -199,7 +219,50 @@ def run_ic(seed, rundir):
         # spreads them out. Measured skip rate rose from 0.5% at 4 concurrent
         # processes to 4.4% at 500.
         time.sleep(random.uniform(1.0, 5.0*(attempt + 1)))
-    raise ICFailure(f"monofonIC failed three times for seed {seed}; see {rundir}/run.log")
+    raise ICFailure(f"monofonIC failed {NRETRY} times for {tag}; see {rundir}/run.log")
+
+
+def generate_batch(seeds, rundir):
+    """Fields for a run of consecutive seeds, one call if possible.
+
+    A batch that will not generate is retried one seed at a time, so a seed that
+    fails every time costs itself rather than the whole batch.
+    """
+    seeds = list(seeds)
+    if len(seeds) == 1:
+        try:
+            return run_ic(seeds, rundir)
+        except ICFailure as e:
+            print(f"   {e}\n   seed {seeds[0]}: skipped", flush=True)
+            SKIPPED.append(seeds[0])
+            return {}
+    try:
+        return run_ic(seeds, rundir)
+    except ICFailure as e:
+        print(f"   {e}\n   falling back to one seed at a time", flush=True)
+    got = {}
+    for s in seeds:
+        got.update(generate_batch([s], rundir))
+    return got
+
+
+def consecutive_runs(seeds, maxlen):
+    """Split seeds into runs of consecutive values, each at most maxlen long.
+
+    monofonIC's SeedCount writes consecutive seeds, so an arbitrary --seed-list
+    is batched only where its values happen to run on.
+    """
+    out, cur = [], []
+    for s in seeds:
+        if cur and s == cur[-1] + 1 and len(cur) < maxlen:
+            cur.append(s)
+        else:
+            if cur:
+                out.append(cur)
+            cur = [s]
+    if cur:
+        out.append(cur)
+    return out
 
 
 # ---- k grid, bins, pencil masks (identical for every seed) -------------------
@@ -352,20 +415,26 @@ def write_chunk():
     print(f"wrote {OUT}/chunk_{tag}.hdf5", flush=True)
     for v in ACC.values():
         v.clear()
+READY = {}          # seed -> field path, for the batch currently generated
 for s in SEEDS:
     t0 = time.time()
     # Unique per chunk: parallel array tasks share one --out directory, so a
     # single _work would have them deleting each other's field mid-run.
     rundir = f"{OUT}/_work_{SEEDS[0]:07d}" if ARGS.compact else f"{OUT}/seed_{s:05d}"
     os.makedirs(rundir, exist_ok=True)
-    if ARGS.compact:
-        for stale in glob.glob(f"{rundir}/deltaq.hdf5"):
-            os.remove(stale)
-    try:
-        fic = run_ic(s, rundir)
-    except ICFailure as e:
-        print(f"   {e}\n   seed {s}: skipped", flush=True)
-        SKIPPED.append(s)
+    if s not in READY:
+        if ARGS.compact:
+            for stale in glob.glob(f"{rundir}/deltaq*.hdf5"):
+                os.remove(stale)
+        rest = SEEDS[SEEDS.index(s):]
+        batch = consecutive_runs(rest, max(1, ARGS.batch_seeds))[0]
+        t_gen = time.time()
+        READY = generate_batch(batch, rundir)
+        if len(batch) > 1:
+            print(f"   generated {len(READY)}/{len(batch)} seeds "
+                  f"{batch[0]}-{batch[-1]} in {time.time()-t_gen:.1f} s", flush=True)
+    fic = READY.pop(s, None)
+    if fic is None:
         continue
     with h5py.File(fic) as f:
         d = {sp: f[DSET[sp]][:].astype(float) for sp in SPECIES}
