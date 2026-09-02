@@ -137,9 +137,12 @@ for tag, _ in runs:
         a1.loglog(kt[mt], Pt[mt], color=COL[s], lw=4.0, alpha=0.25,
                   solid_capstyle="round",
                   label="linear theory" if (s == "cdm" and tag == runs[0][0]) else None)
-        a1.loglog(k, P[s], color=COL[s], ls=LS[tag], lw=1.6,
-                  label=f"{s}, {LBL[tag]}")
-        a2.semilogx(k, P[s]/T[s] - 1.0, color=COL[s], ls=LS[tag], lw=1.7,
+        # One marker per band, so it is clear that the measurement exists only at
+        # these wavenumbers and the line between them is drawn, not measured.
+        a1.loglog(k, P[s], color=COL[s], ls=LS[tag], lw=1.4, marker="o", ms=3.6,
+                  mfc="white", mew=1.2, label=f"{s}, {LBL[tag]}")
+        a2.semilogx(k, P[s]/T[s] - 1.0, color=COL[s], ls=LS[tag], lw=1.4,
+                    marker="o", ms=3.6, mfc="white", mew=1.2,
                     label=f"{s}, {LBL[tag]}")
 
 for ax in (a1, a2):
