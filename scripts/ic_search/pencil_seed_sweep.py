@@ -51,6 +51,17 @@ _ap.add_argument("--environment", action="store_true",
 _ap.add_argument("--smooth", type=float, nargs="+", default=[20.0, 40.0],
                  help="Gaussian smoothing radii in Mpc/h for the tidal shear. Keep these "
                       "above the cell size and below the pencil width")
+_ap.add_argument("--smooth-frac", type=float, nargs="+", default=None,
+                 help="smoothing radii as fractions of the pencil's transverse width, "
+                      "which is L/FRAC. Overrides --smooth. Given as a fraction the same "
+                      "geometry holds at any box size, whereas a radius in Mpc/h that is "
+                      "well inside the region for one box can exceed it for another")
+_ap.add_argument("--interior-margin", type=float, default=0.0, metavar="M",
+                 help="also measure every environment quantity on the pencil trimmed by "
+                      "M smoothing radii from each long face. The smoothed field near a "
+                      "face is built partly from material outside the pencil, so the "
+                      "untrimmed average is not a property of the pencil alone. 0 "
+                      "measures only the whole pencil")
 _ap.add_argument("--nthreads", type=int, default=None,
                  help="OpenMP threads for monofonIC. Deliberately has no default: the "
                       "right value depends on how many sweeps you intend to run at once")
@@ -109,6 +120,8 @@ if ARGS.seed_list:
 else:
     SEEDS = list(range(ARGS.seed0, ARGS.seed0 + ARGS.nseeds))
 NGRID, LBOX, FRAC = ARGS.ngrid, 700.0, 8   # pencil = 1/FRAC of the box in two axes
+if ARGS.smooth_frac:
+    ARGS.smooth = [f*LBOX/FRAC for f in ARGS.smooth_frac]
 SPECIES = ARGS.species                          # dataset / theory column pairs below
 DSET = {"matter": "delta_q", "cdm": "delta_q_cdm", "baryon": "delta_q_baryon"}
 THCOL = {"matter": 1, "cdm": 2, "baryon": 3}   # columns of *_input_powerspec.txt
@@ -182,14 +195,27 @@ nmodes = np.array([(ib == i+1).sum() for i in range(nb)])
 binned = lambda P: np.array([P.ravel()[ib == i+1].mean() for i in range(nb)])
 
 
-def pencil_slice(axis, i, j):
+def pencil_slice(axis, i, j, margin=0):
     """Index tuple selecting one pencil. Slicing beats building a mask array: at
-    N = 128 the 192 masks would be 3.2 GB."""
+    N = 128 the 192 masks would be 3.2 GB.
+
+    margin trims that many cells from each of the four long faces. The smoothed
+    field at a cell within a smoothing radius of a face is built partly from
+    material outside the pencil, so a quantity averaged over the whole pencil is
+    not a property of the pencil alone. Trimming a margin of order the smoothing
+    radius leaves the cells that are. Nothing is trimmed along the pencil's long
+    axis, which spans the periodic box and has no face.
+
+    Returns None when the margin would leave nothing, which happens whenever the
+    smoothing radius approaches half the pencil width.
+    """
+    if 2*margin >= npen:
+        return None
     idx = [None, None, None]
     idx[axis] = slice(None)
     rest = [a for a in range(3) if a != axis]
-    idx[rest[0]] = slice(i*npen, (i+1)*npen)
-    idx[rest[1]] = slice(j*npen, (j+1)*npen)
+    idx[rest[0]] = slice(i*npen + margin, (i+1)*npen - margin)
+    idx[rest[1]] = slice(j*npen + margin, (j+1)*npen - margin)
     return tuple(idx)
 
 
@@ -208,6 +234,10 @@ if ARGS.npencils and ARGS.npencils < len(ALL_PENCILS):
                sorted(_rng.choice(len(ALL_PENCILS), ARGS.npencils, replace=False))]
 else:
     PENCILS = ALL_PENCILS
+# Margin in cells for each smoothing radius, from --interior-margin in units of R.
+MARGIN_CELLS = ([int(np.ceil(ARGS.interior_margin*R*NGRID/LBOX)) for R in ARGS.smooth]
+                if ARGS.interior_margin > 0 else [])
+
 W0 = np.zeros((NGRID,)*3); W0[pencil_slice(*PENCILS[0])] = 1.0
 fvol = W0.mean()
 
@@ -251,7 +281,8 @@ print(f"{len(PENCILS)} pencils per seed, {len(SEEDS)} seeds, DoFixing = {ARGS.do
 fit = (kbin > 2*dkperp) & (kbin <= 0.9*kny)      # band used for the metrics
 rows = []
 ACC = {k: [] for k in ("seed", "P_full", "P_pencil", "shear", "dbar", "lambda",
-                       "webtype", "contrast", "bulk")}
+                       "webtype", "contrast", "bulk",
+                       "shear_interior", "dbar_interior", "lambda_interior")}
 SKIPPED = []
 
 
@@ -280,6 +311,9 @@ def write_chunk():
         f["P_win"] = P_win
         if ARGS.environment:
             f["smooth_R"] = np.array(ARGS.smooth)
+            if MARGIN_CELLS:
+                f["margin_cells"] = np.array(MARGIN_CELLS)
+                f.attrs["interior_margin"] = ARGS.interior_margin
         # Skipped seeds are recorded once, with the batch that was open when the
         # skip happened, so the totals over all files still come out right.
         f["skipped"] = np.array(SKIPPED, dtype=np.int64)
@@ -328,6 +362,9 @@ for s in SEEDS:
         lam = np.empty((nR, len(PENCILS), 3))     # mean sorted eigenvalues per pencil
         web = np.empty((nR, len(PENCILS), 4))     # knot, filament, sheet, void fractions
         contrast = np.empty((nR, len(PENCILS)))   # region minus its surrounding tiles
+        shear_in = np.full((nR, len(PENCILS)), np.nan)
+        dbar_in = np.full((nR, len(PENCILS)), np.nan)
+        lam_in = np.full((nR, len(PENCILS), 3), np.nan)
         bulk = np.empty((len(PENCILS), 3))        # mean Zel'dovich displacement, Mpc/h
         dk0 = np.fft.fftn(d["matter"])
         # Bulk flow: the region's mean displacement, Psi(k) = i k delta / k^2. It is
@@ -371,6 +408,19 @@ for s in SEEDS:
                         for di in (-1, 0, 1) for dj in (-1, 0, 1) if (di, dj) != (0, 0)]
                 contrast[r, n] = dbar[r, n] - np.mean(
                     [dsm[pencil_slice(ax, a_, b_)].mean() for a_, b_ in ring])
+                # The same quantities on the pencil with a margin trimmed off each
+                # long face, so that no cell entering the average was smoothed with
+                # material from outside the pencil. NaN where the margin would
+                # consume the region, which happens once R approaches half its width.
+                if MARGIN_CELLS:
+                    sli = pencil_slice(*p, margin=MARGIN_CELLS[r])
+                    if sli is None:
+                        shear_in[r, n] = dbar_in[r, n] = np.nan
+                        lam_in[r, n] = np.nan
+                    else:
+                        shear_in[r, n] = np.sqrt(s2[sli].mean())
+                        dbar_in[r, n] = dsm[sli].mean()
+                        lam_in[r, n] = ev[sli].mean((0, 1, 2))
 
     if ARGS.compact:
         ACC["seed"].append(s)
@@ -380,6 +430,10 @@ for s in SEEDS:
             ACC["shear"].append(shear); ACC["dbar"].append(dbar)
             ACC["lambda"].append(lam); ACC["webtype"].append(web)
             ACC["contrast"].append(contrast); ACC["bulk"].append(bulk)
+            if MARGIN_CELLS:
+                ACC["shear_interior"].append(shear_in)
+                ACC["dbar_interior"].append(dbar_in)
+                ACC["lambda_interior"].append(lam_in)
     with h5py.File(f"{rundir}/pk.hdf5", "w") as f:
         f["k"] = kbin
         f["P_full"] = P_full
@@ -391,6 +445,10 @@ for s in SEEDS:
             f["webtype"] = web          # fractions, order: knot, filament, sheet, void
             f["contrast"] = contrast
             f["bulk"] = bulk
+            if MARGIN_CELLS:
+                f["shear_interior"] = shear_in
+                f["dbar_interior"] = dbar_in
+                f["lambda_interior"] = lam_in
             f["smooth_R"] = np.array(ARGS.smooth)
         f["pencil_axis"] = np.array([p[0] for p in PENCILS])
         f["pencil_i"] = np.array([p[1] for p in PENCILS])
