@@ -101,21 +101,58 @@ for name in SHOW:
         pts.append(((win.mean() - mu)/sd, win.std()/sd/np.sqrt(ngroup), ngroup))
     res[name] = np.array(pts)
 
-fig, ax = plt.subplots(figsize=(8.6, 5.8))
+SOLID = 50          # repeats below which a point carries little information
+fig, (ax, ax2) = plt.subplots(1, 2, figsize=(13.6, 5.6))
+ngroups = np.array([nseed//N for N in SIZES])
+nfirm = int((ngroups >= SOLID).sum())
+if nfirm < len(SIZES):
+    ax.axvspan(SIZES[nfirm-1], SIZES[-1]*1.25, color="0.88", zorder=0)
+    ax.text(SIZES[nfirm-1]*1.15, ax.get_ylim()[1], "  too few repeats\n  to interpret",
+            fontsize=8.5, color="0.45", va="top")
 for i, name in enumerate(SHOW):
     v, e, ng = res[name].T
-    ax.errorbar(SIZES, v, yerr=e, marker="o", ms=4.5, lw=1.5, capsize=3,
-                label=name, color=f"C{i}")
+    # Solid where the experiment was repeated enough times to mean something,
+    # faded where it was not. The last points are the same data repartitioned,
+    # so their scatter is not independent evidence of a trend.
+    ax.errorbar(SIZES[:nfirm], v[:nfirm], yerr=e[:nfirm], marker="o", ms=4.5,
+                lw=1.6, capsize=3, label=name, color=f"C{i}")
+    if nfirm < len(SIZES):
+        ax.errorbar(SIZES[nfirm-1:], v[nfirm-1:], yerr=e[nfirm-1:], marker="o",
+                    ms=3.5, lw=1.0, ls=":", capsize=2, color=f"C{i}",
+                    alpha=0.35, mfc="none")
 ax.axhline(0.0, color="0.35", lw=1.0)
+ax.set_xlim(SIZES[0]*0.75, SIZES[-1]*1.25)
 ax.set_xscale("log")
 ax.set_xlabel("number of seeds searched, keeping the best one")
 ax.set_ylabel("shift of the selected region  [standard deviations]")
-ax.legend(fontsize=8.5, framealpha=0.95, loc="upper left")
+ax.legend(fontsize=8.5, framealpha=0.95, loc="lower right", ncol=2)
 ax.grid(alpha=0.25)
-ax.set_title(f"What the search actually produces, as a function of its size\n"
-             f"{nseed:,} realizations; the error bar is the spread over "
-             f"{nseed:,}/N independent repeats", fontsize=10.5)
-fig.tight_layout()
+ax.set_title("Searching harder stops helping", fontsize=10.5)
+# Second panel: the same shifts divided by the shift in the quantity actually
+# being selected on. If the conditioning identity holds, every curve is flat at
+# its own correlation, and the size of the search sets only the common factor.
+pw = cols["large-scale power"][np.arange(nseed), pick]
+for i, name in enumerate(SHOW):
+    if name == "large-scale power":
+        continue
+    T1 = cols[name][np.arange(nseed), pick]
+    rho = np.corrcoef(pw, T1)[0, 1]
+    ratio = res[name][:nfirm, 0]/res["large-scale power"][:nfirm, 0]
+    ax2.plot(SIZES[:nfirm], ratio, marker="o", ms=4.5, lw=1.6, color=f"C{i}", label=name)
+    ax2.axhline(rho, color=f"C{i}", lw=1.0, ls="--", alpha=0.55)
+ax2.set_xscale("log")
+ax2.set_xlabel("number of seeds searched, keeping the best one")
+ax2.set_ylabel("shift  /  shift in large-scale power")
+ax2.grid(alpha=0.25)
+ax2.legend(fontsize=8, framealpha=0.95, loc="upper right", ncol=2)
+ax2.set_title("The size of the search sets only a common factor", fontsize=10.5)
+
+fig.suptitle(f"{nseed:,} realizations. Left: each point repeats the search "
+             f"{nseed:,}/N times; the error bar is the spread over those repeats.\n"
+             f"Right: the same shifts divided by the shift in the quantity being "
+             f"selected on; dashed lines are each property's correlation with it.",
+             fontsize=9.8, y=0.995)
+fig.tight_layout(rect=(0, 0, 1, 0.90))
 fig.savefig(A.out)
 print(f"wrote {A.out}\n")
 

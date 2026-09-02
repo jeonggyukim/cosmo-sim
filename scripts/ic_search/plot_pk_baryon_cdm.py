@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Baryon and cold dark matter spectra under back-scaled and forward initial conditions.
+"""Power spectrum of the baryon and cold dark matter components of the ICs.
 
 Two ways of setting the initial field differ in what they promise, and the
 difference shows up in the acoustic oscillations of the two species.
@@ -22,7 +22,7 @@ Left panel: the measured full-box spectra. Right panel: each measured spectrum
 against the theory the run itself wrote, as P/P_theory - 1.
 
 Usage:
-    python plot_species_split.py --back DIR --fwd DIR [--out PNG]
+    python plot_pk_baryon_cdm.py --back DIR --fwd DIR [--out PNG]
 """
 import argparse, os
 import numpy as np, h5py
@@ -37,7 +37,7 @@ ap.add_argument("--back", default=None,
                 help="run directory with ztarget = 0; omit to show the forward run alone")
 ap.add_argument("--fwd", required=True, help="run directory with ztarget = zstart")
 ap.add_argument("--lbox", type=float, default=700.0)
-ap.add_argument("--out", default=os.path.join(paths.FIGS, "species_split.png"))
+ap.add_argument("--out", default=os.path.join(paths.FIGS, "pk_baryon_cdm.png"))
 A = ap.parse_args()
 
 DSET = {"cdm": "delta_q_cdm", "baryon": "delta_q_baryon"}

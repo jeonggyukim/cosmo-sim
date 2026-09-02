@@ -87,15 +87,20 @@ print(f"That is {(aw[sel].mean()-aw.mean())/aw.std():.2f} standard deviations "
 fig, (a1, a2) = plt.subplots(1, 2, figsize=(11.6, 4.6))
 for ax, (name, a), col in ((a1, ("windowed model", aw), "C0"),
                            (a2, ("raw theory model", ar), "C1")):
-    bins = np.linspace(*np.percentile(a, [0.2, 99.8]), 70)
-    ax.hist(a, bins=bins, color=col, alpha=0.75, edgecolor="none", label="all pencils")
-    ax.hist(a[sel], bins=bins, histtype="step", lw=1.8, color="C3",
+    # Densities, not counts: the kept sample is 1% of the whole and would be a
+    # flat line on a count axis, which is exactly what the figure has to show.
+    bins = np.linspace(*np.percentile(np.concatenate([a, a[sel]]), [0.1, 99.9]), 70)
+    ax.hist(a, bins=bins, color=col, alpha=0.7, edgecolor="none", density=True,
+            label=f"all {len(a):,} regions")
+    ax.hist(a[sel], bins=bins, histtype="step", lw=1.9, color="C3", density=True,
             label=f"kept by the search ({100*A.keep:g}%)")
     ax.axvline(1.0, color="0.2", lw=1.6, label="A = 1")
-    ax.axvline(a.mean(), color=col, lw=1.3, ls="--", label=f"mean {a.mean():.3f}")
+    ax.axvline(a.mean(), color=col, lw=1.4, ls="--", label=f"all: mean {a.mean():.3f}")
+    ax.axvline(a[sel].mean(), color="C3", lw=1.4, ls=":",
+               label=f"kept: mean {a[sel].mean():.3f}")
     ax.set_xlabel(f"fitted amplitude A, {name}")
-    ax.set_ylabel("pencils")
-    ax.legend(fontsize=8.5, framealpha=0.95)
+    ax.set_ylabel("probability density")
+    ax.legend(fontsize=8, framealpha=0.95, loc="upper left")
     ax.set_title(name, fontsize=10.5)
 
 fig.suptitle("Fitting an amplitude is unbiased; searching for a realization is not\n"
