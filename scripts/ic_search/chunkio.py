@@ -116,3 +116,53 @@ def load(path, species="matter", nchunk=None, want_spectra=False):
     cols = {n: np.concatenate(v) for n, v in cols.items()}
     return (ct, cw, cols, meta,
             np.concatenate(spec) if want_spectra else None)
+
+
+def selection_stats(crit, cols, keep):
+    """Helpers for asking what a selection does, shared by the plotting scripts.
+
+    Returns (shift, shift_err, radii_for). shift(name, crit_key) is the mean of
+    the kept subvolumes minus the mean of all, in units of the scatter over all.
+    shift_err bootstraps over realizations, which is the independent unit:
+    subvolumes inside one box share that box's modes.
+
+    crit is a dict of criterion arrays keyed by name, each of shape
+    (nseed, npencil); cols holds the quantities in the same shape.
+    """
+    import re
+    nseed, npen = next(iter(crit.values())).shape
+    C = {k: v.ravel() for k, v in crit.items()}
+    Q = {n: v.ravel() for n, v in cols.items()}
+    rng = np.random.default_rng(0)
+
+    def shift(name, which, idx=None):
+        T, c = Q[name], C[which]
+        if idx is not None:
+            T, c = T[idx], c[idx]
+        n = max(1, int(round(keep*len(c))))
+        sel = np.argpartition(c, n)[:n]
+        sd = T.std()
+        return (T[sel].mean() - T.mean())/sd if sd > 0 else np.nan
+
+    def shift_err(name, which, nboot=200):
+        boot = np.empty(nboot)
+        for b in range(nboot):
+            g = rng.integers(0, nseed, nseed)
+            boot[b] = shift(name, which, (g[:, None]*npen + np.arange(npen)).ravel())
+        return float(np.std(boot))
+
+    def radii_for(stem):
+        """Smoothing radii present for one quantity, sorted, as (radius, key)."""
+        out = []
+        for n in Q:
+            m = re.fullmatch(rf"{stem} R=(\d+(?:\.\d+)?)", n)
+            if m:
+                out.append((float(m.group(1)), n))
+        return sorted(out)
+
+    return shift, shift_err, radii_for
+
+
+# A sphere of radius R at the mean matter density encloses this mass, which says
+# which objects a smoothing scale corresponds to. Omega_m = 0.3.
+MASS_PER_R3 = 4*np.pi/3 * 0.3 * 2.775e11    # h^-1 Msun per (h^-1 Mpc)^3

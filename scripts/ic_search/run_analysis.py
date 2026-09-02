@@ -68,10 +68,14 @@ STEPS = [
      ["fit_amplitude.py", "--data", A.data, "--keep", K,
       "--out", os.path.join(OUT, "amplitude_fit.png")],
      "amplitude_fit.txt"),
-    ("dependence on smoothing scale, and the box comparison",
-     ["plot_scale_and_box.py", "--data", A.data, "--keep", K,
-      "--out", os.path.join(OUT, "scale_and_box.png")],
-     "scale_and_box.txt"),
+    ("dependence on the smoothing scale",
+     ["plot_scale_dependence.py", "--data", A.data, "--keep", K,
+      "--out", os.path.join(OUT, "scale_dependence.png")],
+     "scale_dependence.txt"),
+    ("region against the box that contains it",
+     ["plot_region_vs_box.py", "--data", A.data, "--keep", K,
+      "--out", os.path.join(OUT, "region_vs_box.png")],
+     "region_vs_box.txt"),
 ]
 
 print(f"sweep  {A.data}")

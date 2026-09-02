@@ -184,9 +184,15 @@ def run_ic(seeds, rundir):
     alone for a single seed.
     """
     seeds = list(seeds)
-    base = f"{rundir}/deltaq.hdf5"
-    outs = ({s: f"{rundir}/deltaq_seed{s}.hdf5" for s in seeds}
-            if len(seeds) > 1 else {seeds[0]: base})
+    # Every seed gets its own file, whether it came from a batch or from a
+    # single-seed retry. Sharing one name across retries would let the first
+    # measurement delete the file the next seed still needs.
+    if len(seeds) > 1:
+        base = f"{rundir}/deltaq.hdf5"          # monofonIC appends _seed<N>
+        outs = {s: f"{rundir}/deltaq_seed{s}.hdf5" for s in seeds}
+    else:
+        base = f"{rundir}/deltaq_seed{seeds[0]}.hdf5"
+        outs = {seeds[0]: base}
     if all(os.path.exists(p) for p in outs.values()):
         return outs
     conf = f"{rundir}/deltaq.conf"
