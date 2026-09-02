@@ -51,6 +51,31 @@ by a sweep.
 Measured cost: 67 s per seed on one grammar core. A 200-seed task takes 3.7 h,
 and the array totals 100,000 x 67 s = 1,860 core-hours.
 
+## big128b — a second 100,000 at N = 128, with the added measurements
+
+| | |
+|---|---|
+| Slurm job | 491168 on grammar, array 0-499, `--dependency=afterany:490017` |
+| Seeds | 200000-299999; task *t* runs 200000 + 200*t* … + 199 |
+| Smoothing | radii at 0.1, 0.25 and 0.5 of the pencil width: 8.75, 21.9, 43.75 Mpc/h |
+| Interior margin | one smoothing radius trimmed from each long face |
+| Also recorded | whole-box shear, eigenvalues and web fractions; interior variants |
+| Chunk files | written every 25 seeds, so the run can be analysed while it goes |
+| Output | `/gpfs/jeonggyukim/monofonic-tests/data/big128b/` |
+
+Submitted with:
+
+```bash
+sbatch --dependency=afterany:490017 --array=0-499 \
+       --export=ALL,NPER=200,SEEDBASE=200000,NGRID=128,RUNTAG=big128b,FLUSH=25 \
+       sweep.sbatch
+```
+
+Everything else matches big128, so the two can be merged for the quantities they
+share. They do not share the smoothing radii: big128 used 20 and 40 Mpc/h fixed,
+this run uses fractions of the region width, and only the 0.25 fraction
+(21.9 Mpc/h) is close to one of them.
+
 ## Earlier runs
 
 | tag | seeds | N | notes |
