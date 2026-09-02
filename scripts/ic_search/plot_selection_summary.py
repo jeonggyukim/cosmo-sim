@@ -135,6 +135,14 @@ for off, (tag, col, mk, lab) in zip((+0.26, 0.0, -0.26), style):
     axR.errorbar(v, y + off, xerr=np.abs(e.T - v), fmt=mk, color=col, ms=5,
                  lw=1.4, capsize=2.5, label=lab)
 axR.axvline(0.0, color="0.3", lw=1.0)
+# Without a reference the axis runs to about half a standard deviation and makes
+# these shifts look like the whole distribution. Mark where one standard
+# deviation of the region-to-region scatter actually is.
+for x in (-1.0, 1.0):
+    axR.axvline(x, color="0.45", lw=1.0, ls=":")
+axR.set_xlim(-1.12, 1.28)
+axR.text(1.0, len(SHOW) - 0.4, " 1 sd of the scatter\n between regions",
+         fontsize=8, color="0.4", va="top", ha="left")
 axR.set_yticks(y)
 axR.set_yticklabels([n.replace("\n", " ") for n in SHOW], fontsize=8.5)
 axR.set_xlabel("shift of the selected regions  [standard deviations]")
