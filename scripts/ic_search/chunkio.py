@@ -80,6 +80,29 @@ def load(path, species="matter", nchunk=None, want_spectra=False):
         if "bulk" in f:
             add("bulk flow", np.linalg.norm(f["bulk"][:], axis=-1))
 
+        # The same quantities on the pencil trimmed by a margin, and on the whole
+        # box. Both are one value per seed for the box, so they are broadcast to
+        # the pencil axis to sit alongside the per-pencil columns.
+        npen = P.shape[1]
+        for src, label in (("shear_interior", "tidal shear interior"),
+                           ("dbar_interior", "mean overdensity interior")):
+            if src in f:
+                arr = f[src][:]
+                for r, R in enumerate(RS):
+                    add(f"{label} R={R:.0f}", arr[:, r])
+        for src, label in (("shear_box", "tidal shear box"),
+                           ("dbar_box", "mean overdensity box")):
+            if src in f:
+                arr = f[src][:]
+                for r, R in enumerate(RS):
+                    add(f"{label} R={R:.0f}", np.repeat(arr[:, r, None], npen, 1))
+        if "webtype_box" in f:
+            wb = f["webtype_box"][:]
+            for r, R in enumerate(RS):
+                for w, wn in enumerate(("knot", "filament", "sheet", "void")):
+                    add(f"{wn} fraction box R={R:.0f}",
+                        np.repeat(wb[:, r, w, None], npen, 1))
+
     if chunks:
         for fn in chunks:
             with h5py.File(fn) as f:
