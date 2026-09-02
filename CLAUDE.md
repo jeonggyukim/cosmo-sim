@@ -214,6 +214,14 @@ scatter".
 
 The rule above applies first. What follows is specific to `notes/`.
 
+**Define every term, symbol, and name where it first appears.** This one holds in
+every note regardless of register, including the journal-register ones. A reader
+who meets `tidal shear` in a results table and finds its definition in the method
+section at the end has been failed, even if the definition is eventually there.
+Put the definitions before the results that use them.
+
+The rest of this section is for the textbook-register notes.
+
 These notes are for self-study. The reader is meeting the material for the first
 time, or returning to it after a long gap, and has nothing else in front of them.
 Write the way a good textbook written for international students reads:
