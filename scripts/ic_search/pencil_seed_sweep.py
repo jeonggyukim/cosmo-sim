@@ -96,6 +96,17 @@ os.makedirs(OUT, exist_ok=True)
 tpl = open(TPL).read()
 
 
+class ICFailure(RuntimeError):
+    """monofonIC would not produce a field for this seed, after retries.
+
+    A few seeds in a thousand fault deterministically inside CLASS. The sweep
+    skips them rather than aborting: one lost realization is a far smaller loss
+    than the whole chunk, and a seed is only a label, so dropping one does not
+    favour any kind of realization. The skipped seeds are recorded with the
+    output so the rate can be checked.
+    """
+
+
 def run_ic(seed, rundir):
     """Generate delta(q) for one seed. Returns the path to the field file."""
     out = f"{rundir}/deltaq.hdf5"
@@ -120,7 +131,7 @@ def run_ic(seed, rundir):
             return out
         print(f"   seed {seed}: monofonIC exited {r.returncode}, retrying "
               f"({attempt+1}/3)", flush=True)
-    raise RuntimeError(f"monofonIC failed three times for seed {seed}; see {rundir}/run.log")
+    raise ICFailure(f"monofonIC failed three times for seed {seed}; see {rundir}/run.log")
 
 
 # ---- k grid, bins, pencil masks (identical for every seed) -------------------
@@ -212,6 +223,7 @@ fit = (kbin > 2*dkperp) & (kbin <= 0.9*kny)      # band used for the metrics
 rows = []
 ACC = {k: [] for k in ("seed", "P_full", "P_pencil", "shear", "dbar", "lambda",
                        "webtype", "contrast", "bulk")}
+SKIPPED = []
 for s in SEEDS:
     t0 = time.time()
     # Unique per chunk: parallel array tasks share one --out directory, so a
@@ -221,7 +233,12 @@ for s in SEEDS:
     if ARGS.compact:
         for stale in glob.glob(f"{rundir}/deltaq.hdf5"):
             os.remove(stale)
-    fic = run_ic(s, rundir)
+    try:
+        fic = run_ic(s, rundir)
+    except ICFailure as e:
+        print(f"   {e}\n   seed {s}: skipped", flush=True)
+        SKIPPED.append(s)
+        continue
     with h5py.File(fic) as f:
         d = {sp: f[DSET[sp]][:].astype(float) for sp in SPECIES}
         zstart = float(f["Header"].attrs["zstart"])
@@ -344,6 +361,7 @@ if ARGS.compact:
         f["P_win"] = P_win
         if ARGS.environment:
             f["smooth_R"] = np.array(ARGS.smooth)
+        f["skipped"] = np.array(SKIPPED, dtype=np.int64)
         f.attrs["species"] = np.array(SPECIES, dtype=h5py.string_dtype())
         f.attrs.update(dict(N=NGRID, L=LBOX, frac=FRAC, fvol=fvol, kny=kny,
                             dkperp=dkperp, dofixing=ARGS.dofixing,
@@ -351,6 +369,12 @@ if ARGS.compact:
     import shutil
     shutil.rmtree(f"{OUT}/_work_{SEEDS[0]:07d}", ignore_errors=True)
     print(f"wrote {OUT}/chunk_{tag}.hdf5")
+
+if SKIPPED:
+    print(f"skipped {len(SKIPPED)} of {len(SEEDS)} seeds: "
+          f"{', '.join(str(x) for x in SKIPPED)}")
+if not rows:
+    raise SystemExit("every seed in this chunk failed; no summary written")
 
 rows = np.array(rows)
 with h5py.File(f"{OUT}/summary.hdf5", "w") as f:

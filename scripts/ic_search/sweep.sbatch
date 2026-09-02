@@ -13,21 +13,24 @@
 # merged; merge_sweeps.py refuses duplicate seeds.
 #
 # Variables, all overridable through --export:
-#   NPER      seeds per array task            (default 250)
+#   NPER      seeds per array task            (default 200)
 #   SEEDBASE  first seed of task 0            (default 100000)
 #   NGRID     cells per side                  (default 128)
 #   RUNTAG    subdirectory under data/        (default run)
 #   WORKDIR   root holding scripts/ ref/ build/ data/ logs/
 #   PYTHON    interpreter with numpy and h5py
 #
-# Wall time is per task, not for the array. At N = 128 one seed takes about
-# 40 s, so NPER = 250 needs roughly three hours; raise --time if you raise NPER.
+# Wall time is per task, not for the array. A task writes its chunk file only
+# after its last seed, so a task killed at the limit loses everything it did:
+# keep --time well above NPER x the per-seed cost. Measured 67 s/seed at
+# N = 128 on grammar, so NPER = 200 takes 3.7 h and --time=08:00:00 is a
+# factor of two of margin.
 
 #SBATCH --job-name=pencil
 #SBATCH --partition=normal
 #SBATCH --cpus-per-task=1
 #SBATCH --ntasks=1
-#SBATCH --time=04:00:00
+#SBATCH --time=08:00:00
 #SBATCH --output=/gpfs/jeonggyukim/monofonic-tests/logs/%x_%A_%a.out
 
 set -eo pipefail
@@ -39,7 +42,7 @@ module load gnu12/12.2.0 openmpi4/4.1.5 fftw/3.3.10 hdf5/1.14.0 gsl/2.7.1
 
 : "${WORKDIR:=/gpfs/jeonggyukim/monofonic-tests}"
 : "${PYTHON:=$HOME/miniconda3/envs/pyathena/bin/python}"
-: "${NPER:=250}"
+: "${NPER:=200}"
 : "${SEEDBASE:=100000}"
 : "${NGRID:=128}"
 : "${RUNTAG:=run}"
