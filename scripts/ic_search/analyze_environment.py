@@ -27,6 +27,12 @@ ap.add_argument("--species", default="matter", choices=["matter", "cdm", "baryon
 ap.add_argument("--keep", type=float, default=0.05,
                 help="fraction of pencils retained by the selection")
 ap.add_argument("--nboot", type=int, default=2000)
+ap.add_argument("--one-per-seed", type=int, default=0, metavar="NDRAW",
+                help="keep a single randomly chosen pencil from each realization, and "
+                     "repeat the draw NDRAW times. Pencils inside one box share its "
+                     "modes; taking one removes that correlation instead of modelling "
+                     "it with the bootstrap, at the cost of using a fraction of the "
+                     "data. The reported spread is over the NDRAW draws")
 A = ap.parse_args()
 
 
@@ -131,6 +137,22 @@ def shift_in_sd(c, T, idx=None):
 
 rng = np.random.default_rng(1)
 by_seed = [np.where(seed_of == s)[0] for s in range(nseed)]
+
+if A.one_per_seed:
+    idx_by_seed = np.array(by_seed)          # (nseed, npen), same count for every seed
+    print(f"one pencil per realization, {A.one_per_seed} independent draws\n")
+    print(f"{'quantity':<26} {'shift [sd]':>22} {'all pencils':>13}")
+    for name, T in cols.items():
+        s = np.empty(A.one_per_seed)
+        for d in range(A.one_per_seed):
+            pick = idx_by_seed[np.arange(nseed), rng.integers(0, npen, nseed)]
+            s[d] = shift_in_sd(crit[pick], T[pick])[0]
+        print(f"{name:<26} {s.mean():+8.3f} +/- {s.std():.3f} {shift_in_sd(crit, T)[0]:+12.3f}")
+    print(f"\n{nseed} realizations; the spread is over the {A.one_per_seed} draws of which "
+          f"pencil to take.\nThese draws are independent, so agreement with the last column "
+          f"means the\nbootstrap is treating the within-box correlation correctly.")
+    raise SystemExit
+
 print(f"{'quantity':<26} {'shift [sd]':>18} {'scatter kept/all':>18}")
 for name, T in cols.items():
     point, ratio = shift_in_sd(crit, T)
