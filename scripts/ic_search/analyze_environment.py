@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """What selecting on the pencil power spectrum does to the state of the region.
 
-Applies the proposed selection criterion -- distance from the unwindowed theory at
-low k -- and reports how far the surviving realizations differ, in quantities the
-criterion never mentions: the tidal shear of the region, its mean overdensity, the
+Applies the proposed selection criterion -- distance at low k from a reference
+curve, set by --reference -- and reports how far the surviving realizations differ,
+in quantities the criterion never mentions: the tidal shear of the region, its mean overdensity, the
 shape of its tidal ellipsoid, its bulk flow, how it stands against its neighbours,
 and its power on scales above and below the window width.
 
@@ -15,6 +15,13 @@ while respecting that correlation.
 
 Reads either layout written by pencil_seed_sweep.py --environment: a directory per
 seed (small local runs) or the chunk files written by --compact (cluster arrays).
+Run it both ways. With --reference theory the pencils are asked to match the raw
+linear spectrum, which their own mean sits about 34% below at the fundamental, so
+only an upward fluctuation can succeed. With --reference window they are asked to
+match that same theory convolved with the pencil window, which is what the
+estimator has for its mean, so nothing atypical is required. The difference
+between the two runs is the bias the choice of curve introduces.
+
 See merge_sweeps.py for combining parallel runs of the first kind.
 """
 import argparse, glob, os
@@ -26,6 +33,13 @@ ap.add_argument("--data", default=os.path.join(paths.DATA, "env_n128_L700_x400")
 ap.add_argument("--species", default="matter", choices=["matter", "cdm", "baryon"])
 ap.add_argument("--keep", type=float, default=0.05,
                 help="fraction of pencils retained by the selection")
+ap.add_argument("--reference", default="theory", choices=["theory", "window"],
+                help="the curve the selection tries to match: 'theory' is the raw "
+                     "linear spectrum, which a pencil measures 34%% below at the "
+                     "fundamental for purely geometric reasons; 'window' is that "
+                     "theory convolved with the pencil window, which is what the "
+                     "estimator actually has for its mean. Selecting on 'window' is "
+                     "the control: it asks for nothing atypical")
 ap.add_argument("--nboot", type=int, default=2000)
 ap.add_argument("--one-per-seed", type=int, default=0, metavar="NDRAW",
                 help="keep a single randomly chosen pencil from each realization, and "
@@ -68,9 +82,11 @@ def load(path, species):
 
     crit, cols, seed_of, nseed = [], {}, [], 0
 
+    P_ref = P_th if A.reference == "theory" else P_win
+
     def add(P, env, RS):
         """One realization: P is (npencil, nk), env holds its per-pencil arrays."""
-        crit.append(np.sqrt((np.log(P[:, lo]/P_th[lo])**2).mean(1)))
+        crit.append(np.sqrt((np.log(P[:, lo]/P_ref[lo])**2).mean(1)))
         cols.setdefault("large-scale power", []).append((P[:, lo]/P_win[lo]).mean(1))
         cols.setdefault("small-scale power", []).append((P[:, hi]/P_win[hi]).mean(1))
         if env is None:
@@ -123,7 +139,8 @@ npen = len(crit)//nseed
 
 print(f"{nseed} realizations x {npen} pencils = {len(crit)} measurements, "
       f"N = {int(meta['N'])}, L = {meta['L']:g} Mpc/h, species {A.species}")
-print(f"selection: the closest {100*A.keep:g}% to unwindowed theory over "
+print(f"selection: the closest {100*A.keep:g}% to "
+      f"{'unwindowed theory' if A.reference == 'theory' else 'theory * window'} over "
       f"k <= 2 dk_perp ({k[lo][0]:.3f}-{k[lo][-1]:.3f} h/Mpc)\n")
 
 
