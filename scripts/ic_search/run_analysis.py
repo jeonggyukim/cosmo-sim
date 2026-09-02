@@ -68,6 +68,10 @@ STEPS = [
      ["fit_amplitude.py", "--data", A.data, "--keep", K,
       "--out", os.path.join(OUT, "amplitude_fit.png")],
      "amplitude_fit.txt"),
+    ("dependence on smoothing scale, and the box comparison",
+     ["plot_scale_and_box.py", "--data", A.data, "--keep", K,
+      "--out", os.path.join(OUT, "scale_and_box.png")],
+     "scale_and_box.txt"),
 ]
 
 print(f"sweep  {A.data}")

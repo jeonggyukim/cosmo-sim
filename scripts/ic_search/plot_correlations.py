@@ -38,6 +38,15 @@ ORDER = ["large-scale power", "small-scale power"] + \
         [n for n in C if n.split()[0] in ("knot", "filament", "sheet", "void")] + \
         [n for n in C if n == "bulk flow"]
 ORDER = [n for n in ORDER if n in C]
+# A quantity that is undefined, such as the interior of a region smoothed on half
+# its own width, or one with no scatter, has no correlation with anything. Left
+# in, either makes the matrix impossible to diagonalise.
+usable = [n for n in ORDER
+          if np.all(np.isfinite(C[n])) and np.std(C[n]) > 0]
+dropped = [n for n in ORDER if n not in usable]
+if dropped:
+    print("not correlated, undefined or constant: " + ", ".join(dropped) + "\n")
+ORDER = usable
 X = np.stack([C[n] for n in ORDER])
 R = np.corrcoef(X)
 
