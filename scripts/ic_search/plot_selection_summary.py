@@ -34,13 +34,8 @@ ap.add_argument("--nnull", type=int, default=200)
 ap.add_argument("--out", default=os.path.join(paths.FIGS, "selection_summary.png"))
 A = ap.parse_args()
 
-with h5py.File(f"{A.data}/theory.hdf5") as f:
-    names = [x.decode() if isinstance(x, bytes) else str(x) for x in f.attrs["species"]]
-    SP = names.index("matter")
-    k, P_th, P_win = f["k"][:], f["P_theory"][SP], f["P_win"][SP]
-    kny, dkperp, N, L = (f.attrs[x] for x in ("kny", "dkperp", "N", "L"))
-lo = k <= 2*dkperp
-
+# The theory curves and the geometry come from chunkio, which reads them from a
+# chunk file when there is one and from theory.hdf5 for the per-seed layout.
 import chunkio
 
 crit_th, crit_wn, COLS, meta, P = chunkio.load(A.data, "matter", want_spectra=True)

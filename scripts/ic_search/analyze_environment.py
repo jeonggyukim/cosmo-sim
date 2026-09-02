@@ -72,7 +72,10 @@ def load(path, species):
     if not chunks and not seeds:
         raise SystemExit(f"no chunk_*.hdf5 or seed_*/pk.hdf5 under {path}")
 
-    with h5py.File(f"{path}/theory.hdf5") as f:
+    # Chunk files carry their own copy of the theory curves, so a sweep is
+    # readable from its chunks alone; only the per-seed layout needs theory.hdf5.
+    ref = chunks[0] if chunks else f"{path}/theory.hdf5"
+    with h5py.File(ref) as f:
         names = [x.decode() if isinstance(x, bytes) else str(x) for x in f.attrs["species"]]
         SP = names.index(species)
         k, P_th, P_win = f["k"][:], f["P_theory"][SP], f["P_win"][SP]

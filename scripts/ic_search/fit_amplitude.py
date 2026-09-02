@@ -98,15 +98,21 @@ for ax, (name, a), col in ((a1, ("windowed model", aw), "C0"),
     ax.axvline(a.mean(), color=col, lw=1.4, ls="--", label=f"all: mean {a.mean():.3f}")
     ax.axvline(a[sel].mean(), color="C3", lw=1.4, ls=":",
                label=f"kept: mean {a[sel].mean():.3f}")
-    ax.set_xlabel(f"fitted amplitude A, {name}")
+    ax.set_xlabel("$A$   (1 = the region has exactly the power the model predicts)")
     ax.set_ylabel("probability density")
-    ax.legend(fontsize=8, framealpha=0.95, loc="upper left")
-    ax.set_title(name, fontsize=10.5)
+    ax.legend(fontsize=8.5, framealpha=0.95, loc="upper left")
 
-fig.suptitle("Fitting an amplitude is unbiased; searching for a realization is not\n"
-             f"{len(P):,} pencils, generalised least squares over "
-             f"k = {k[band][0]:.3f}-{k[band][-1]:.3f} $h$ Mpc$^{{-1}}$ with the "
-             f"measured covariance", fontsize=11)
-fig.tight_layout(rect=(0, 0, 1, 0.88))
+a1.set_title("$P_{\\rm model}$ = theory $\\ast$ window\n"
+             "the curve a subvolume is unbiased for", fontsize=10.5)
+a2.set_title("$P_{\\rm model}$ = raw linear theory\n"
+             "the curve the seed search asks for", fontsize=10.5)
+
+fig.suptitle("How much power does a subvolume have, compared with the model?\n"
+             "Fit one number $A$ to each subvolume:  "
+             "$\\hat P(k) = A \\, P_{\\rm model}(k)$\n"
+             f"{len(P):,} subvolumes, generalised least squares over "
+             f"k = {k[band][0]:.3f}-{k[band][-1]:.3f} $h$ Mpc$^{{-1}}$ "
+             f"with the measured covariance", fontsize=11)
+fig.tight_layout(rect=(0, 0, 1, 0.84))
 fig.savefig(A.out)
 print(f"\nwrote {A.out}")

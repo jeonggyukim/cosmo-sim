@@ -30,13 +30,8 @@ ap.add_argument("--keep", type=float, default=0.05)
 ap.add_argument("--out", default=os.path.join(paths.FIGS, "selection_histograms.png"))
 A = ap.parse_args()
 
-with h5py.File(f"{A.data}/theory.hdf5") as f:
-    names = [x.decode() if isinstance(x, bytes) else str(x) for x in f.attrs["species"]]
-    SP = names.index("matter")
-    k, P_th, P_win = f["k"][:], f["P_theory"][SP], f["P_win"][SP]
-    kny, dkperp, N, L = (f.attrs[x] for x in ("kny", "dkperp", "N", "L"))
-lo = k <= 2*dkperp
-hi = (k > 2*dkperp) & (k <= 0.9*kny)
+# The theory curves and the geometry come from chunkio, which reads them from a
+# chunk file when there is one and from theory.hdf5 for the per-seed layout.
 
 
 def shape_params(lam):

@@ -87,6 +87,12 @@ SHOW = [n for n in SHOW if not n.startswith("mean overdensity")][:8]
 
 SIZES = [n for n in (3, 10, 30, 100, 300, 1000, 3000, 10000, 30000)
          if nseed//n >= A.min_repeats]
+if not SIZES:
+    raise SystemExit(
+        f"{nseed:,} realizations support no search size with at least "
+        f"{A.min_repeats} independent repeats. The smallest search plotted is 3 "
+        f"seeds, so this needs {3*A.min_repeats:,} realizations; lower "
+        f"--min-repeats to see it anyway.")
 
 res = {}
 for name in SHOW:
@@ -102,6 +108,12 @@ for name in SHOW:
     res[name] = np.array(pts)
 
 SOLID = 50          # repeats below which a point carries little information
+if nseed//SIZES[0] < SOLID:
+    raise SystemExit(
+        f"{nseed:,} realizations give at most {nseed//SIZES[0]} repeats of the "
+        f"smallest search plotted ({SIZES[0]} seeds), below the {SOLID} this "
+        f"figure treats as interpretable. It needs about {SOLID*SIZES[0]:,} "
+        f"realizations.")
 fig, (ax, ax2) = plt.subplots(1, 2, figsize=(13.6, 5.6))
 ngroups = np.array([nseed//N for N in SIZES])
 nfirm = int((ngroups >= SOLID).sum())
