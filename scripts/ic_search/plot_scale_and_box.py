@@ -105,7 +105,7 @@ a1.text(lperp, 0.02, " region width", transform=a1.get_xaxis_transform(),
         fontsize=9, color="0.4")
 a1.set_xscale("log")
 a1.set_xlabel("smoothing radius  [Mpc/$h$]")
-a1.set_ylabel("shift of the selected regions  [standard deviations]")
+a1.set_ylabel("shift of the pencil zoom-in region  [standard deviations]")
 a1.set_title("Dependence on the smoothing radius", fontsize=11)
 a1.legend(fontsize=9, framealpha=0.95)
 a1.grid(alpha=0.25)
@@ -125,14 +125,14 @@ if pairs:
     ereg = [shift_err(n) for _, n, _ in pairs]
     ebox = [shift_err(b) for _, _, b in pairs]
     a2.errorbar(reg, y + 0.13, xerr=ereg, fmt="D", color="C3", ms=5, lw=1.4,
-                capsize=3, label="the selected region")
+                capsize=3, label="pencil zoom-in region")
     a2.errorbar(box, y - 0.13, xerr=ebox, fmt="o", color="C0", ms=5, lw=1.4,
-                capsize=3, label="the whole box it came from")
+                capsize=3, label="whole box")
     a2.axvline(0.0, color="0.3", lw=1.0)
     a2.set_yticks(y)
     a2.set_yticklabels([p[0].replace("\n", ", ") for p in pairs], fontsize=9)
     a2.set_xlabel("shift  [standard deviations]")
-    a2.set_title("The region against the box that contains it", fontsize=11)
+    a2.set_title("Pencil zoom-in region against the whole box", fontsize=11)
     a2.legend(fontsize=9, framealpha=0.95, loc="lower right")
     a2.grid(axis="x", alpha=0.25)
 else:
