@@ -17,6 +17,8 @@
 #   SEEDBASE  first seed of task 0            (default 100000)
 #   NGRID     cells per side                  (default 128)
 #   FLUSH     seeds per chunk file            (default 25; 0 = one file at the end)
+#   SMOOTHFRAC smoothing radii as fractions of the pencil width (default 0.1 0.25 0.5)
+#   MARGIN    interior margin in smoothing radii (default 1.0)
 #   RUNTAG    subdirectory under data/        (default run)
 #   WORKDIR   root holding scripts/ ref/ build/ data/ logs/
 #   PYTHON    interpreter with numpy and h5py
@@ -47,6 +49,8 @@ module load gnu12/12.2.0 openmpi4/4.1.5 fftw/3.3.10 hdf5/1.14.0 gsl/2.7.1
 : "${SEEDBASE:=100000}"
 : "${NGRID:=128}"
 : "${FLUSH:=25}"
+: "${SMOOTHFRAC:=0.1 0.25 0.5}"
+: "${MARGIN:=1.0}"
 : "${RUNTAG:=run}"
 
 export MONOFONIC_TESTS=$WORKDIR
@@ -66,5 +70,6 @@ mkdir -p "$OUT" "$WORKDIR/logs"
 cd "$WORKDIR/scripts"
 exec $PYTHON pencil_seed_sweep.py \
     --seed0 "$SEED0" --nseeds "$NPER" --ngrid "$NGRID" \
-    --species matter --npencils 24 --environment --smooth 20 40 \
+    --species matter --npencils 24 --environment \
+    --smooth-frac $SMOOTHFRAC --interior-margin "$MARGIN" \
     --nthreads 1 --compact --flush-every "$FLUSH" --out "$OUT"
