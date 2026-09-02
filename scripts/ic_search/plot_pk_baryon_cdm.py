@@ -68,7 +68,7 @@ def measure(rundir):
     kny = np.pi*N/L
     # Log-spaced bins: the plot is logarithmic in k, and linear bins would put
     # only one or two of them below k = 0.03 while crowding the small scales.
-    nb = 26
+    nb = 70
     kfund = 2*np.pi/L
     edges = np.logspace(np.log10(0.9*kfund), np.log10(kny), nb+1)
     idx = np.digitize(kk[g].ravel(), edges) - 1
@@ -98,7 +98,7 @@ def measure(rundir):
     # A bin needs enough modes for its average to mean anything. At the fundamental
     # there are only six modes in the whole box, so the first bins are dropped
     # rather than plotted as noise.
-    ok = (cnt >= 12) & (kbin > 0)
+    ok = (cnt >= 20) & (kbin > 0)
     # The raw table too, for drawing the theory at its own resolution rather than
     # at the resolution of the measurement's bins.
     fine = {s: (th[:, 0], th[:, THCOL[s]]*(2*np.pi)**3) for s in d}
@@ -107,7 +107,7 @@ def measure(rundir):
         if line.strip().startswith("zstart"):
             zs = float(line.split("=")[1].split("#")[0])
     return (kbin[ok], {s: P[s][ok] for s in P}, {s: Pth[s][ok] for s in Pth},
-            kny, fine, N, zs)
+            kny, fine, N, zs, cnt[ok])
 
 
 runs = [("fwd", A.fwd)] + ([("back", A.back)] if A.back else [])
@@ -142,10 +142,10 @@ for tag, _ in runs:
                   label="linear theory" if (s == "cdm" and tag == runs[0][0]) else None)
         # One marker per band, so it is clear that the measurement exists only at
         # these wavenumbers and the line between them is drawn, not measured.
-        a1.loglog(k, P[s], color=COL[s], ls=LS[tag], lw=1.4, marker="o", ms=3.6,
-                  mfc="white", mew=1.2, label=f"{s}, {LBL[tag]}")
-        a2.semilogx(k, P[s]/T[s] - 1.0, color=COL[s], ls=LS[tag], lw=1.4,
-                    marker="o", ms=3.6, mfc="white", mew=1.2,
+        a1.loglog(k, P[s], color=COL[s], ls=LS[tag], lw=1.3, marker="o", ms=2.8,
+                  mfc="white", mew=0.9, label=f"{s}, {LBL[tag]}")
+        a2.semilogx(k, P[s]/T[s] - 1.0, color=COL[s], ls=LS[tag], lw=1.3,
+                    marker="o", ms=2.8, mfc="white", mew=0.9,
                     label=f"{s}, {LBL[tag]}")
 
 for ax in (a1, a2):
@@ -163,6 +163,13 @@ a1.legend(framealpha=0.95)
 a1.set_title("Measured full-box spectra, with linear theory beneath")
 a1.grid(alpha=0.25)
 
+# A band with n independent modes scatters about its mean by sqrt(2/n) for a
+# Gaussian field, so the excursions at small k are what the mode count allows
+# rather than a discrepancy with the theory.
+kc, _, _, _, _, _, _, cntc = M[runs[0][0]]
+sig = np.sqrt(2.0/np.maximum(cntc, 1))
+a2.fill_between(kc, -sig, sig, color="0.75", alpha=0.45, lw=0,
+                label="expected scatter, $\\sqrt{2/N_{\\rm modes}}$", zorder=0)
 a2.axhline(0.0, color="0.3", lw=1.0)
 a2.set_xlabel("$k$  [$h$ Mpc$^{-1}$]")
 a2.set_ylabel("$P(k)\\,/\\,P_{\\rm theory}(k) - 1$")

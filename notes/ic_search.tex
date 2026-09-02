@@ -472,6 +472,81 @@ large-scale power and shows no shift at any search size or tolerance. A criterio
 is safe for exactly those quantities it does not correlate with, and the
 correlation matrix identifies them.
 
+\section{A related point: which redshift the transfer functions are taken at}
+\label{sec:ztarget}
+
+This section is not about selection. It records a property of the initial
+conditions used here that surprised a collaborator, and that anyone measuring
+the two matter components separately will meet.
+
+In the runs above the baryon and the cold dark matter fields carry the same
+acoustic oscillations, differing only by a smooth offset of a few tenths of a
+per cent. That is not a defect of the transfer function code, and switching
+between CLASS and a tabulated CAMB file does not change it. It follows from
+back-scaling.
+
+With back-scaling, the default, CLASS is evaluated at the back-scaling target
+redshift, $z_{\rm target} = 0$, and the field is scaled to the starting redshift
+with the growth factor. By $z = 0$ the baryons have long since fallen into the
+cold dark matter potentials, so the two transfer functions have nearly converged
+there. Multiplying both by the same growth factor preserves that near-equality,
+and the acoustic features, which live in the common part, come out identical in
+the two components.
+
+monofonIC already provides the alternative. Setting
+\texttt{[cosmology] ztarget} equal to \texttt{zstart} takes the transfer
+functions at the starting redshift itself, where the baryons have not yet caught
+up, and makes the back-scaling factor unity. Measured at $N = 256^3$,
+$L = 700\Mpch$, $z = 200$, from the same white noise, over
+$k = 0.02$--$0.5\ h\,\mathrm{Mpc}^{-1}$:
+
+\begin{table}[htbp]
+  \centering
+  \caption{Ratio of the two components under the two conventions, from the same
+  white noise field.}
+  \label{tab:ztarget}
+  \begin{tabular}{lrr}
+    \toprule
+    convention & $\delta_b/\delta_c$ & variation \\
+    \midrule
+    back-scaled, \texttt{ztarget} $= 0$ & $0.9936$--$0.9964$ & $0.3\%$ \\
+    forward, \texttt{ztarget} $=$ \texttt{zstart} & $0.386$--$0.723$ & $34\%$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{pk_baryon_cdm.pdf}
+  \caption{The two components under the forward convention. The baryons are
+  suppressed relative to the cold dark matter by a factor of two to six
+  depending on scale, and carry pronounced acoustic oscillations that the cold
+  dark matter curve does not share; under back-scaling the two curves lie on top
+  of one another. Markers show the wavenumbers at which the spectra were
+  measured, and the line between them is drawn rather than measured. The theory
+  beneath each is taken from the table the run itself wrote, at its own
+  resolution, so it resolves the oscillations that a bin average smooths.}
+  \label{fig:species}
+\end{figure}
+
+Neither convention is wrong, and the right panel of Figure~\ref{fig:species}
+shows that each reproduces the theory its own run writes. They promise different
+things. The back-scaled field is constructed so that an $N$-body code carrying
+no radiation and no baryon physics evolves it to the correct total matter field
+at $z = 0$; the price is that the split between the components at the starting
+redshift is not the physical one. The forward field is the true field at the
+starting redshift, with the physical split, and carries no such guarantee about
+$z = 0$.
+
+For the measurements in this note the choice does not matter, and that is worth
+stating rather than assuming. The window convolution of \S\ref{sec:window} is
+linear and acts on whichever field is supplied, and the conditioning identity of
+\S\ref{sec:conditioning} involves correlations between quantities rather than
+the overall normalisation. The measurements here use the total matter field,
+which is the same under both conventions up to the growth factor. The choice
+matters for anyone comparing the two components to each other, which is the
+situation that raised the question.
+
 \section{Recommendations}
 \label{sec:recommendations}
 
