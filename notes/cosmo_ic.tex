@@ -3208,6 +3208,220 @@ with an anisotropic term parameterized by three eigenvalues
 embedding in a large-scale tidal field.
 
 %----------------------------------------------------------------------
+\subsection{How the white noise is actually generated}
+\label{sec:ngenic}
+
+Everything above starts from a white-noise field.  The companion note
+\texttt{cosmo\_stat.pdf} derives what that field looks like
+statistically: each Fourier mode has a uniformly distributed phase, and
+an amplitude that follows the Rayleigh distribution, which is derived
+from scratch in Step two below.
+
+The companion note begins from the assumption that the field is
+Gaussian, and deduces the distribution the amplitudes and phases must
+have.  This subsection begins from the only tool actually available.  A
+random number generator produces numbers drawn uniformly from the
+interval $[0,1)$, and nothing else.  Two questions follow.  How does one
+turn such numbers into modes with the right distribution?  And how does
+one arrange the work so that the same seed gives the same universe on
+one core and on a thousand?
+
+We follow the method of \texttt{N-GenIC}, which \texttt{monofonIC}
+inherits as its \texttt{NGENIC} generator, in full.  Two of its design
+choices look arbitrary until the problem each one solves is shown.
+
+\paragraph{Turning uniform numbers into a Gaussian mode.}
+The generator draws two uniform deviates per mode and forms
+\begin{equation}
+  \phi = 2\pi u_1, \qquad
+  A = \sqrt{-\ln u_2}, \qquad
+  z = A\,e^{i\phi},
+  \label{eq:ngenic-draw}
+\end{equation}
+with $u_1, u_2$ independent and uniform on $(0,1)$.  We now check that
+$z$ is a complex Gaussian of unit variance, in three steps.
+
+\emph{Step one: $-\ln u$ is an exponential variable.}  Take any
+$y \ge 0$.  Exponentiating both sides of an inequality preserves its
+direction, because $\exp$ is an increasing function, so
+\begin{equation}
+  \mathrm{Pr}(-\ln u > y) = \mathrm{Pr}(\ln u < -y) = \mathrm{Pr}(u < e^{-y}) = e^{-y},
+\end{equation}
+where the last equality is the statement that a uniform variable falls
+below $c$ with probability $c$.  This is exactly the survival function
+of the exponential distribution with unit rate, so
+$A^2 = -\ln u_2 \sim \mathrm{Exp}(1)$.  The construction is
+inverse-transform sampling: the exponential distribution has cumulative
+distribution function $F(y) = 1 - e^{-y}$, whose inverse is
+$-\ln(1-u)$, and $1-u$ is uniform whenever $u$ is.
+
+\emph{Step two: therefore $A$ is Rayleigh.}  Because $A = \sqrt{-\ln
+u_2}$ is non-negative, squaring both sides of $A \le a$ preserves the
+inequality, so $\mathrm{Pr}(A \le a) = \mathrm{Pr}(A^2 \le a^2)$.
+Differentiating that cumulative distribution gives the density,
+\begin{equation}
+  \mathrm{Pr}(A \le a) = \mathrm{Pr}(A^2 \le a^2) = 1 - e^{-a^2}
+  \quad\Longrightarrow\quad
+  f_A(a) = 2a\,e^{-a^2}, \qquad a \ge 0 .
+\end{equation}
+The \emph{Rayleigh distribution} with parameter $\sigma$ has density
+$f(a) = (a/\sigma^2)\exp(-a^2/2\sigma^2)$, and comparing the two
+expressions identifies $\sigma^2 = \tfrac12$.  Notice that the logic
+here runs in the opposite direction from the companion note.
+\texttt{cosmo\_stat.pdf} \emph{derives} the Rayleigh law from the
+assumption that the field is Gaussian, while here we \emph{impose} it by
+construction, in order to make the field Gaussian.
+
+\emph{Step three: a uniform phase completes the complex Gaussian.}
+Because $u_1$ and $u_2$ were drawn independently, $A$ and $\phi$ are
+independent, and $\phi = 2\pi u_1$ is uniform on $[0, 2\pi)$ with
+density $1/2\pi$.  Their joint density therefore factorises as
+$p(A, \phi) = f_A(A)\cdot\tfrac{1}{2\pi}$.  Now change variables from
+$(A, \phi)$ to $x = A\cos\phi$, $y = A\sin\phi$.  The area element
+transforms as $\mathrm dx\,\mathrm dy = A\,\mathrm dA\,\mathrm d\phi$,
+so converting to a density in $(x, y)$ introduces a factor $1/A$:
+\begin{equation}
+  p(x,y) = f_A(A)\cdot\frac{1}{2\pi}\cdot\frac{1}{A}
+         = \frac{2A\,e^{-A^2}}{2\pi A}
+         = \frac{1}{\pi}\,e^{-(x^2+y^2)}
+         = \Bigl[\tfrac{1}{\sqrt\pi}e^{-x^2}\Bigr]
+           \Bigl[\tfrac{1}{\sqrt\pi}e^{-y^2}\Bigr].
+\end{equation}
+The factor $A$ from the Jacobian cancels the $A$ in the Rayleigh
+density, which is why the polar construction works at all.  The result
+factorises into two independent Gaussians of variance $\tfrac12$ each.
+The mode therefore carries
+\begin{equation}
+  \langle|z|^2\rangle = \langle A^2\rangle = 1,
+\end{equation}
+since the mean of an $\mathrm{Exp}(1)$ variable is $1$.  This is unit
+variance per mode, which is what a white-noise field requires.
+
+For comparison, the Box--Muller transform as usually written uses
+$R = \sqrt{-2\ln u}$ and delivers two Gaussians of unit variance.
+Eq.~(\ref{eq:ngenic-draw}) drops that factor of two, which halves the
+variance to $\tfrac12$ per component.  The choice is deliberate.  It is
+$|\tilde\delta_\bk|^2$ that must equal the power, so the complex mode
+needs $\langle|z|^2\rangle = 1$ rather than $2$.
+
+Written this way, amplitude fixing is a one-line change.  Setting
+\texttt{DoFixing = yes} replaces the Rayleigh-distributed $A$ by $A = 1$
+exactly, while leaving $\phi$ uniform.  Since $\tilde\delta_\bk =
+\sqrt{P(k)}\,z$, fixing $|z| = 1$ fixes $|\tilde\delta_\bk|$ at
+$\sqrt{P(k)}$ exactly, and only the phases remain random; the box on
+fixed-amplitude ICs in \S\ref{sec:icgen} discusses when that is
+desirable.  Phase inversion, \texttt{DoInversion}, is the same kind of
+one-line change: $\phi \to \phi + \pi$.
+
+\paragraph{Which mode gets which random number.}
+The subtler problem is keeping track of which random number belongs to
+which mode.  A naive implementation would walk the grid in memory order,
+drawing numbers as it goes.  That works, but the realisation it produces
+depends on the grid size $N$.  Change $N$, and every mode receives a
+different random number.  A convergence test at higher resolution would
+then compare two unrelated universes, not the same universe resolved
+more finely.
+
+\texttt{N-GenIC} avoids this with a two-level scheme.  A master
+generator, seeded once with the user's seed, fills a \emph{seed table}
+holding one integer per transverse mode $(n_x, n_y)$.  Each such pair
+labels a \emph{column} of modes running along the third axis.  The
+generator then reseeds itself from that integer and draws the pairs of
+Eq.~(\ref{eq:ngenic-draw}) down the column, $k_z = 0, 1, 2, \dots$
+
+The key choice is the order in which the table is filled: outward from
+the origin in square rings, eight symmetric entries per ring, rather
+than row by row.  Call the row-by-row scan \emph{raster order} and the
+outward-ring scan \emph{ring order}.  Figure~\ref{fig:ngenic-seedtable}
+shows both on a small example.  Under raster order the entry for
+$(n_x, n_y)$ sits at position $i N + j$ of the master stream, so its
+position depends on $N$.  Under ring order its position depends only on
+which ring it belongs to, so it does not depend on $N$ at all.
+
+Two runs at $N = 64$ and $N = 128$ with the same seed therefore share
+every mode they have in common.  The finer run reads further down each
+column, adding small-scale power beneath modes that are already fixed.
+Measured on the fields themselves, all $250\,046$ shared modes agree to
+a maximum fractional difference of $2.2\times10^{-13}$.
+
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=\textwidth]{ngenic_seedtable.pdf}
+  \caption{The \texttt{N-GenIC} white-noise layout, on an $8^2$ and a
+  $16^2$ transverse grid, in signed wavenumber coordinates.
+  \textit{(a)} The order in which the master generator's outputs are
+  assigned to modes: outward from the origin in square rings.
+  \textit{(b, c)} The ring index at two resolutions.  \textit{(d)} Under
+  the naive raster order the draw position of a given mode shifts by up
+  to $192$ places between the two grids.  \textit{(e)} Under ring order
+  it does not shift at all.  \textit{(f)} Each mode column is then an
+  independent stream reseeded from its own table entry, so the finer
+  grid extends the same stream rather than replacing it.}
+  \label{fig:ngenic-seedtable}
+\end{figure}
+
+\paragraph{Keeping the field real.}
+The field $\delta(\bq)$ is real, so its transform must satisfy
+$\tilde\delta_{-\bk} = \tilde\delta_\bk^*$ (App.~\ref{app:fft_hermitian}).
+A real-to-complex transform stores only the half-space $k_z \ge 0$ and
+leaves the other half implied, so for $k_z > 0$ the symmetry is
+structural and the generator simply writes one number per mode.  The
+plane $k_z = 0$ is the exception.  There both $\bk$ and $-\bk$ are
+stored, so the code writes the conjugate pair explicitly: $z$ at
+$(n_x, n_y, 0)$ and $z^*$ at $(-n_x, -n_y, 0)$.  The loop is restricted
+to one half of the plane so that each pair is visited only once.
+
+The Nyquist planes need yet more care, because those modes are their own
+complex conjugates and would therefore have to be purely real.  Rather
+than special-case them, the generator discards them entirely.  This is
+why a grid of size $N$ carries no power at $|n_a| = N/2$.
+
+One detail in the loop looks like a bug and is not.  The two uniform
+deviates are drawn \emph{before} the test that skips the Nyquist and
+zero modes, so the stream advances even for modes that are thrown away.
+That is what keeps mode $k_z$ at the same position in its column's
+stream regardless of which modes happen to be discarded; moving the test
+earlier would silently shift every subsequent mode.
+
+\paragraph{Why this survives parallelisation.}
+The same two-level scheme solves a second problem.  Under MPI the grid
+is cut into slabs, and Fig.~\ref{fig:mpi-fft-slabs} shows what that
+means for the transform.  A three-dimensional FFT is three sets of
+one-dimensional transforms.  Two of the three directions lie inside a
+slab and need no communication.  The third does not: the array must be
+redistributed once, in a global all-to-all.  \texttt{FFTW} can stop
+there and return an array whose first two axes are swapped, saving a
+second all-to-all, and \texttt{monofonIC} takes that option.  Fourier
+space is then sliced along $k_y$, and the array index order is
+$[k_y][k_x][k_z]$ rather than $[k_x][k_y][k_z]$.
+
+Because each column carries its own seed, none of this changes the
+realisation.  Every rank runs the whole loop over $(n_x, n_y)$ and
+redraws every random number, writing only the slabs it owns.  No rank
+ever needs a number another rank produced, so the generator itself
+communicates nothing.  The transposed layout is handled by swapping the
+two indices in the table lookup, so a given physical mode keeps its seed
+under either layout.  The realisation depends only on the map from
+$(n_x, n_y)$ to seed, never on how the work was divided, and one rank
+and a thousand ranks produce the same field.
+
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=\textwidth]{mpi_fft_slabs.pdf}
+  \caption{Slab decomposition of a distributed FFT, with four ranks.
+  \textit{(a)} Real space is cut along $x$.  \textit{(b)} The transforms
+  along $y$ and $z$ act inside a slab and need no communication.
+  \textit{(c)} The transform along $x$ does, so the array is
+  redistributed once; this is the only communication in the transform.
+  \textit{(d)} Stopping there leaves Fourier space sliced along $k_y$
+  with the first two axes swapped.  \textit{(e)} A given physical mode
+  therefore sits at a different array index in the two layouts, which
+  the seed lookup compensates by swapping $i$ and $j$.  \textit{(f)} The
+  realisation is consequently independent of the decomposition.}
+  \label{fig:mpi-fft-slabs}
+\end{figure}
+
+%----------------------------------------------------------------------
 \subsection{Numerical subtleties worth knowing about}
 \label{sec:numerical}
 

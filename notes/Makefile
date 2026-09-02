@@ -39,6 +39,8 @@ FIGURES = \
     figures/ic_sampling/pgrid_comparison.pdf \
     figures/cosmo_ic/pancake.pdf \
     figures/cosmo_ic/shotnoise_order.pdf \
+    figures/cosmo_ic/ngenic_seedtable.pdf \
+    figures/cosmo_ic/mpi_fft_slabs.pdf \
     figures/fft/grf_exponential.pdf \
     figures/restriction/restriction_density.pdf \
     figures/restriction/restriction_psi.pdf \
@@ -105,6 +107,12 @@ figures/cosmo_ic/pancake.pdf : figures/cosmo_ic/plot_pancake.py
 
 figures/cosmo_ic/shotnoise_order.pdf : figures/cosmo_ic/plot_shotnoise_order.py
 	cd figures/cosmo_ic && $(PYTHON) plot_shotnoise_order.py
+
+figures/cosmo_ic/ngenic_seedtable.pdf : figures/cosmo_ic/plot_ngenic_seedtable.py
+	cd figures/cosmo_ic && $(PYTHON) plot_ngenic_seedtable.py
+
+figures/cosmo_ic/mpi_fft_slabs.pdf : figures/cosmo_ic/plot_mpi_fft_slabs.py
+	cd figures/cosmo_ic && $(PYTHON) plot_mpi_fft_slabs.py
 
 figures/fft/grf_exponential.pdf : figures/fft/plot_grf_exponential.py
 	cd figures/fft && $(PYTHON) plot_grf_exponential.py
