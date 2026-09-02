@@ -74,6 +74,7 @@ and the MUSIC2 build).
 | `icpipe/`           | Python library: `ICField`, `LinearTheory`, `io`          | [`icpipe/README.md`](icpipe/README.md) |
 | `icpipe/cli/`       | pipeline-step console scripts                            | (in `icpipe/README.md`) |
 | `scripts/analysis/` | ad-hoc inspection CLIs (not in `run-pipeline`)        | [`scripts/analysis/README.md`](scripts/analysis/README.md) |
+| `scripts/ic_search/` | pencil-subvolume P(k), window convolution, seed sweep   | [`scripts/ic_search/README.md`](scripts/ic_search/README.md) |
 | `tools/`            | build / clean / cluster sbatch scripts                   | [`tools/README.md`](tools/README.md) |
 | `conf/`             | MUSIC2 config files (template + generated)               | —         |
 | `data/`             | CLASS outputs, measured P/ξ/ψ tables (gitignored)        | —         |

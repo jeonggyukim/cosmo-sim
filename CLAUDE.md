@@ -24,6 +24,9 @@ cosmo-sim/
                     make-monofonic-conf, compute-pk, compute-pv, plot-ic
   scripts/analysis/ — ad-hoc CLIs (check_ic, plot_box_size_comparison,
                     plot_dr_histogram, xi_sweep)
+  scripts/ic_search/ — pencil-subvolume P(k) and the seed sweep; needs the
+                    monofonIC `lagrangian-density` fork and reads/writes runs
+                    outside the repo (see its README)
   tools/          — build-music.sh, build-monofonic.sh, clean.sh, sbatch templates
   tests/          — bundled validation tests (matched-noise zoom)
   notebooks/      — worked examples using icpipe
@@ -158,6 +161,27 @@ LaTeX write-ups in `notes/`; full list and reading order in `notes/README.md`.
 Planning docs in `docs-claude/`: `CLAUDE_MUSIC2.md` (MUSIC2 code structure,
 transfer functions, file formats), `baryon_ic_plan.md`, `swift_gpu_gravity_plan.md`
 (KIAS GPU-porting project), plus per-feature plans.
+
+## Pencil subvolumes (`scripts/ic_search/`)
+
+Measures P(k) in a pencil subvolume — 1/8 of the box in two axes, the full box in
+the third — of a monofonIC δ(q) field, and sweeps seeds looking for a pencil that
+matches linear theory.
+
+The one fact that governs everything there: masking multiplies in configuration
+space, so ξ divides out the mask autocorrelation exactly, but P(k) **convolves**
+and cannot be deconvolved per mode. A pencil measures a spectrum 34% below theory
+at the fundamental, deterministically. Convolving the theory with the pencil
+window reproduces the measurement to 0.4%, so comparisons are made in the observed
+basis and never deconvolved. Selecting a seed on agreement with the *unconvolved*
+theory selects a realisation whose scatter cancels that geometric deficit —
+`notes/seed_selection.tex` is the same argument for ξ.
+
+Requires the `lagrangian-density` branch of the monofonIC fork
+(`github.com/jeonggyukim/monofonIC`), which adds `[setup] LagrangianDensityOnly`.
+Runs live outside the repo under `$MONOFONIC_TESTS` (default
+`~/Documents/monofonic-tests`); `scripts/ic_search/paths.py` holds every path.
+`DoFixing = no` is the production setting.
 
 ```bash
 make -C notes              # regenerate figures + compile all PDFs
