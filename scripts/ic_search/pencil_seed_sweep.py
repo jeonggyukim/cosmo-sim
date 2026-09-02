@@ -282,7 +282,8 @@ fit = (kbin > 2*dkperp) & (kbin <= 0.9*kny)      # band used for the metrics
 rows = []
 ACC = {k: [] for k in ("seed", "P_full", "P_pencil", "shear", "dbar", "lambda",
                        "webtype", "contrast", "bulk",
-                       "shear_interior", "dbar_interior", "lambda_interior")}
+                       "shear_interior", "dbar_interior", "lambda_interior",
+                       "shear_box", "dbar_box", "lambda_box", "webtype_box")}
 SKIPPED = []
 
 
@@ -362,6 +363,14 @@ for s in SEEDS:
         lam = np.empty((nR, len(PENCILS), 3))     # mean sorted eigenvalues per pencil
         web = np.empty((nR, len(PENCILS), 4))     # knot, filament, sheet, void fractions
         contrast = np.empty((nR, len(PENCILS)))   # region minus its surrounding tiles
+        # The same quantities for the whole periodic box. They cost a few array
+        # reductions, since s2, dsm, ev and npos are already computed everywhere,
+        # and they answer a different question: whether selecting a pencil also
+        # makes the box it came from atypical, or only the region inside it.
+        shear_box = np.empty(nR)
+        dbar_box = np.empty(nR)
+        lam_box = np.empty((nR, 3))
+        web_box = np.empty((nR, 4))
         shear_in = np.full((nR, len(PENCILS)), np.nan)
         dbar_in = np.full((nR, len(PENCILS)), np.nan)
         lam_in = np.full((nR, len(PENCILS), 3), np.nan)
@@ -393,6 +402,11 @@ for s in SEEDS:
             # axis along which a region collapses first (Zel'dovich).
             ev = np.linalg.eigvalsh(T)[..., ::-1]
             npos = (ev > 0.0).sum(-1)             # T-web class: 3 knot ... 0 void
+            shear_box[r] = np.sqrt(s2.mean())
+            dbar_box[r] = dsm.mean()              # zero by construction; a check
+            lam_box[r] = ev.mean((0, 1, 2))
+            cnt_box = np.bincount(npos.ravel(), minlength=4)
+            web_box[r] = cnt_box[::-1]/cnt_box.sum()
             for n, p in enumerate(PENCILS):
                 sl = pencil_slice(*p)
                 shear[r, n] = np.sqrt(s2[sl].mean())
@@ -430,6 +444,8 @@ for s in SEEDS:
             ACC["shear"].append(shear); ACC["dbar"].append(dbar)
             ACC["lambda"].append(lam); ACC["webtype"].append(web)
             ACC["contrast"].append(contrast); ACC["bulk"].append(bulk)
+            ACC["shear_box"].append(shear_box); ACC["dbar_box"].append(dbar_box)
+            ACC["lambda_box"].append(lam_box); ACC["webtype_box"].append(web_box)
             if MARGIN_CELLS:
                 ACC["shear_interior"].append(shear_in)
                 ACC["dbar_interior"].append(dbar_in)
@@ -445,6 +461,10 @@ for s in SEEDS:
             f["webtype"] = web          # fractions, order: knot, filament, sheet, void
             f["contrast"] = contrast
             f["bulk"] = bulk
+            f["shear_box"] = shear_box
+            f["dbar_box"] = dbar_box
+            f["lambda_box"] = lam_box
+            f["webtype_box"] = web_box
             if MARGIN_CELLS:
                 f["shear_interior"] = shear_in
                 f["dbar_interior"] = dbar_in
