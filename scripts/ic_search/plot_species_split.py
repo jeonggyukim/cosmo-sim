@@ -120,7 +120,10 @@ KFUND = 2*np.pi/A.lbox
 KNY = kny
 KLO, KHI = 0.7*KFUND, 1.4*KNY
 
-fig, (a1, a2) = plt.subplots(1, 2, figsize=(13.2, 5.4))
+plt.rcParams.update({"font.size": 12, "axes.titlesize": 12.5,
+                     "axes.labelsize": 12.5, "legend.fontsize": 10.5,
+                     "xtick.labelsize": 11, "ytick.labelsize": 11})
+fig, (a1, a2) = plt.subplots(1, 2, figsize=(13.6, 6.0))
 COL = {"cdm": "C0", "baryon": "C1"}
 LS = {"fwd": "-", "back": "--"}
 ZT = {tag: read_ztarget(d) for tag, d in runs}
@@ -149,15 +152,15 @@ for ax in (a1, a2):
     for kv, lab in ((KFUND, "$k_{\\rm fund}$"), (KNY, "$k_{\\rm Ny}$")):
         ax.axvline(kv, color="0.55", lw=1.0, ls=":")
     ax.text(KFUND, 0.02, " $k_{\\rm fund}$", transform=ax.get_xaxis_transform(),
-            fontsize=8, color="0.4", ha="left")
+            fontsize=10, color="0.4", ha="left")
     ax.text(KNY, 0.02, " $k_{\\rm Ny}$", transform=ax.get_xaxis_transform(),
-            fontsize=8, color="0.4", ha="left")
+            fontsize=10, color="0.4", ha="left")
 
 a1.set_xlabel("$k$  [$h$ Mpc$^{-1}$]")
 a1.set_ylabel("$P(k)$  [$(\\mathrm{Mpc}/h)^3$]")
 a1.set_xlim(KLO, KHI)
-a1.legend(fontsize=8.5, framealpha=0.95)
-a1.set_title("Measured full-box spectra, with linear theory beneath", fontsize=10.5)
+a1.legend(framealpha=0.95)
+a1.set_title("Measured full-box spectra, with linear theory beneath")
 a1.grid(alpha=0.25)
 
 a2.axhline(0.0, color="0.3", lw=1.0)
@@ -165,19 +168,19 @@ a2.set_xlabel("$k$  [$h$ Mpc$^{-1}$]")
 a2.set_ylabel("$P(k)\\,/\\,P_{\\rm theory}(k) - 1$")
 a2.set_xlim(KLO, KHI)
 a2.set_ylim(-0.25, 0.25)
-a2.legend(fontsize=8.5, framealpha=0.95, loc="upper left")
-a2.set_title("Each against the theory its own run wrote", fontsize=10.5)
+a2.legend(framealpha=0.95, loc="upper left")
+a2.set_title("Each against the theory its own run wrote")
 a2.grid(alpha=0.25)
 
 N3 = int(round(next(iter(M.values()))[5]))
 zs = next(iter(M.values()))[6]
-fig.suptitle("Taking the transfer functions at the starting redshift separates the "
-             "two species\n"
+fig.suptitle("Taking the transfer functions at the starting redshift\n"
+             "separates the two species\n"
              f"$N={N3}^3$, $L={A.lbox:g}$ Mpc/$h$, $z_{{\\rm start}}={zs:g}$, "
              f"monofonIC "
              + ", ".join(f"[cosmology] ztarget = {ZT[t]:g}" for t, _ in runs)
-             + ", full box (no subvolume window)", fontsize=10.5)
-fig.tight_layout(rect=(0, 0, 1, 0.90))
+             + ", full box", fontsize=13)
+fig.tight_layout(rect=(0, 0, 1, 0.87))
 fig.savefig(A.out)
 print(f"wrote {A.out}\n")
 
