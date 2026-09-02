@@ -27,7 +27,7 @@ of which subdirectory `X.pdf` lives in.
 | `restriction/`    | `plot_restriction_{density,psi,deformation,phi,phi_spectral,cdm,cdm_truth}`, `plot_window_compare`, `plot_alias_diagram`, `plot_zoom_ic_{comparison,pk_full}` | `restriction_lpt.tex` |
 | `music2/`         | `plot_meyer`                                           | `music2_internals.tex` |
 | `xi_estimators/`  | `plot_xi_toy`, `plot_xi_identity`                      | `xi_estimators.tex`    |
-| `seed_selection/` | `plot_seed_dice`, `plot_seed_conditioning`             | `seed_selection.tex`   |
+| `ic_search/` | figures built by `scripts/ic_search/plot_*.py` from a sweep, not by a script here | `ic_search.tex` |
 | `figures/` (top)  | `plot_growth`, `plot_aliasing`                         | shared (used by 4 .tex each) |
 | `figures/` (top)  | `plot_2lpt_cic_pk`, `plot_zoom_ic_pk`                  | orphan: exploratory, not in `notes/Makefile` |
 
@@ -56,7 +56,6 @@ levels up from a subdir, or `../../data/` from the top level):
 | `ic_sampling/plot_pgrid.py`                    | `data/class_pk_z200_pk.dat`          |
 | `restriction/plot_restriction_cdm.py`          | `data/class_pk_z200_pk.dat`          |
 | `restriction/plot_restriction_cdm_truth.py`    | `data/class_pk_z200_pk.dat`          |
-| `seed_selection/plot_seed_conditioning.py`     | `data/class_pk_z200_pk.dat`          |
 
 `notes/Makefile` knows about these dependencies; running `make
 -C notes ../data/class_pk_z200_pk.dat` will generate the CLASS table

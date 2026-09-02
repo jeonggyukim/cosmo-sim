@@ -155,7 +155,7 @@ LaTeX write-ups in `notes/`; full list and reading order in `notes/README.md`.
 | `restriction_lpt.tex` | Restriction of δ and Ψ⁽¹⁾; why restricting the displacement potential is Poisson-inconsistent |
 | `music2_internals.tex` | File-and-line walkthrough of MUSIC2's δ construction and zoom noise hierarchy |
 | `cosmo_stat.tex` | Statistics of cosmological fields: ensembles, ergodicity, ξ(r), P(k), covariance, Gaussian random fields, generating and measuring them |
-| `seed_selection.tex` | Why adopting the seed whose subvolume ξ(r) best matches theory makes the run unrepresentative: two-dice example, ξ as a sum of ~10 squared mode amplitudes, Gaussian conditioning, integral-constraint displacement of the target; 600 realisations at 256³; what to do instead. Written in journal register (abstract + numbered sections), not the textbook register of the other notes |
+| `ic_search.tex` | Why adopting the seed whose subvolume P(k) best matches linear theory selects an atypical region. The estimator is unbiased for theory convolved with the subvolume window, 34% below theory at the fundamental, so matching the raw theory needs an upward fluctuation. Selection displaces the subvolume's large-scale power by 1.26σ and every other property by its correlation with that power times 1.26; the displacement saturates, so a million-seed search is no worse than a thousand. 83,542 realisations at 128³. Controls: random criterion 0.000, convolved-theory criterion 0.016. Written in journal register, not the textbook register of the other notes |
 | `xi_estimators.tex` | Why a direct lag sum and a zero-padded FFT are the same estimator: grid Landy–Szalay in the infinite-random limit and Slepian & Eisenstein's N = D−R convolution form, Wiener–Khinchin as a finite identity, circular vs linear autocorrelation and the padding condition d ≤ P−N, the separable N−d pair count, per-axis boundaries for pencil beams, cost scaling, and the gridding artefacts the FFT route concedes |
 
 Planning docs in `docs-claude/`: `CLAUDE_MUSIC2.md` (MUSIC2 code structure,
@@ -175,7 +175,7 @@ at the fundamental, deterministically. Convolving the theory with the pencil
 window reproduces the measurement to 0.4%, so comparisons are made in the observed
 basis and never deconvolved. Selecting a seed on agreement with the *unconvolved*
 theory selects a realisation whose scatter cancels that geometric deficit —
-`notes/seed_selection.tex` is the same argument for ξ.
+`notes/ic_search.tex` is the same argument, measured for P(k).
 
 Requires the `lagrangian-density` branch of the monofonIC fork
 (`github.com/jeonggyukim/monofonIC`), which adds `[setup] LagrangianDensityOnly`.
@@ -206,7 +206,7 @@ nothing about its neighbours", "the right-hand side mentions x nowhere",
 
 The money-and-injury family for "a method removes something" — cost, price,
 buys, pays, damage, penalty, free — recurred six times in a first draft of
-`notes/seed_selection.tex` after being corrected once in `cosmo_stat.tex`.
+`notes/ic_search.tex` after being corrected once in `cosmo_stat.tex`.
 Name the quantity: "removes 21% of the scatter", not "costs a fifth of the
 scatter".
 

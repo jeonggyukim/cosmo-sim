@@ -1,0 +1,440 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\graphicspath{{figures/}{figures/ic_search/}}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{natbib}
+\bibliographystyle{aasjournal}
+
+\newcommand{\bk}{\mathbf{k}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\avg}[1]{\left\langle #1 \right\rangle}
+\newcommand{\Mpch}{\ \mathrm{Mpc}/h}
+
+\title{Selecting an Initial-Conditions Seed on the Power Spectrum\\
+       of a Subvolume}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A subvolume of a simulation box does not measure the linear power spectrum. Its
+estimator is unbiased for the theory convolved with the subvolume's own window,
+which for the geometry used here lies $34\%$ below the theory at the fundamental
+mode. Choosing an initial-conditions seed because its subvolume spectrum matches
+the unconvolved theory therefore selects realisations whose large-scale power is
+anomalously high, by construction rather than by accident. We measure what this
+does using $83\,542$ independent realisations at $N = 128^3$,
+$L = 700\Mpch$. Selection displaces the subvolume's large-scale power by
+$1.26\sigma$ and every other property by its correlation with that power times
+$1.26$: the tidal shear by $0.62\sigma$, the cosmic-web composition by
+$0.35\sigma$, the mean density, whose correlation is $0.001$, not at all. The
+displacement saturates, because the realisation scatter bounds how far the power
+can be pushed, so a search over a million seeds is no worse than one over a
+thousand. Two controls confirm the cause: a randomly permuted criterion produces
+$0.000 \pm 0.045$ in every property, and selecting against the convolved theory,
+which asks for nothing atypical, produces $0.016$. Fitting an amplitude with the
+window in the model returns $A = 0.9995 \pm 0.0765$ over all subvolumes with no
+search at all, while the selected subvolumes have $A = 1.065$. The result is not
+specific to power spectra: any rule for choosing which region to resimulate
+conditions the field, and the correlation between the rule and the quantity of
+interest predicts the bias in advance.
+\end{abstract}
+
+\section{The proposal}
+\label{sec:proposal}
+
+Generate initial conditions with many random seeds. In each, measure the power
+spectrum inside the subvolume that will be resimulated at higher resolution.
+Adopt the seed whose subvolume spectrum best matches linear theory, on the
+grounds that such a region is a faithful piece of the universe to zoom into.
+
+The intent is reasonable, and the failure is not obvious from the outside. This
+note sets out why the criterion cannot do what it is meant to do, measures how
+large the resulting distortion is, and shows that the distortion is bounded and
+predictable.
+
+Throughout, the subvolume is a pencil: one eighth of the box across in two
+directions and its full length in the third, so
+$87.5 \times 87.5 \times 700\ (\Mpch)^3$ in a $700\Mpch$ box. Fields are
+Lagrangian densities $\delta(q)$ at $z = 200$ from monofonIC with second-order
+Lagrangian perturbation theory, on a $128^3$ grid.
+
+\section{A subvolume does not measure the theory}
+\label{sec:window}
+
+Restricting a field to a region multiplies it by a mask. Multiplication in
+configuration space is convolution in Fourier space, so the power spectrum
+measured in the region is not the theory but the theory smeared with the
+region's window,
+\begin{equation}
+  \label{eq:conv}
+  \avg{\hat P(\bk)} \;=\; \big[P_{\rm th} \ast |\widetilde W|^2\big](\bk)
+  \;\neq\; P_{\rm th}(\bk).
+\end{equation}
+The smearing moves power from the largest scales, where the spectrum is
+steepest, into neighbouring wavenumbers. The effect is deterministic. It is
+identical in every realisation, it does not average away with more
+realisations, and it is not noise. For this geometry it is a $34\%$ deficit at
+the fundamental mode.
+
+Equation~\eqref{eq:conv} is a statement about an average, so it can be tested
+directly. Averaging $2\,005\,008$ subvolume measurements against the convolved
+curve gives $0.9996 \pm 0.0001$, and against the full box the unconvolved theory
+gives $0.99994 \pm 0.00002$. The estimator is unbiased for the convolved theory
+and biased against the raw theory, exactly as the equation says.
+
+The measurement is therefore not failing to reach the theory. It is succeeding
+at measuring something else: the theory as seen through a window of that size
+and shape.
+
+\section{What the search selects}
+\label{sec:selects}
+
+If the mean measurement lies $34\%$ below a curve, the only realisations that
+reach that curve are those with anomalously high power. A search for a matching
+seed does not find a region that agrees with the theory; it finds a region
+unusual in precisely the way needed to cancel a geometric deficit.
+
+The cleanest way to see this is to stop searching and fit instead. For each
+subvolume, fit the amplitude $A$ in $\hat P(k) = A\,P_{\rm model}(k)$ by
+generalised least squares using the covariance measured from the ensemble, once
+with the window in the model and once without. Table~\ref{tab:amplitude} gives
+the result and Figure~\ref{fig:amplitude} shows the distributions.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Amplitudes fitted to $568\,272$ subvolume spectra over
+  $k = 0.011$--$0.135\ h\,\mathrm{Mpc}^{-1}$.}
+  \label{tab:amplitude}
+  \begin{tabular}{lrl}
+    \toprule
+    fit & $A$ & \\
+    \midrule
+    all subvolumes, window in the model & $0.9995 \pm 0.0765$ & unbiased \\
+    all subvolumes, raw theory          & $0.892$             & the wrong model absorbs the deficit \\
+    the subvolumes a search keeps, window in the model & $1.065$ & $0.85\sigma$ high \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{amplitude_fit.pdf}
+  \caption{Fitting an amplitude is unbiased; searching for a realisation is not.
+  With the window in the model (left) the amplitude fitted to each subvolume
+  centres on $A = 1$. With the raw theory as the model (right) it centres on
+  $0.892$, because that model overpredicts the data and the fit absorbs the
+  difference. The outlined histogram is the one per cent of subvolumes a search
+  keeps: they are the realisations that make the wrong model look right, and
+  under the correct model they carry $6.5\%$ too much large-scale power.}
+  \label{fig:amplitude}
+\end{figure}
+
+Put the window in the model and no search is needed: the fit returns $A = 1$.
+The search instead keeps the realisations that make a misspecified model return
+$A = 1$, and those realisations have $A = 1.065$ when measured correctly. An
+amplitude of $1.065 \pm 0.077$ would not be reported as agreement with a
+cosmology; the search manufactures precisely that and treats it as a match.
+
+\section{What this does to every other property}
+\label{sec:conditioning}
+
+A region has many properties besides its power spectrum, and the criterion
+mentions none of them. They move regardless, and by an amount fixed in advance.
+
+Selection acts on one quantity. For jointly Gaussian variables the conditional
+mean of any other is
+$\avg{y \mid x} = \bar y + \rho\,(\sigma_y/\sigma_x)(x - \bar x)$, so in units
+of each quantity's own scatter a selection that displaces $x$ by $\Delta$
+displaces $y$ by
+\begin{equation}
+  \label{eq:rho}
+  \Delta_y \;=\; \rho\,\Delta_x ,
+\end{equation}
+and by nothing else. No other property of the selection enters. Here the
+selection displaces the subvolume's large-scale power by
+$\Delta_x = 1.26\sigma$, so every other property should move by
+$\rho \times 1.26$. Table~\ref{tab:rho} shows that it does.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Correlation with the selected quantity, the shift
+  Eq.~\eqref{eq:rho} predicts, and the shift measured, keeping the closest one
+  per cent of $2\,005\,008$ subvolumes. Shifts are in units of the
+  region-to-region scatter.}
+  \label{tab:rho}
+  \begin{tabular}{lrrr}
+    \toprule
+    property & $\rho$ & $\rho\,\Delta_x$ & measured \\
+    \midrule
+    tidal shear, $R = 20\Mpch$      & $+0.451$ & $+0.57$ & $+0.62$ \\
+    knot fraction, $R = 40\Mpch$    & $+0.291$ & $+0.37$ & $+0.35$ \\
+    void fraction, $R = 40\Mpch$    & $+0.288$ & $+0.36$ & $+0.35$ \\
+    tidal shear, $R = 40\Mpch$      & $+0.251$ & $+0.32$ & $+0.24$ \\
+    filament fraction, $R = 40\Mpch$& $-0.171$ & $-0.22$ & $-0.21$ \\
+    bulk flow of the region         & $+0.024$ & $+0.03$ & $+0.05$ \\
+    mean density of the region      & $+0.001$ & $+0.00$ & $-0.00$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The last two rows carry as much weight as the first. The bulk flow and the mean
+density barely correlate with the selected quantity, and they do not move.
+Equation~\eqref{eq:rho} predicts the nulls as well as the effects, which is what
+separates an explanation from a list of findings.
+
+Figure~\ref{fig:summary} shows the same result graphically, with the predicted
+shifts marked alongside the measured ones.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{selection_summary.pdf}
+  \caption{Left: the convolved theory and the mean of all $2\,005\,008$
+  subvolume measurements lie together well below the linear theory at large
+  scales, while the selected one per cent instead follow the theory curve.
+  Right: the shift in each property for the proposed criterion, for the same
+  selection made against the convolved theory, and for a randomly permuted
+  criterion. The short vertical marks are not fits but the shifts predicted by
+  Eq.~\eqref{eq:rho}. The dotted lines mark one standard deviation of the
+  natural region-to-region scatter.}
+  \label{fig:summary}
+\end{figure}
+
+\section{The distortion is bounded}
+\label{sec:bounded}
+
+An obvious worry is that searching harder makes matters worse without limit. It
+does not, and the reason follows from the same identity.
+
+The displacement in the selected quantity cannot exceed what the realisation
+scatter makes available. Once a search finds realisations whose subvolume power
+reaches the raw theory, searching further finds realisations that match slightly
+better, not realisations with more power. The displacement saturates near
+$1.3\sigma$, and by Eq.~\eqref{eq:rho} everything else saturates at
+$\rho \times 1.3$.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Shift against the number of seeds searched, keeping the best one.
+  Each entry repeats the search $83\,542/N$ times; entries beyond $N = 1000$
+  have too few repeats to interpret and are omitted.}
+  \label{tab:saturation}
+  \begin{tabular}{lrrrrr}
+    \toprule
+    seeds searched $N$ & 3 & 30 & 100 & 300 & 1000 \\
+    \midrule
+    large-scale power        & $+0.63$ & $+1.16$ & $+1.23$ & $+1.28$ & $+1.31$ \\
+    tidal shear, $R = 20\Mpch$ & $+0.26$ & $+0.56$ & $+0.61$ & $+0.64$ & $+0.64$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+A search over a thousand seeds is no worse than one over three hundred, and one
+over a million would be no worse either. Figure~\ref{fig:search} shows this, and
+in its right-hand panel shows something stronger: the ratio of each property's
+shift to the shift in the selected quantity is flat in $N$ and equal to $\rho$.
+The size of the search sets only the common factor $\Delta_x$; the structure of
+the result is a property of the field.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{search_size.pdf}
+  \caption{Left: the shift in each property against the number of seeds
+  searched. Both the selected quantity and everything else saturate within a few
+  hundred seeds. The shaded region has too few independent repeats to interpret.
+  Right: the same shifts divided by the shift in the selected quantity, with
+  each property's correlation with that quantity marked as a dashed line. The
+  ratios are flat, so the size of the search changes only a common factor.}
+  \label{fig:search}
+\end{figure}
+
+The same invariance holds against the tolerance rather than the search size.
+Tightening the retained fraction from a quarter to two parts in ten thousand, a
+range of $1250$, changes the shift in the large-scale power by $42\%$, from
+$0.945\sigma$ to $1.338\sigma$, while the ratio for the tidal shear stays
+between $0.43$ and $0.50$ against $\rho = 0.451$, and the ratio for the void
+fraction between $0.28$ and $0.33$ against $\rho = 0.288$. Nothing in the
+conclusion depends on where the threshold is placed.
+
+Stated without inflation: the criterion biases the ensemble by a fraction of its
+natural spread. A single selected region is not grotesque, and usually overlaps
+the ordinary population. What is not defensible is calling such a region typical,
+or treating the match as evidence that it is.
+
+\section{Two controls}
+\label{sec:controls}
+
+Both competing explanations can be excluded by measurement rather than argument.
+
+\emph{Is the machinery producing shifts on its own?} Replace the criterion with
+a random permutation of itself, keeping everything else identical. Every
+property returns $0.000 \pm 0.045$. The geometry, the estimator and the
+selection arithmetic invent nothing.
+
+\emph{Is it the act of selecting, or the curve being matched?} Change only the
+target: select against the theory convolved with the window, which is the curve
+the estimator is unbiased for. That target requires nothing atypical, so it
+should do nothing.
+
+\begin{table}[htbp]
+  \centering
+  \caption{The same selection against two different target curves, and against a
+  random criterion. Keeping the closest one per cent.}
+  \label{tab:controls}
+  \begin{tabular}{lrrr}
+    \toprule
+    property & raw theory & convolved theory & random \\
+    \midrule
+    large-scale power             & $+1.259$ & $+0.016$ & $+0.000$ \\
+    tidal shear, $R = 20\Mpch$    & $+0.617$ & $+0.056$ & $+0.000$ \\
+    knot fraction, $R = 40\Mpch$  & $+0.353$ & $+0.019$ & $-0.001$ \\
+    filament fraction, $R = 40\Mpch$ & $-0.205$ & $-0.013$ & $-0.001$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The whole effect is attributable to the choice of target curve. Selecting is not
+the problem. Selecting against a curve the measurement was never going to reach
+is. Figure~\ref{fig:hist} shows the same comparison as distributions, which also
+distinguishes a displaced sample from a merely narrowed one.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{selection_histograms.pdf}
+  \caption{Each property over all subvolumes and over those a selection keeps. A
+  shift of the mean does not say whether the retained sample is displaced or
+  merely narrowed, and the two are different for a simulation drawn from it. The
+  large-scale power becomes a narrow distribution barely overlapping its parent;
+  the shear and the web fractions keep most of the parent range with the centre
+  moved.}
+  \label{fig:hist}
+\end{figure}
+
+\section{How many independent statements these are}
+\label{sec:independence}
+
+Tables~\ref{tab:rho} and~\ref{tab:controls} list several properties, which
+invites reading them as several independent confirmations. They are fewer than
+they look, and the correlation matrix says how many.
+
+The four cosmic-web fractions sum to unity at every cell, so only three of them
+can be independent; measured, they sum to $1.0000$ with zero scatter, and the
+correlation matrix has two exactly vanishing eigenvalues, one per smoothing
+radius. The two smoothing radii largely repeat each other, the shear at
+$R = 20$ and $R = 40\Mpch$ correlating at $0.76$. Of fifteen measured
+quantities, three eigenvalues exceed unity and the participation ratio is
+$3.49$.
+
+The three surviving directions are interpretable, and this is the useful part.
+The tidal shear correlates with the web fractions at between $-0.01$ and
+$-0.09$, so the shear and the web composition are nearly orthogonal to one
+another while both correlate with the selected power. They are therefore two
+genuinely independent confirmations, which is stronger evidence than a dozen
+correlated ones. The bulk flow is the third direction and does not move.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{correlations.pdf}
+  \caption{Left: correlations between all measured properties. Most measure
+  overlapping things, and the fifteen quantities span about three independent
+  directions. Right: each property's correlation with the large-scale power the
+  selection acts on, which by Eq.~\eqref{eq:rho} predicts the entire result.}
+  \label{fig:corr}
+\end{figure}
+
+\section{The same argument applies to any selection rule}
+\label{sec:general}
+
+Equation~\eqref{eq:rho} says nothing about power spectra. It governs any rule
+for choosing which region to resimulate.
+
+A region chosen for a quiet merger history, for a particular halo mass, for an
+isolated environment, or for resembling an observed system, is a region on which
+a condition has been imposed. Every property correlated with that condition is
+displaced, by the same arithmetic, whether or not the displacement was intended
+and whether or not it is reported. The choice of region is part of the numerical
+experiment and belongs in its interpretation, in the same way a selection
+function belongs in the interpretation of a survey.
+
+The useful half is that this is predictable before anything is run. The
+correlations are properties of the field and the geometry, not of the selection,
+and a few hundred realisations measure them. Anyone proposing a criterion can be
+told in advance which properties of the resimulated region it will distort and
+by how much.
+
+The converse is equally useful. A property uncorrelated with the criterion is
+untouched: the mean density of the region has $\rho = 0.001$ with the subvolume's
+large-scale power and shows no shift at any search size or tolerance. A criterion
+is safe for exactly those quantities it does not correlate with, and the
+correlation matrix identifies them.
+
+\section{Recommendations}
+\label{sec:recommendations}
+
+\begin{enumerate}
+\item \textbf{Compare in the basis you measured in.} Convolve the theory with
+  the subvolume's window and compare against that. It reproduces the measurement
+  to a fraction of a per cent, and requires no search: a typical region already
+  agrees with it.
+
+\item \textbf{If a number is wanted, fit one.} Put the window in the model and
+  fit an amplitude. It returns $A = 1.000 \pm 0.077$ with no seed selection at
+  all, and the width of that interval is the honest statement of how well a
+  region of this size constrains the amplitude.
+
+\item \textbf{Do not treat agreement with the unwindowed theory as validation.}
+  A region that agrees with it is, for that reason, not a representative region.
+
+\item \textbf{If a region must be chosen on some criterion}, and often one must
+  be, measure the correlation between that criterion and the properties the
+  science depends on, and quote the induced shift with the result. That converts
+  a hidden bias into a stated systematic.
+\end{enumerate}
+
+\section{Method}
+\label{sec:method}
+
+Realisations are generated with a monofonIC fork that writes the Lagrangian
+density field directly, avoiding the particle stage. Each realisation is a
+$128^3$ grid in a $700\Mpch$ box at $z = 200$ with second-order Lagrangian
+perturbation theory and no amplitude fixing. Twenty-four subvolumes are measured
+per realisation, drawn from the $192$ that tile the box in three orientations.
+
+The power spectrum of a subvolume is measured by masked fast Fourier transform
+with the normalisation of \citet{Park1994}, and the theory is convolved with the
+same window on the same grid, so measurement and prediction share every
+convention.
+
+The tidal tensor is $T_{ij} = \partial_i \partial_j \Phi$ with
+$\nabla^2 \Phi = \delta$, evaluated on the Gaussian-smoothed field. The shear is
+its traceless part, and for a Gaussian field
+$\avg{s^2} = \tfrac{2}{3}\avg{\delta^2}$, which the measurement reproduces as
+$0.6667$. Cells are classified by the number of positive eigenvalues of $T$; for
+a Gaussian field the expected fractions are $0.08$, $0.42$, $0.42$ and $0.08$
+for knots, filaments, sheets and voids, and the measurement gives $0.0799$,
+$0.4198$, $0.4202$ and $0.0801$.
+
+Uncertainties come from a bootstrap over whole realisations, never over
+subvolumes, because subvolumes within one realisation share that realisation's
+modes. At the one per cent tolerance the retained subvolumes come from
+$17\,835$ distinct realisations, $1.12$ per realisation, so they are close to
+independent draws in any case.
+
+Code, run provenance and the analysis are in the \texttt{cosmo-sim} repository
+under \texttt{scripts/ic\_search/}; the seed ranges and configuration of each
+production run are recorded in \texttt{scripts/ic\_search/RUNS.md}.
+
+\begin{thebibliography}{9}
+\bibitem[Park et al.(1994)]{Park1994} Park, C., Vogeley, M.~S., Geller, M.~J.,
+  \& Huchra, J.~P. 1994, ApJ, 431, 569
+\end{thebibliography}
+
+\end{document}
