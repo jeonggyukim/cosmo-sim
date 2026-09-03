@@ -15,6 +15,7 @@ measured two ways, and only one of them needs a window drawn on it.
 import argparse, glob, os, sys, numpy as np, h5py, matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import NullFormatter
 
 ap = argparse.ArgumentParser()
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -119,7 +120,14 @@ print(f"  median D over all {len(P_pen)} pencils: {np.median(D_th):.4f}\n")
 
 rng = np.random.default_rng(0)
 show = rng.choice(len(P_pen), size=min(A.nshow, len(P_pen)), replace=False)
-GREY = dict(color="0.35", lw=0.5, alpha=0.3, zorder=1)
+# The box panels were drawing every realization rather than a sample, so at
+# thousands of seeds they filled solid and showed no envelope at all.
+show_box = rng.choice(len(P_full), size=min(A.nshow, len(P_full)), replace=False)
+# Individual pencils are drawn to show the spread, not to be read one by one, so
+# the ink per line falls as more are drawn and the envelope stays legible. At the
+# default 250 lines this is alpha 0.30, at 2000 it is 0.06.
+_alpha = float(np.clip(0.30*np.sqrt(250.0/max(A.nshow, 1)), 0.04, 0.30))
+GREY = dict(color="0.35", lw=0.5, alpha=_alpha, zorder=1)
 RED = dict(color="C3", lw=2.4, zorder=4)
 
 # xi(r) of the linear theory, on the measurement's own separation bins. With
@@ -157,7 +165,7 @@ fig, ax = plt.subplots(NROW, 2, figsize=(12.0, 4.0*NROW))
 fig.subplots_adjust(hspace=0.28, wspace=0.24)
 
 a = ax[0, 0]
-for P in P_full:
+for P in P_full[show_box]:
     a.loglog(k, P, **GREY)
 a.loglog(k, mf, **RED, label=f"mean of {nseed} seeds")
 a.loglog(k, P_th, color="0.1", lw=1.2, ls="--", zorder=5, label="theory (CLASS, back-scaled)")
@@ -167,7 +175,7 @@ a.set_title(r"(a)  full periodic box", fontsize=10)
 a.legend(frameon=False, fontsize=8, loc="lower left")
 
 a = ax[0, 1]
-for P in P_full:
+for P in P_full[show_box]:
     a.semilogx(k, P/P_th, **GREY)
 a.semilogx(k, mf/P_th, **RED)
 a.axhline(1.0, color="0.1", ls="--", lw=1.2)
@@ -213,7 +221,6 @@ a.legend(frameon=False, fontsize=8, loc="upper right")
 
 # Without sharex each panel draws its own minor tick labels, and on a log axis
 # spanning less than two decades they collide into unreadable overlap.
-from matplotlib.ticker import NullFormatter
 for a in ax.ravel():
     a.xaxis.set_minor_formatter(NullFormatter())
 for a in ax[:2].ravel():
@@ -249,12 +256,23 @@ if HAVE_XI:
     a.set_title(r"(e)  the same pencils, in configuration space", fontsize=10)
     a.legend(frameon=False, fontsize=8, loc="lower left")
 
+    # The ratio panel stops well before xi crosses zero near 80 Mpc/h. Past the
+    # crossing the denominator vanishes and the ratio measures the crossing
+    # rather than the estimator, which is what filled the right of this panel
+    # with excursions of several hundred per cent. The curves themselves run the
+    # full range in the panel to the left.
+    # Cut relative to where the theory crosses zero, not to its amplitude: xi
+    # falls by orders of magnitude over this range, so any fixed fraction of its
+    # small-separation value stops the panel almost immediately.
+    _pos = np.where((rbin > 0) & (xi_th <= 0))[0]
+    _rzero = rbin[_pos[0]] if len(_pos) else rbin.max()
+    gr = gx & (rbin > 0) & (rbin <= 0.8*_rzero)
     a = ax[2, 1]
     for i in show:
-        a.semilogx(rbin[gx], (X_pen[i]/xi_th)[gx], **GREY)
+        a.semilogx(rbin[gr], (X_pen[i]/xi_th)[gr], **GREY)
     for i in best:
-        a.semilogx(rbin[gx], (X_pen[i]/xi_th)[gx], color="C0", lw=1.0, alpha=0.9, zorder=3)
-    a.semilogx(rbin[gx], (mx/xi_th)[gx], **RED, label="mean of pencils")
+        a.semilogx(rbin[gr], (X_pen[i]/xi_th)[gr], color="C0", lw=1.0, alpha=0.9, zorder=3)
+    a.semilogx(rbin[gr], (mx/xi_th)[gr], **RED, label="mean of pencils")
     a.axhline(1.0, color="0.1", ls="--", lw=1.2, label="theory: the expectation, unconvolved")
     a.set_ylim(0, 2.3)
     a.set_xlabel(r"$r\ [\mathrm{Mpc}/h]$"); a.set_ylabel(r"$\xi/\xi_{\rm theory}$")
@@ -262,10 +280,17 @@ if HAVE_XI:
                 fontsize=10)
     a.legend(frameon=False, fontsize=8, loc="upper right")
     rhi = min(200.0, rbin.max())
+    # The left panel keeps the full range so the acoustic peak stays visible; the
+    # ratio panel is limited to where its denominator is safe.
+    ax[2, 0].axvspan(lperp, rhi, color="0.85", alpha=0.45, lw=0, zorder=0)
+    ax[2, 0].axvline(lperp, ls="--", color="C1", lw=1)
+    ax[2, 0].set_xlim(L/N, rhi)
+    if gr.any():
+        ax[2, 1].set_xlim(L/N, rbin[gr].max())
+    # Setting the limits restores the default minor-tick labels, which collide on
+    # a log axis spanning less than a decade, so they are cleared again here.
     for a in ax[2]:
-        a.axvspan(lperp, rhi, color="0.85", alpha=0.45, lw=0, zorder=0)
-        a.axvline(lperp, ls="--", color="C1", lw=1)
-        a.set_xlim(L/N, rhi)
+        a.xaxis.set_minor_formatter(NullFormatter())
 
 fig.suptitle(rf"Seed sweep: {nseed} monofonIC realisations $\times$ {npen} disjoint pencils "
              rf"$= {len(P_pen)}$ pencil spectra"
