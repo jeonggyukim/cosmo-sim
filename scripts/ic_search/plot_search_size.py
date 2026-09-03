@@ -133,6 +133,15 @@ for i, name in enumerate(SHOW):
                     ms=3.5, lw=1.0, ls=":", capsize=2, color=f"C{i}",
                     alpha=0.35, mfc="none")
 ax.axhline(0.0, color="0.35", lw=1.0)
+# What a search would achieve if the criterion selected directly on the quantity
+# that moves, rather than through a noisy proxy for it: the mean of the best 1 in
+# N draws from a Gaussian, phi(z)/f with f = 1/N. It keeps growing without limit,
+# as sqrt(2 ln N), so the gap between it and the measurement is the saturation.
+from scipy.stats import norm
+_f = 1.0/np.asarray(SIZES, float)
+ax.plot(SIZES, norm.pdf(norm.isf(_f))/_f, color="0.35", lw=1.4, ls="--",
+        zorder=1, label="best of $N$ for a Gaussian,\nselecting directly on the "
+                        "quantity that moves")
 ax.set_xlim(SIZES[0]*0.75, SIZES[-1]*1.25)
 ax.set_xscale("log")
 ax.set_xlabel("number of seeds searched, keeping the best one")

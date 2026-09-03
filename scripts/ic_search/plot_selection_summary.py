@@ -29,14 +29,37 @@ import paths
 ap = argparse.ArgumentParser()
 ap.add_argument("--data", default=os.path.join(paths.DATA, "web_n128_all"))
 ap.add_argument("--keep", type=float, default=0.05)
+ap.add_argument("--keep2", type=float, default=0.001,
+                help="a second, tighter cut, drawn beside the first so the\n"
+                     "saturation is visible in the figure rather than asserted")
 ap.add_argument("--nboot", type=int, default=500)
 ap.add_argument("--nnull", type=int, default=200)
 ap.add_argument("--out", default=os.path.join(paths.FIGS, "selection_summary.png"))
+ap.add_argument("--cache", default=None,
+                help="npz holding everything the figure draws. Default is the "
+                     "output path with a .npz suffix. Reading 800 chunk files and "
+                     "running 20000 resamples takes minutes; redrawing from the "
+                     "cache takes a second, which is what a change of colour needs")
+ap.add_argument("--recompute", action="store_true",
+                help="ignore the cache even when its signature matches")
 A = ap.parse_args()
+CACHE = A.cache or os.path.splitext(A.out)[0] + ".npz"
 
 # The theory curves and the geometry come from chunkio, which reads them from a
 # chunk file when there is one and from theory.hdf5 for the per-seed layout.
 import chunkio
+
+import glob as _glob
+# The signature is everything that changes the numbers. Anything else -- colours,
+# labels, limits -- redraws from the cache without touching the data.
+SIG = np.array([len(_glob.glob(f"{A.data}/chunk_*.hdf5")), A.keep, A.keep2,
+                A.nboot, A.nnull], float)
+CACHED = None
+if os.path.exists(CACHE) and not A.recompute:
+    _z = np.load(CACHE, allow_pickle=True)
+    if _z["sig"].shape == SIG.shape and np.allclose(_z["sig"], SIG):
+        CACHED = _z
+        print(f"redrawing from {CACHE}")
 
 crit_th, crit_wn, COLS, meta, P = chunkio.load(A.data, "matter", want_spectra=True)
 nseed, npen = crit_th.shape
@@ -51,41 +74,13 @@ keep_wn = np.argsort(crit_wn)[:nkeep]
 
 PREFER = ["tidal shear", "knot fraction", "filament fraction", "sheet fraction",
           "void fraction", "bulk flow", "mean overdensity"]
-# A column with nothing finite in it draws an empty row, which reads as a
-# missing measurement rather than an impossible one. The interior variants at a
-# radius of half the region width are the case: the margin consumes the region,
-# so no cell is left that was smoothed without material from outside it.
-#
-# Radii that leave no interior are dropped outright. At half the region width the
-# smoothed field there is 92% sourced by matter outside the region, measured by
-# the inside/outside split in pencil_seed_sweep.py, so the number describes the
-# surroundings rather than the region. region_vs_box drops the same radii.
-def _no_interior():
-    import re
-    out = set()
-    for n, v in COLS.items():
-        m = re.fullmatch(r"tidal shear interior R=(\d+(?:\.\d+)?)", n)
-        if m and not np.any(np.isfinite(v)):
-            out.add(m.group(1))
-    return out
+_keep = chunkio.usable(COLS)
+SHOW = [n for stem in PREFER for n in COLS if n.startswith(stem) and _keep(n)][:12]
 
-
-DROP_R = _no_interior()
-
-
-def _keep(n):
-    import re
-    m = re.search(r" R=(\d+(?:\.\d+)?)$", n)
-    return not (m and m.group(1) in DROP_R)
-
-
-SHOW = [n for stem in PREFER for n in COLS if n.startswith(stem)
-        and np.any(np.isfinite(COLS[n])) and _keep(n)][:12]
-
-def shift(c, T, idx=None):
+def shift(c, T, idx=None, keep=None):
     if idx is not None:
         c, T = c[idx], T[idx]
-    n = max(1, int(round(A.keep*len(c))))
+    n = max(1, int(round((A.keep if keep is None else keep)*len(c))))
     kp = np.argpartition(c, n)[:n]   # partial: the order inside does not matter
     return (T[kp].mean() - T.mean())/T.std()
 
@@ -113,6 +108,16 @@ for name in SHOW:
         row[tag] = (pt, np.percentile(boot, [16, 84]))
     nulls = np.array([shift(rng.permutation(crit_th), T) for _ in range(A.nnull)])
     row["null"] = (nulls.mean(), np.percentile(nulls, [16, 84]))
+    # The same criterion applied ten times harder. Its near-coincidence with the
+    # looser cut is the saturation: the shift is bounded by the scatter between
+    # regions, not by how many seeds are searched.
+    pt2 = shift(crit_th, T, keep=A.keep2)
+    boot2 = np.empty(A.nboot)
+    for b in range(A.nboot):
+        g = rng.integers(0, nseed, nseed)
+        idx = (g[:, None]*npen + np.arange(npen)).ravel()
+        boot2[b] = shift(crit_th, T, idx, keep=A.keep2)
+    row["theory2"] = (pt2, np.percentile(boot2, [16, 84]))
     res[name] = row
 
 fig, (axL, axR) = plt.subplots(1, 2, figsize=(13.5, 7.2),
@@ -162,12 +167,13 @@ axL.set_title("A small region always measures less power than the theory,\n"
 y = np.arange(len(SHOW))[::-1]
 style = [("null", "0.6", "o", "random criterion (noise floor)"),
          ("window", "C2", "s", "match theory $\\ast$ window (control)"),
-         ("theory", "C3", "D", "match raw theory (the proposal)")]
-axR.plot([RHO[n]*shift_power for n in SHOW], y - 0.26, marker="|", ls="none",
+         ("theory", "C3", "D", f"match raw theory, keeping {100*A.keep:g}%"),
+         ("theory2", "C1", "v", f"match raw theory, keeping {100*A.keep2:g}%")]
+axR.plot([RHO[n]*shift_power for n in SHOW], y - 0.30, marker="|", ls="none",
          ms=13, mew=1.8, color="0.15", zorder=5,
          label=("predicted: $\\rho$ with the selected power $\\times$ its own"
                 "\nshift of %.2f$\\sigma$" % shift_power))
-for off, (tag, col, mk, lab) in zip((+0.26, 0.0, -0.26), style):
+for off, (tag, col, mk, lab) in zip((+0.30, +0.10, -0.10, -0.30), style):
     v = np.array([res[n][tag][0] for n in SHOW])
     e = np.array([res[n][tag][1] for n in SHOW])
     axR.errorbar(v, y + off, xerr=np.abs(e.T - v), fmt=mk, color=col, ms=5,
@@ -178,14 +184,16 @@ axR.axvline(0.0, color="0.3", lw=1.0)
 # deviation of the region-to-region scatter actually is.
 for x in (-1.0, 1.0):
     axR.axvline(x, color="0.45", lw=1.0, ls=":")
-axR.set_xlim(-1.12, 1.28)
+# Extended past the 1 sd mark on the right to leave the legend somewhere it does
+# not cover the points, now that there are four series and a prediction marker.
+axR.set_xlim(-1.12, 1.85)
 axR.text(1.0, len(SHOW) - 0.4, " 1 sd of the scatter\n between regions",
          fontsize=8, color="0.4", va="top", ha="left")
 axR.set_yticks(y)
 axR.set_yticklabels([n.replace("\n", " ") for n in SHOW], fontsize=8.5)
 axR.set_xlabel(f"shift {chunkio.SHIFT_SYMBOL} of the selected regions"
                "  [standard deviations]")
-axR.legend(fontsize=9, loc="lower left", framealpha=0.95)
+axR.legend(fontsize=9, loc="lower right", framealpha=0.95)
 axR.set_title("The criterion never measures these, and moves them anyway,\n"
               "by their correlation with the power it does measure",
               fontsize=10.5)
@@ -195,10 +203,12 @@ fig.suptitle(f"Selecting a pencil subvolume on its power spectrum: "
              f"{nseed} realizations, $N={int(N)}^3$, $L={L:g}$ Mpc/$h$, 2LPT, "
              f"$\\delta(q)$ matter, pencil = $(L/8)^2\\times L$, keeping {100*A.keep:g}%",
              fontsize=11)
-fig.tight_layout(rect=(0, 0, 1, 0.94))
+# Reserve a strip at the bottom for the two definition lines. Without it they
+# are drawn over the tick labels and the axis label, which is where they landed.
+fig.tight_layout(rect=(0, 0.075, 1, 0.94))
 # After the layout, so the panel positions are final, and under the right panel,
 # which is the one whose axis is the shift.
-chunkio.annotate_shift(fig, ax=axR)
+chunkio.annotate_shift(fig, ax=axR, y=0.012, fontsize=9.5)
 fig.savefig(A.out, dpi=300)
 print(f"wrote {A.out}")
 for n in SHOW:

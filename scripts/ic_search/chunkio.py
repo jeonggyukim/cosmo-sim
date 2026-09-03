@@ -142,6 +142,37 @@ def load(path, species="matter", nchunk=None, want_spectra=False):
             np.concatenate(spec) if want_spectra else None)
 
 
+def usable(cols):
+    """Return a predicate saying whether a quantity is worth plotting.
+
+    Two things make a column unplottable. A column with nothing finite in it
+    draws an empty panel, which a reader takes for a missing measurement rather
+    than an impossible one. And a smoothing radius of half the region width
+    leaves no interior at all once the margin is trimmed, so its interior
+    variant is entirely NaN; at that radius the smoothed field is 92% sourced by
+    matter outside the region, measured by the inside/outside split in
+    pencil_seed_sweep.py, so every quantity at that radius describes the
+    surroundings rather than the region. Both are dropped.
+
+    Every selection figure applies the same rule, so it lives here rather than
+    once per figure.
+    """
+    import re
+    dead = set()
+    for n, v in cols.items():
+        m = re.fullmatch(r"tidal shear interior R=(\d+(?:\.\d+)?)", n)
+        if m and not np.any(np.isfinite(v)):
+            dead.add(m.group(1))
+
+    def ok(n):
+        if not np.any(np.isfinite(cols[n])):
+            return False
+        m = re.search(r" R=(\d+(?:\.\d+)?)$", n)
+        return not (m and m.group(1) in dead)
+
+    return ok
+
+
 # The quantity every selection figure plots, named once here so the figures can
 # show its definition rather than leaving the reader to infer it from an axis
 # label. Q is whichever property is being measured; the average runs over the
@@ -156,8 +187,7 @@ SHIFT_DEF = (r"$\Delta_Q \equiv \left(\langle Q\rangle_{\rm selected}"
 # uncertainty on the plotted shift, and shrinks as the sweep grows. Both live in
 # the same units, so a figure that shows one without naming the other invites
 # them to be read as the same thing.
-ERRBAR_DEF = ("error bars: bootstrap over realizations, resampling whole seeds "
-              "with their 24 subvolumes together")
+ERRBAR_DEF = "error bars: bootstrap over realizations, whole seeds resampled together"
 
 
 def annotate_shift(fig, x=0.005, y=0.005, fontsize=10.5, ax=None):
