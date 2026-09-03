@@ -56,6 +56,14 @@ _ap.add_argument("--smooth-frac", type=float, nargs="+", default=None,
                       "which is L/FRAC. Overrides --smooth. Given as a fraction the same "
                       "geometry holds at any box size, whereas a radius in Mpc/h that is "
                       "well inside the region for one box can exceed it for another")
+_ap.add_argument("--xi", action="store_true",
+                 help="also measure the two-point correlation function, for the whole "
+                      "box and for each pencil. Masking multiplies in configuration "
+                      "space, so the mask autocorrelation divides out exactly and a "
+                      "subvolume xi is unbiased for the true xi, unlike its P(k)")
+_ap.add_argument("--rmax", type=float, default=200.0,
+                 help="largest separation for xi, in Mpc/h")
+_ap.add_argument("--nrbin", type=int, default=40, help="number of separation bins")
 _ap.add_argument("--interior-margin", type=float, default=0.0, metavar="M",
                  help="also measure every environment quantity on the pencil trimmed by "
                       "M smoothing radii from each long face. The smoothed field near a "
@@ -333,6 +341,38 @@ else:
 MARGIN_CELLS = ([int(np.ceil(ARGS.interior_margin*R*NGRID/LBOX)) for R in ARGS.smooth]
                 if ARGS.interior_margin > 0 else [])
 
+# Separation grid for xi. A periodic box makes the wrapped pairs real pairs, so
+# the circular correlation is the right one and no zero-padding is needed; the
+# survey case in notes/xi_estimators.tex needs padding because it is not periodic.
+if ARGS.xi:
+    _ax = np.minimum(np.arange(NGRID), NGRID - np.arange(NGRID))*(LBOX/NGRID)
+    RX, RY, RZ = np.meshgrid(_ax, _ax, _ax, indexing="ij")
+    rr = np.sqrt(RX**2 + RY**2 + RZ**2)
+    r_edges = np.linspace(0.0, ARGS.rmax, ARGS.nrbin + 1)
+    r_idx = np.digitize(rr.ravel(), r_edges) - 1
+    r_in = (r_idx >= 0) & (r_idx < ARGS.nrbin)
+    r_idx = r_idx[r_in]
+    r_cnt = np.bincount(r_idx, minlength=ARGS.nrbin)[:ARGS.nrbin]
+    rbin = (np.bincount(r_idx, weights=rr.ravel()[r_in], minlength=ARGS.nrbin)[:ARGS.nrbin]
+            / np.maximum(r_cnt, 1))
+
+    def xi_bin(num, den=None):
+        """Bin a pair sum by separation, dividing by the pair count if given."""
+        n = np.bincount(r_idx, weights=num.ravel()[r_in], minlength=ARGS.nrbin)[:ARGS.nrbin]
+        if den is None:
+            return n/np.maximum(r_cnt, 1)/NGRID**3
+        dsum = np.bincount(r_idx, weights=den.ravel()[r_in],
+                           minlength=ARGS.nrbin)[:ARGS.nrbin]
+        return np.where(dsum > 0, n/np.maximum(dsum, 1e-30), np.nan)
+
+# Pair count of the mask, one per orientation: the mask's shape does not depend
+# on which tile it is, only on which axis is the long one.
+if ARGS.xi:
+    RR_AXIS = {}
+    for _a in sorted({p[0] for p in PENCILS}):
+        _W = np.zeros((NGRID,)*3); _W[pencil_slice(_a, 0, 0)] = 1.0
+        RR_AXIS[_a] = np.real(np.fft.ifftn(np.abs(np.fft.fftn(_W))**2))
+
 W0 = np.zeros((NGRID,)*3); W0[pencil_slice(*PENCILS[0])] = 1.0
 fvol = W0.mean()
 
@@ -375,7 +415,8 @@ print(f"{len(PENCILS)} pencils per seed, {len(SEEDS)} seeds, DoFixing = {ARGS.do
 # ---- sweep ------------------------------------------------------------------
 fit = (kbin > 2*dkperp) & (kbin <= 0.9*kny)      # band used for the metrics
 rows = []
-ACC = {k: [] for k in ("seed", "P_full", "P_pencil", "shear", "dbar", "lambda",
+ACC = {k: [] for k in ("seed", "P_full", "P_pencil", "xi_full", "xi_pencil",
+                       "shear", "dbar", "lambda",
                        "webtype", "contrast", "bulk",
                        "shear_interior", "dbar_interior", "lambda_interior",
                        "shear_box", "dbar_box", "lambda_box", "webtype_box")}
@@ -400,6 +441,8 @@ def write_chunk():
         for key, v in ACC.items():
             if v:
                 f[key] = np.array(v)
+        if ARGS.xi:
+            f["r"] = rbin
         f["pencil_axis"] = np.array([p[0] for p in PENCILS])
         f["pencil_i"] = np.array([p[1] for p in PENCILS])
         f["pencil_j"] = np.array([p[2] for p in PENCILS])
@@ -449,10 +492,23 @@ for s in SEEDS:
 
     P_full = np.empty((len(SPECIES), nb))
     P_pen = np.empty((len(SPECIES), len(PENCILS), nb))
+    if ARGS.xi:
+        xi_full = np.empty((len(SPECIES), ARGS.nrbin))
+        xi_pen = np.empty((len(SPECIES), len(PENCILS), ARGS.nrbin))
     for m, sp in enumerate(SPECIES):
-        P_full[m] = binned(V*np.abs(np.fft.fftn(d[sp])/NGRID**3)**2)
+        F2 = np.abs(np.fft.fftn(d[sp]))**2
+        P_full[m] = binned(V*F2/NGRID**6)
+        if ARGS.xi:
+            # ifftn(|F|^2)[r] is the sum over x of delta(x) delta(x+r); dividing
+            # by the number of pairs, N^3 for the unmasked box, gives xi(r).
+            xi_full[m] = xi_bin(np.real(np.fft.ifftn(F2)))
         for n, p in enumerate(PENCILS):
-            P_pen[m, n] = binned(V*np.abs(np.fft.fftn(masked(d[sp], p))/NGRID**3)**2/fvol)
+            G2 = np.abs(np.fft.fftn(masked(d[sp], p)))**2
+            P_pen[m, n] = binned(V*G2/NGRID**6/fvol)
+            if ARGS.xi:
+                # Same sum, but only over pairs with both points inside the
+                # pencil, divided by the count of those pairs. The mask cancels.
+                xi_pen[m, n] = xi_bin(np.real(np.fft.ifftn(G2)), RR_AXIS[p[0]])
 
     # Physical state of each region: the tidal shear s_ij = (d_i d_j / laplacian
     # - delta_ij/3) delta, and the mean overdensity, both on the smoothed field.
@@ -541,6 +597,9 @@ for s in SEEDS:
         ACC["seed"].append(s)
         ACC["P_full"].append(P_full)
         ACC["P_pencil"].append(P_pen)
+        if ARGS.xi:
+            ACC["xi_full"].append(xi_full)
+            ACC["xi_pencil"].append(xi_pen)
         if ARGS.environment:
             ACC["shear"].append(shear); ACC["dbar"].append(dbar)
             ACC["lambda"].append(lam); ACC["webtype"].append(web)
@@ -571,6 +630,8 @@ for s in SEEDS:
                 f["dbar_interior"] = dbar_in
                 f["lambda_interior"] = lam_in
             f["smooth_R"] = np.array(ARGS.smooth)
+        if ARGS.xi:
+            f["r"] = rbin
         f["pencil_axis"] = np.array([p[0] for p in PENCILS])
         f["pencil_i"] = np.array([p[1] for p in PENCILS])
         f["pencil_j"] = np.array([p[2] for p in PENCILS])

@@ -42,12 +42,32 @@ shift, shift_err, radii_for = chunkio.selection_stats(
     {"raw": crit_raw, "win": crit_win}, COLS, A.keep)
 N, L = meta["N"], meta["L"]
 
-rows = []
+# A radius at half the region width leaves no interior: every cell in the region
+# was smoothed with material from outside it, so the region value is not a
+# property of the region and does not belong in a comparison against the box.
+# Found from the data rather than hardcoded: the interior column is all NaN.
+# Whether an interior survives is a property of the radius, not of the quantity,
+# so it is settled once from whichever quantity carries interior columns and then
+# applied to all of them.
+no_interior = {r for r, _ in radii_for("tidal shear")
+               if f"tidal shear interior R={r:.0f}" in COLS
+               and not np.any(np.isfinite(COLS[f"tidal shear interior R={r:.0f}"]))}
+
+
+def has_interior(stem, r):
+    return r not in no_interior
+
+
+rows, dropped = [], []
 for stem in ("tidal shear", "knot fraction", "void fraction", "mean overdensity"):
     for r, name in radii_for(stem):
         box = f"{stem} box R={r:.0f}"
-        if box in COLS:
+        if box not in COLS:
+            continue
+        if has_interior(stem, r):
             rows.append((f"{stem}, $R$ = {r:g}", name, box))
+        else:
+            dropped.append(f"{stem} R={r:g}")
 
 if not rows:
     raise SystemExit(f"{A.data} records no whole-box quantities to compare against")
@@ -76,7 +96,10 @@ ax.set_ylim(y.min() - 0.6, y.max() + 0.6)
 ax.set_xlabel("shift  [standard deviations]")
 ax.legend(framealpha=0.95, loc="lower right")
 ax.grid(axis="x", alpha=0.25)
-ax.set_title(f"Two ways of choosing a region, and the box that contains it\n"
+note = ("" if not dropped else
+        "\nradii with no interior left are omitted: the region value there is "
+        "the region blended with its surroundings")
+ax.set_title(f"Two ways of choosing a region, and the box that contains it{note}\n"
              f"{nseed:,} realizations $\\times$ {npen} subvolumes\n"
              f"$N={int(N)}^3$, $L={L:g}$ Mpc/$h$, keeping the closest "
              f"{100*A.keep:g}%", pad=14, fontsize=13.5)
