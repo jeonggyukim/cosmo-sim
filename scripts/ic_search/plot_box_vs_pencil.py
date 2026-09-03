@@ -38,7 +38,7 @@ matplotlib.use("Agg")
 matplotlib.rcParams["savefig.dpi"] = 300
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-import paths
+import paths, chunkio
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--data", default=os.path.join(paths.DATA, "xi128"))
@@ -287,11 +287,11 @@ fig, ax = plt.subplots(2, 2, figsize=(13.6, 10.4))
 a = ax[0, 0]
 for sp in SP:
     i, xt = IDX[sp], XI_TH[sp]
-    xb = XF[:, i].mean(0)
-    a.loglog(r[fin & (xt > 0)], xt[fin & (xt > 0)], color=COL[sp], lw=4.0,
-             alpha=0.22, solid_capstyle="round")
-    a.loglog(r[fin & (xb > 0)], xb[fin & (xb > 0)], color=COL[sp], marker="o",
-             label=NAME[sp], **MK)
+    chunkio.plot_signed(a, r, xt, color=COL[sp], lw=4.0, alpha=0.22,
+                        solid_capstyle="round")
+    chunkio.plot_signed(a, r, XF[:, i].mean(0), color=COL[sp], marker="o",
+                        label=NAME[sp], **MK)
+a.set_xscale("log"); a.set_yscale("log")
 a.set_ylabel(r"$\xi(r)$")
 a.set_title("Whole box, each species, with its own theory beneath")
 a.legend(framealpha=0.95)
@@ -315,12 +315,13 @@ xp = pencil_one(XP, i)
 xpm, xpe = pencil_ensemble(XP, i)
 xb = XF[:, i].mean(0)
 a = ax[1, 0]
-a.loglog(r[fin & (xt > 0)], xt[fin & (xt > 0)], color="0.45", lw=4.0, alpha=0.28,
-         solid_capstyle="round", label="linear theory (one curve, not two)")
-a.loglog(r[fin & (xb > 0)], xb[fin & (xb > 0)], color=BOXC, marker="o",
-         label="whole box", **MK)
-a.loglog(r[fin & (xp > 0)], xp[fin & (xp > 0)], color=PENC, ls="--", marker="s",
-         label=PEN1LAB, **MK)
+chunkio.plot_signed(a, r, xt, color="0.45", lw=4.0, alpha=0.28,
+                    solid_capstyle="round",
+                    label="linear theory (one curve, not two)")
+chunkio.plot_signed(a, r, xb, color=BOXC, marker="o", label="whole box", **MK)
+chunkio.plot_signed(a, r, xp, color=PENC, marker="s", label=PEN1LAB, **MK)
+a.set_xscale("log"); a.set_yscale("log")
+a.plot([], [], color="0.4", ls="--", lw=1.2, label=r"dashed: $\xi < 0$, drawn as $|\xi|$")
 a.set_ylabel(r"$\xi(r)$")
 a.set_title(f"Whole box against pencil, {NAME[ONE]}")
 a.legend(framealpha=0.95, loc="lower left")

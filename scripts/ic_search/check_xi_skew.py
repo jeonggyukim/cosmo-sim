@@ -68,6 +68,27 @@ xt = (np.bincount(idx[inb], weights=x3.ravel()[inb], minlength=len(r))[:len(r)]
       / np.maximum(cnt, 1))
 
 n = len(XP)
+NSEED = len(XF)
+NPEN = n//NSEED if NSEED else 1
+_rng = np.random.default_rng(0)
+
+
+def boot_err(v, nboot=400):
+    """Error on the fraction below theory, resampling realizations.
+
+    A binomial error would treat every pencil as an independent draw. Pencils cut
+    from one box share that box's large-scale modes, and the disjoint pencils of
+    one orientation tile it exactly, so the independent unit is the realization.
+    Resampling whole realizations keeps whatever correlation exists inside a box
+    instead of assuming it away.
+    """
+    if NSEED < 2 or NPEN < 1:
+        return np.sqrt(np.mean(v < 1)*(1 - np.mean(v < 1))/max(len(v), 1))
+    g = v[:NSEED*NPEN].reshape(NSEED, NPEN)
+    draws = _rng.integers(0, NSEED, (nboot, NSEED))
+    return float(np.std([(g[d] < 1.0).mean() for d in draws]))
+
+
 print(f"{n} pencils from {len(XF)} realizations"
       f"{', one per realization' if A.one_per_seed else ''}")
 print(f"pencil width {width:.1f} Mpc/h, cell {L/N:.2f} Mpc/h\n")
@@ -78,10 +99,7 @@ for j in range(len(r)):
         continue
     v = XP[:, j]/xt[j]
     below = np.mean(v < 1.0)
-    # Binomial error on the fraction. Pencils inside one box share its modes, so
-    # with all pencils kept this understates the true uncertainty; --one-per-seed
-    # removes that correlation at the cost of a smaller sample.
-    err = np.sqrt(below*(1 - below)/n)
+    err = boot_err(XP[:, j]/xt[j])
     sk = ((v - v.mean())**3).mean()/max(v.std()**3, 1e-30)
     rows.append((r[j], v.mean(), np.median(v), below, err, sk))
     print(f"{r[j]:7.1f} {v.mean():9.4f} {np.median(v):10.4f} {below:7.3f} "

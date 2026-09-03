@@ -12,12 +12,13 @@ no per-mode division undoes, so the pencils there scatter about the
 window-convolved curve instead. Panels (d) and (f) are the same subvolumes
 measured two ways, and only one of them needs a window drawn on it.
 """
-import argparse, glob, os, numpy as np, h5py, matplotlib
+import argparse, glob, os, sys, numpy as np, h5py, matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 ap = argparse.ArgumentParser()
-import paths
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths, chunkio
 ap.add_argument("--data", default=os.path.join(paths.DATA, "pencil_sweep_n64_L700"))
 ap.add_argument("--png", default=None)
 ap.add_argument("--nshow", type=int, default=250, help="individual pencil curves drawn")
@@ -224,7 +225,7 @@ if HAVE_XI:
     lperp = L/8.0
     # Only where the theory is safely away from its zero crossing near 80 Mpc/h:
     # a ratio to a vanishing denominator measures the crossing, not the estimator.
-    gx = (rbin > 0) & (rbin <= min(200.0, rbin.max())) & (xi_th > 0)
+    gx = (rbin > 0) & (rbin <= min(200.0, rbin.max()))
     mx = X_pen.mean(0)
     print(f"\npencils : xi mean/theory over r < {lperp:.0f} Mpc/h "
           f"{np.average((mx/xi_th)[gx], weights=np.abs(xi_th[gx])):.4f}; "
@@ -232,15 +233,17 @@ if HAVE_XI:
 
     a = ax[2, 0]
     for i in show:
-        pos_i = gx & (X_pen[i] > 0)
-        a.loglog(rbin[pos_i], X_pen[i][pos_i], **GREY)
+        chunkio.plot_signed(a, rbin[gx], X_pen[i][gx], **GREY)
     for i in best:
-        pos_i = gx & (X_pen[i] > 0)
-        a.loglog(rbin[pos_i], X_pen[i][pos_i], color="C0", lw=1.0, alpha=0.9, zorder=3)
+        chunkio.plot_signed(a, rbin[gx], X_pen[i][gx], color="C0", lw=1.0,
+                            alpha=0.9, zorder=3)
     a.plot([], [], color="C0", lw=1.0, label=f"{A.nbest} best matches to raw theory")
-    a.loglog(rbin[gx], mx[gx], **RED, label=f"mean of {len(X_pen)} pencils")
-    a.loglog(rbin[gx], xi_th[gx], "--", color="0.1", lw=1.2, zorder=5,
-             label="theory (no window: none applies)")
+    chunkio.plot_signed(a, rbin[gx], mx[gx], label=f"mean of {len(X_pen)} pencils", **RED)
+    chunkio.plot_signed(a, rbin[gx], xi_th[gx], color="0.1", lw=1.2, zorder=5,
+                        label="theory (no window: none applies)")
+    a.set_xscale("log"); a.set_yscale("log")
+    a.plot([], [], color="0.4", ls="--", lw=1.2,
+           label=r"dashed: $\xi < 0$, drawn as $|\xi|$")
     a.plot([], [], **GREY, label=f"individual pencils ({len(show)} drawn)")
     a.set_xlabel(r"$r\ [\mathrm{Mpc}/h]$"); a.set_ylabel(r"$\xi(r)$")
     a.set_title(r"(e)  the same pencils, in configuration space", fontsize=10)

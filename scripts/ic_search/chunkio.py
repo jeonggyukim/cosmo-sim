@@ -134,6 +134,30 @@ def annotate_shift(fig, x=0.005, y=0.005, fontsize=10.5):
              ha="left", va="bottom")
 
 
+def plot_signed(ax, x, y, **kw):
+    """Draw xi on a log axis as |xi|, solid where positive and dashed where not.
+
+    A log axis cannot show a negative number, and xi turns over near 80 Mpc/h,
+    so plotting it directly drops everything past the zero crossing. The
+    convention here is the one icpipe/cli/plot_ic.py already uses for the same
+    quantity: the magnitude is drawn throughout and the line style carries the
+    sign. Callers must therefore not spend line style on anything else in these
+    panels; colour and marker are free.
+
+    Any label is attached to the positive branch alone, so a legend gains one
+    entry per curve rather than two.
+    """
+    x, y = np.asarray(x), np.asarray(y)
+    ok = np.isfinite(y) & (x > 0)
+    pos, neg = ok & (y > 0), ok & (y < 0)
+    kw.pop("ls", None), kw.pop("linestyle", None)
+    if pos.any():
+        ax.plot(x[pos], y[pos], ls="-", **kw)
+    if neg.any():
+        kw.pop("label", None)
+        ax.plot(x[neg], -y[neg], ls="--", **kw)
+
+
 def selection_stats(crit, cols, keep):
     """Helpers for asking what a selection does, shared by the plotting scripts.
 
