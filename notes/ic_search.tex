@@ -331,6 +331,75 @@ mask's own pair count at each lag. Dividing instead by the region's volume, a
 constant, reintroduces a deficit that looks like the power-spectrum one and is
 purely an error of normalisation.
 
+\subsection{The simulation box has a window too}
+\label{sec:boxwindow}
+
+Nothing in \S\ref{sec:window} was specific to a subvolume. Any finite volume
+carries a window, and the simulation box is a finite volume, so the same
+argument applies one level up. The companion note \texttt{ic\_sampling.tex}
+treats this in full; it is repeated here because the parallel decides how the
+results of this note should be read.
+
+\citet{Pen1997} writes the box version of Eq.~\eqref{eq:conv} as
+\begin{equation}
+  \label{eq:pen}
+  P^{\rm grid}(\bk) \;=\; \int \! d^3k' \; P(|\bk'|)\, W_c(\bk' - \bk) ,
+\end{equation}
+where $W_c$ is the window of a cubical box of side $L$,
+\begin{equation}
+  \label{eq:wc}
+  W_c(\bk) \;=\;
+  \frac{\sin(L k_x/2)\, \sin(L k_y/2)\, \sin(L k_z/2)}
+       {(\pi L)^3\, k_x k_y k_z} .
+\end{equation}
+This is the same object as Eq.~\eqref{eq:winform}: a product of one sinc-like
+factor per axis. Only the geometry differs. The box is bounded at $L$ in all
+three directions, while the pencil is bounded at $\ell_\perp = L/8$ in two and
+unbounded in the third, which is why its window is eight times wider transverse
+and a Kronecker delta along its length.
+
+\paragraph{What codes actually do is different, and worse.}
+Equation~\eqref{eq:pen} is what \citet{Pen1997} argues \emph{should} be done. The
+conventional method does something else: it evaluates $P(k)$ at the discrete
+lattice wavenumbers $\bk = 2\pi\mathbf{m}/L$ and sets every mode below the
+fundamental $k_f = 2\pi/L$ to zero. That is truncation and sparse sampling
+rather than convolution. No power is moved between neighbouring modes; power on
+scales larger than the box is simply absent. The consequence is a shortfall
+rather than a smearing, and it is large: \citet{Gelb1994} found $\sigma_8$
+systematically $40\%$ below the analytic value for $L = 51.2$~Mpc, requiring
+$L = 100$~Mpc to reduce the error to $10\%$, and \citet{Pen1997} reports $60\%$
+error at $L = 16\Mpch$ where convolving first gives $7\%$.
+
+\paragraph{The periodic box imposes a condition on the field.}
+This is the part that matters for the rest of this note. Because the $k = 0$
+mode is set to zero, the mean overdensity of the box,
+$\bar\delta_{\rm box} = \avg{\delta}_{\rm box}$, is exactly zero in every
+realisation. In the real universe it is not. A randomly placed cube of side $L$
+has $\bar\delta_{\rm box}$ drawn from a distribution of non-zero width, and
+\citet{Sirko2005} identifies the variance so removed, $P_L(0)/V$ with
+$V = L^3$, as about $6\%$ of $\sigma_8^2$ at $L = 50\Mpch$. Pen puts the same
+point plainly: the total density in the box is defined to be the cosmic mean,
+whereas ``in reality, this value varies even when averaged over a corresponding
+volume of the universe.''
+
+Setting $\bar\delta_{\rm box} = 0$ is therefore a \emph{condition imposed on the
+field}, of exactly the kind \S\ref{sec:general} is about, and
+Eq.~\eqref{eq:rho} governs it in the same way. The seed search of this note and
+the periodic box are the same operation pointed in opposite directions: the
+search displaces the region's large-scale power upward by $1.26\sigma$, while
+the box pins its own largest mode to zero and removes scatter that a real volume
+would have.
+
+\paragraph{What this means for the numbers here.}
+The runs used here have $L = 700\Mpch$, so the box window of Eq.~\eqref{eq:wc}
+is eight times narrower than the pencil's and sits where the theory is smooth
+across it; the convolution correction from the box is small beside the $35\%$
+from the pencil. The condition $\bar\delta_{\rm box} = 0$, on the other hand, is
+imposed exactly regardless of box size. It is visible in the measurements: the
+whole-box mean overdensity is the one quantity in this note with no scatter at
+all, and its apparent immunity to selection in \S\ref{sec:each} is not a result
+about selection but a restatement of how the box was built.
+
 \section{What the search selects}
 \label{sec:selects}
 
@@ -1083,10 +1152,14 @@ production run are recorded in \texttt{scripts/ic\_search/RUNS.md}.
 \begin{thebibliography}{9}
 \bibitem[Doroshkevich(1970)]{Doroshkevich1970} Doroshkevich, A.~G. 1970,
   Astrofizika, 6, 581
+\bibitem[Gelb \& Bertschinger(1994)]{Gelb1994} Gelb, J.~M., \& Bertschinger, E.
+  1994, ApJ, 436, 467
 \bibitem[Hahn et al.(2007)]{Hahn2007} Hahn, O., Porciani, C., Carollo, C.~M.,
   \& Dekel, A. 2007, MNRAS, 375, 489
 \bibitem[Park et al.(1994)]{Park1994} Park, C., Vogeley, M.~S., Geller, M.~J.,
   \& Huchra, J.~P. 1994, ApJ, 431, 569
+\bibitem[Pen(1997)]{Pen1997} Pen, U.-L. 1997, ApJ, 490, L127
+\bibitem[Sirko(2005)]{Sirko2005} Sirko, E. 2005, ApJ, 634, 728
 \end{thebibliography}
 
 \end{document}
