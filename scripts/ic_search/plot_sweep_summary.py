@@ -282,6 +282,9 @@ if HAVE_XI:
     a.set_title(r"(f)  pencils scatter about 1: there is no window to subtract",
                 fontsize=10)
     a.legend(frameon=False, fontsize=8, loc="upper right")
+    # The left panel keeps the full range: it plots |xi| with the sign in the
+    # line style, so it stays readable past the zero crossing, where the ratio
+    # panel beside it does not.
     rhi = min(200.0, rbin.max())
     # The left panel keeps the full range so the acoustic peak stays visible; the
     # ratio panel is limited to where its denominator is safe.
