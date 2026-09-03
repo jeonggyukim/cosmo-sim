@@ -154,7 +154,6 @@ LaTeX write-ups in `notes/`; full list and reading order in `notes/README.md`.
 | `ic_sampling.tex` | P-sampled vs ξ-sampled ICs (Pen 1997, Sirko 2005, Hahn & Abel 2011); box window truncation |
 | `restriction_lpt.tex` | Restriction of δ and Ψ⁽¹⁾; why restricting the displacement potential is Poisson-inconsistent |
 | `music2_internals.tex` | File-and-line walkthrough of MUSIC2's δ construction and zoom noise hierarchy |
-| `cosmo_stat.tex` | Statistics of cosmological fields: ensembles, ergodicity, ξ(r), P(k), covariance, Gaussian random fields, generating and measuring them |
 | `ic_search.tex` | Why adopting the seed whose subvolume P(k) best matches linear theory selects an atypical region. The estimator is unbiased for theory convolved with the subvolume window, 34% below theory at the fundamental, so matching the raw theory needs an upward fluctuation. Selection displaces the subvolume's large-scale power by 1.26σ and every other property by its correlation with that power times 1.26; the displacement saturates, so a million-seed search is no worse than a thousand. 83,542 realisations at 128³. Controls: random criterion 0.000, convolved-theory criterion 0.016. Textbook register, like the other notes: the reader is an international graduate student meeting the material for the first time. Define every term, motivate before deriving, keep sentences plain. Length is not a cost |
 | `xi_estimators.tex` | Why a direct lag sum and a zero-padded FFT are the same estimator: grid Landy–Szalay in the infinite-random limit and Slepian & Eisenstein's N = D−R convolution form, Wiener–Khinchin as a finite identity, circular vs linear autocorrelation and the padding condition d ≤ P−N, the separable N−d pair count, per-axis boundaries for pencil beams, cost scaling, and the gridding artefacts the FFT route concedes |
 
@@ -197,7 +196,7 @@ every word written into a `.tex` or `.md` file here. They are not repeated in
 this file. The short form: write the plainest sentence that states the fact,
 then stop.
 
-Defects that reached `notes/cosmo_stat.tex` and had to be corrected sentence
+Defects that reached `cosmo_stat.tex` (now in `ai-notes`) and had to be corrected sentence
 by sentence, kept here as worked examples: "the bridge between theory and
 data", "for free", "the whole game", "the price of a finite box", "the rescue
 is ergodicity", "through the lens of ordinary statistics", "each cell knows

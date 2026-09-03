@@ -21,7 +21,6 @@ compiled `.pdf`, built by running `make` in this directory.)
 
 | Note | Title | Contents |
 |------|-------|----------|
-| `cosmo_stat.pdf` | Statistical Foundations for Cosmological Fields | Why cosmology needs random fields (one universe, many possible ones), ensemble averages, statistical homogeneity and isotropy, ergodicity, ξ(r) as a covariance, Fourier conventions, P(k) and the variance budget, covariance as the unifying object, Gaussian random fields and Wick's theorem, generating a GRF on a computer (white noise → colouring), estimating ξ and P from one realisation, cosmic variance. Renamed from `foundations.pdf`. |
 | `cosmo_ic.pdf` | Cosmological Initial Conditions: Theory and Practice | FLRW background, fluid equations, LPT (ZA, 2LPT), IC generation, P(k), ξ(r), ψ(r), starting redshifts; §11 MUSIC2 / monofonIC implementation details. Notation table at the start (§1). |
 | `ic_sampling.pdf` | Real-Space vs Fourier-Space IC Sampling | Pen 1997, Sirko 2005, Hahn 2011: P-sampled vs ξ-sampled ICs, box window errors |
 | `restriction_lpt.pdf` | Restriction of a Density Field and the 1LPT Displacement | Bin-averaging restriction (cell window + aliasing), effect on δ / Ψ⁽¹⁾ / deformation tensor / S⁽²⁾, why restricting the displacement potential is Poisson-inconsistent, application to zoom-in IC generation |
@@ -32,9 +31,15 @@ compiled `.pdf`, built by running `make` in this directory.)
 The dark-matter physics notes (`sidm`, `fdm`, `dm_chemistry`, `qft`,
 `classical_mechanics`) moved to the `ai-notes` repository on 2026-07-28, where
 they became `sidm.tex`, `sidm_3d.tex`, `kinetic_theory.tex`, `fdm.tex`,
-`atomic_dm.tex`, `qft.tex` and `classical_mechanics.tex`. They had no
-dependency on this repository; what remains here is the IC-generation and
-statistics material, three figures of which are built from pipeline output.
+`atomic_dm.tex`, `qft.tex` and `classical_mechanics.tex`. `cosmo_stat` followed
+on 2026-09-03 as `cosmo-stat.tex`; its one figure was already present there as
+`figures/fft/grf-exponential.pdf`, serving `fft.tex`.
+
+The same criterion decided each move: a note leaves when it does not depend on
+this repository's pipeline. Every note that remains does — for its runs, its
+measured numbers, or its figures. Notes here still cite `cosmo_stat.pdf`, and
+those citations now name the `ai-notes` repository so the pointer can be
+followed.
 
 ## Reading order
 

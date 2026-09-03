@@ -12,7 +12,8 @@
 \usepackage{natbib}
 \bibliographystyle{aasjournal}
 
-% Notation follows cosmo_stat.tex (bold vectors, \avg, \hat\delta_\bk,
+% Notation follows cosmo_stat.tex, which lives in the ai-notes repository
+% (bold vectors, \avg, \hat\delta_\bk,
 % P(\bk) = \avg{|\hat\delta_\bk|^2}/V) and the Fourier sign convention of
 % cosmo_ic.tex App. A (e^{-i k.x} forward).
 \newcommand{\bk}{\mathbf{k}}
@@ -141,7 +142,8 @@ quantity is $\xi(r)$, which by its definition is an average over an ensemble
 of universes, and there is only one universe to look at.  The formula below
 is therefore not $\xi$ itself but a stand-in for it, and the hat in
 $\hat\xi$ is there to keep the two apart.  Section~\ref{sec:estimator-vs-ensemble}
-returns to the distinction, and \code{cosmo\_stat.pdf} treats it at length.
+returns to the distinction, and \code{cosmo\_stat.pdf}, in the
+\code{ai-notes} repository, treats it at length.
 
 Two different formulas can estimate the same quantity, and two different
 programs can evaluate the same formula.  Both distinctions matter below.  The
@@ -172,7 +174,8 @@ are.
 \subsection{Estimator versus ensemble quantity}\label{sec:estimator-vs-ensemble}
 
 It is worth being clear about what $\hat\xi$ is an estimate \emph{of}, since
-the distinction is the subject of the companion note \code{cosmo\_stat.pdf}
+the distinction is the subject of \code{cosmo\_stat.pdf} in the
+\code{ai-notes} repository
 and the hat is doing real work.
 
 The quantity we would like is the ensemble correlation function, defined

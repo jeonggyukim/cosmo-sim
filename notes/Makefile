@@ -1,4 +1,4 @@
-NOTES  = cosmo_stat ic_sampling cosmo_ic restriction_lpt music2_internals xi_estimators \
+NOTES  = ic_sampling cosmo_ic restriction_lpt music2_internals xi_estimators \
          ic_search
 PYTHON = conda run -n cosmo python
 
@@ -41,7 +41,6 @@ FIGURES = \
     figures/cosmo_ic/shotnoise_order.pdf \
     figures/cosmo_ic/ngenic_seedtable.pdf \
     figures/cosmo_ic/mpi_fft_slabs.pdf \
-    figures/fft/grf_exponential.pdf \
     figures/restriction/restriction_density.pdf \
     figures/restriction/restriction_psi.pdf \
     figures/restriction/restriction_deformation.pdf \
@@ -113,9 +112,6 @@ figures/cosmo_ic/ngenic_seedtable.pdf : figures/cosmo_ic/plot_ngenic_seedtable.p
 figures/cosmo_ic/mpi_fft_slabs.pdf : figures/cosmo_ic/plot_mpi_fft_slabs.py
 	cd figures/cosmo_ic && $(PYTHON) plot_mpi_fft_slabs.py
 
-figures/fft/grf_exponential.pdf : figures/fft/plot_grf_exponential.py
-	cd figures/fft && $(PYTHON) plot_grf_exponential.py
-
 figures/restriction/restriction_density.pdf : figures/restriction/plot_restriction_density.py
 	cd figures/restriction && $(PYTHON) plot_restriction_density.py
 
@@ -173,6 +169,6 @@ clean :
 	rm -f *.aux *.log *.bbl *.blg *.out *.toc *.fls *.synctex.gz
 	rm -f figures/*.png figures/*.pdf $(FIGURES) $(addsuffix .pdf, $(NOTES))
 	rm -f figures/ic_sampling/*.png figures/cosmo_ic/*.png \
-	      figures/fft/*.png figures/restriction/*.png figures/music2/*.png \
+	      figures/restriction/*.png figures/music2/*.png \
 	      figures/ic_search/*.png \
 	
