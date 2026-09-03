@@ -67,6 +67,12 @@ with h5py.File(files[0]) as f:
     frac, kny = int(f.attrs["frac"]), float(f.attrs["kny"])
     P_TH, P_WIN = f["P_theory"][:], f["P_win"][:]
     nmodes = (f["nmodes"][:].astype(float) if "nmodes" in f else None)
+    # r holds the mean separation inside each bin, which is neither the bin
+    # centre nor uniformly spaced, so the edges cannot be recovered from it.
+    # Chunks written before the edges were stored fall back to the sweep's rule,
+    # linear bins from 0 to --rmax, with --rmax inferred from the last edge.
+    R_EDGES = (f["r_edges"][:] if "r_edges" in f else
+               np.linspace(0.0, 250.0, len(f["r"]) + 1))
     _df = f.attrs.get("dofixing", "no")
     FIXED = str(_df.decode() if isinstance(_df, bytes) else _df).lower() in ("yes", "true", "1")
 
@@ -122,7 +128,7 @@ def xi_theory(Pth):
     xi3 = np.real(np.fft.ifftn(P3))*N**3/L**3
     ra = np.minimum(np.arange(N), N - np.arange(N))*(L/N)
     r3 = np.sqrt(sum(g**2 for g in np.meshgrid(ra, ra, ra, indexing="ij")))
-    edge = np.linspace(0.0, r.max() + 0.5*(r[1] - r[0]), len(r) + 1)
+    edge = R_EDGES
     idx = np.digitize(r3.ravel(), edge) - 1
     inb = (idx >= 0) & (idx < len(r))
     cnt = np.bincount(idx[inb], minlength=len(r))[:len(r)]
@@ -142,11 +148,43 @@ NAME = {"cdm": "CDM", "baryon": "baryon", "matter": "total matter"}
 ONE = A.compare if A.compare in IDX else SP[0]
 BOXC, PENC = "C0", "C3"
 
+# The realization is the independent unit, not the subvolume. Pencils cut from
+# one box share that box's large-scale modes, and the 64 disjoint pencils of a
+# single orientation tile it exactly, so averaging over pencils does not reduce
+# cosmic variance and partly rebuilds the very box measurement the pencil is
+# being compared against. Measured on one realization at N = 128: the mean over
+# 192 pencils sits within 6% of the box, while a single pencil scatters about it
+# by 83%. So the comparison takes one pencil per realization and averages across
+# realizations, and the error is the spread over realizations.
+ONEPEN = 0
+SINGLE = nseed == 1
+
+
+def pencil_one(arr, i):
+    """A single pencil from a single realization: what one zoom-in region gives."""
+    return arr[0, i, ONEPEN, :]
+
+
+def pencil_ensemble(arr, i):
+    """Mean over realizations of one pencil each, and the error on that mean.
+
+    One pencil per box, so no two entries share a realization's modes. Averaging
+    over pencils within a box instead would not reduce cosmic variance at all,
+    and with 64 disjoint pencils tiling the box exactly it would partly rebuild
+    the box measurement being compared against.
+    """
+    per = arr[:, i].mean(1) if SINGLE else arr[:, i, ONEPEN, :]
+    return per.mean(0), per.std(0)/np.sqrt(max(nseed - 1, 1))
+
+
 SUB = (f"$N={N}^3$, $L={L:g}$ Mpc/$h$, pencil {width:g} Mpc/$h$ across, "
        f"{nseed} realization{'s' if nseed != 1 else ''} $\\times$ {npen} "
        f"subvolume{'s' if npen != 1 else ''}"
        + (", amplitudes fixed to linear theory (DoFixing = yes)" if FIXED else ""))
 MK = dict(lw=1.3, ms=2.8, mfc="white", mew=0.9)
+PEN1LAB = "one pencil, one realization"
+PENMLAB = ("pencil, mean of all in this realization" if SINGLE else
+           f"mean over {nseed} realizations, one pencil each")
 
 
 def decorate_k(a):
@@ -206,8 +244,7 @@ a.loglog(k, P_TH[i], color="0.45", lw=4.0, alpha=0.28, solid_capstyle="round",
 a.loglog(k, P_WIN[i], color=PENC, lw=4.0, alpha=0.28, solid_capstyle="round",
          label=r"theory $\ast$ pencil window")
 a.loglog(k, PF[:, i].mean(0), color=BOXC, marker="o", label="whole box", **MK)
-a.loglog(k, PP[:, i].mean((0, 1)), color=PENC, ls="--", marker="s",
-         label="pencil zoom-in region", **MK)
+a.loglog(k, pencil_one(PP, i), color=PENC, ls="--", marker="s", label=PEN1LAB, **MK)
 a.set_ylabel("$P(k)$  [$(\\mathrm{Mpc}/h)^3$]")
 a.set_title(f"Whole box against pencil, {NAME[ONE]}")
 a.legend(framealpha=0.95, loc="lower left")
@@ -217,8 +254,12 @@ a = ax[1, 1]
 a.fill_between(k, -sig, sig, color="0.75", alpha=0.45, lw=0, zorder=0, label=BANDLAB)
 a.semilogx(k, PF[:, i].mean(0)/P_TH[i] - 1.0, color=BOXC, marker="o",
            label="whole box", **MK)
-a.semilogx(k, PP[:, i].mean((0, 1))/P_TH[i] - 1.0, color=PENC, ls="--", marker="s",
-           label="pencil zoom-in region", **MK)
+pm, pe = pencil_ensemble(PP, i)
+a.fill_between(k, (pm - pe)/P_TH[i] - 1.0, (pm + pe)/P_TH[i] - 1.0,
+               color=PENC, alpha=0.20, lw=0)
+a.semilogx(k, pencil_one(PP, i)/P_TH[i] - 1.0, color=PENC, ls="--", marker="s",
+           label=PEN1LAB, **MK)
+a.semilogx(k, pm/P_TH[i] - 1.0, color=PENC, lw=2.2, alpha=0.9, label=PENMLAB)
 a.semilogx(k, P_WIN[i]/P_TH[i] - 1.0, color="0.35", lw=1.8, ls=":",
            label=r"theory $\ast$ window, no realization")
 a.axhline(0.0, color="0.3", lw=1.0)
@@ -266,14 +307,16 @@ a.legend(framealpha=0.95, loc="lower left")
 decorate_r(a)
 
 i, xt = IDX[ONE], XI_TH[ONE]
-xb, xp = XF[:, i].mean(0), XP[:, i].mean((0, 1))
+xp = pencil_one(XP, i)
+xpm, xpe = pencil_ensemble(XP, i)
+xb = XF[:, i].mean(0)
 a = ax[1, 0]
 a.loglog(r[fin & (xt > 0)], xt[fin & (xt > 0)], color="0.45", lw=4.0, alpha=0.28,
          solid_capstyle="round", label="linear theory (one curve, not two)")
 a.loglog(r[fin & (xb > 0)], xb[fin & (xb > 0)], color=BOXC, marker="o",
          label="whole box", **MK)
 a.loglog(r[fin & (xp > 0)], xp[fin & (xp > 0)], color=PENC, ls="--", marker="s",
-         label="pencil zoom-in region", **MK)
+         label=PEN1LAB, **MK)
 a.set_ylabel(r"$\xi(r)$")
 a.set_title(f"Whole box against pencil, {NAME[ONE]}")
 a.legend(framealpha=0.95, loc="lower left")
@@ -282,11 +325,14 @@ decorate_r(a)
 a = ax[1, 1]
 g = fin & (xt > 0) & (r <= width)
 a.semilogx(r[g], (xb/xt - 1.0)[g], color=BOXC, marker="o", label="whole box", **MK)
+a.fill_between(r[g], ((xpm - xpe)/xt - 1.0)[g], ((xpm + xpe)/xt - 1.0)[g],
+               color=PENC, alpha=0.20, lw=0)
 a.semilogx(r[g], (xp/xt - 1.0)[g], color=PENC, ls="--", marker="s",
-           label="pencil zoom-in region", **MK)
+           label=PEN1LAB, **MK)
+a.semilogx(r[g], (xpm/xt - 1.0)[g], color=PENC, lw=2.2, alpha=0.9, label=PENMLAB)
 a.axhline(0.0, color="0.3", lw=1.0)
 a.set_ylabel(r"$\xi(r)\,/\,\xi_{\rm theory}(r) - 1$")
-a.set_ylim(-0.45, 0.20)
+a.set_ylim(-1.0, 1.0)
 a.set_title("No offset: the mask cancels between the pair counts")
 a.legend(framealpha=0.95, loc="lower left")
 decorate_r(a)

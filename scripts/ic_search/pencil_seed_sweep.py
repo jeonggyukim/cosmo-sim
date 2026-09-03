@@ -521,6 +521,11 @@ def write_chunk():
                 f[key] = np.array(v)
         if ARGS.xi:
             f["r"] = rbin
+            # The bin edges, not just the centres. rbin holds the mean separation
+            # inside each bin, which is not the bin centre and not uniformly
+            # spaced, so edges cannot be recovered from it: an analysis that tries
+            # lands the theory in different bins than the measurement.
+            f["r_edges"] = r_edges
         f["pencil_axis"] = np.array([p[0] for p in PENCILS])
         f["pencil_i"] = np.array([p[1] for p in PENCILS])
         f["pencil_j"] = np.array([p[2] for p in PENCILS])
@@ -780,6 +785,11 @@ for s in SEEDS:
             f["smooth_R"] = np.array(ARGS.smooth)
         if ARGS.xi:
             f["r"] = rbin
+            # The bin edges, not just the centres. rbin holds the mean separation
+            # inside each bin, which is not the bin centre and not uniformly
+            # spaced, so edges cannot be recovered from it: an analysis that tries
+            # lands the theory in different bins than the measurement.
+            f["r_edges"] = r_edges
         f["pencil_axis"] = np.array([p[0] for p in PENCILS])
         f["pencil_i"] = np.array([p[1] for p in PENCILS])
         f["pencil_j"] = np.array([p[2] for p in PENCILS])

@@ -117,19 +117,27 @@ plt.rcParams.update({"font.size": 11.5, "axes.titlesize": 12,
 fig, ax = plt.subplots(2, 4, figsize=(19.6, 10.0))
 
 
-PEN = (slice(0, npen), slice(0, npen))
+_c0 = (N - npen)//2
+PEN = (slice(_c0, _c0 + npen), slice(_c0, _c0 + npen))
 
 
-def frame(a, title, note=None):
-    """Outline the pencil, and quote what the sweep records from this panel.
+def frame(a, title, note=None, label=False):
+    """Outline a pencil, and quote what the sweep records from this panel.
 
-    The scalar the sweep stores is an average over the outlined square, so
+    The square is drawn at the centre of the box and is there to give the scale
+    of a region against the field, not to mark which region was measured: every
+    pencil has the same shape and the sweep uses all of them. It is named once,
+    on the first panel, rather than repeated on all eight.
+
+    The scalar the sweep stores is an average over a region of this size, so
     printing the region value beside the whole-box value turns each panel into
     the definition of the number rather than an illustration of it.
     """
-    a.add_patch(Rectangle((0, 0), width, width, fill=False, ec="k", lw=2.0))
-    a.text(width*0.5, width*1.03, "pencil", ha="center", va="bottom", fontsize=10,
-           color="k")
+    c = 0.5*(L - width)
+    a.add_patch(Rectangle((c, c), width, width, fill=False, ec="k", lw=2.0))
+    if label:
+        a.text(c + 0.5*width, c + width*1.02, "pencil", ha="center", va="bottom",
+               fontsize=10, color="k")
     a.set_title(title)
     a.set_xticks([0, L/2, L]); a.set_yticks([0, L/2, L])
     if note:
@@ -138,12 +146,12 @@ def frame(a, title, note=None):
                bbox=dict(fc="white", ec="0.7", alpha=0.88, pad=3.0))
 
 
-def show(a, img, title, cmap="RdBu_r", sym=True, note=None, **kw):
+def show(a, img, title, cmap="RdBu_r", sym=True, note=None, label=False, **kw):
     v = np.max(np.abs(img)) if sym else None
     im = a.imshow(img.T, origin="lower", extent=ext, cmap=cmap,
                   vmin=-v if sym else None, vmax=v if sym else None, **kw)
     fig.colorbar(im, ax=a, fraction=0.046, pad=0.03)
-    frame(a, title, note)
+    frame(a, title, note, label)
     return im
 
 
@@ -153,7 +161,8 @@ def pair(img, fmt="{:+.4f}"):
             + "\nbox " + fmt.format(img.mean()))
 
 
-show(ax[0, 0], d[sl], r"(a)  $\delta(q)$, unsmoothed", note=pair(d[sl]))
+show(ax[0, 0], d[sl], r"(a)  $\delta(q)$, unsmoothed", note=pair(d[sl]),
+     label=True)
 show(ax[0, 1], d1[sl], rf"(b)  $\delta_R$, $R$ = {R1:.0f} Mpc/$h$", note=pair(d1[sl]))
 show(ax[0, 2], d2[sl], rf"(c)  $\delta_R$, $R$ = {R2:.0f} Mpc/$h$", note=pair(d2[sl]))
 show(ax[0, 3], d3[sl], rf"(d)  $\delta_R$, $R$ = {R3:.0f} Mpc/$h$", note=pair(d3[sl]))
