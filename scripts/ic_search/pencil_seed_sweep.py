@@ -76,6 +76,12 @@ _ap.add_argument("--sigma-R", type=float, nargs="+", default=None, metavar="R",
                       "8 gives sigma_8 itself. The field is linear and at zstart, so "
                       "dividing by the growth factor the run reports turns the "
                       "measurement into the z = 0 amplitude the region is equivalent to")
+_ap.add_argument("--field", default=None, metavar="FILE",
+                 help="measure this delta(q) file instead of generating one. The "
+                      "sweep otherwise deletes any field it finds in its working "
+                      "directory, since a stale one left by a failed retry would be "
+                      "measured for the wrong seed. Used by test_estimators.py to "
+                      "put fields with known xi and P(k) through this same code")
 _ap.add_argument("--powerspec", default=None, metavar="FILE",
                  help="monofonIC *_input_powerspec.txt to take the theory from. The "
                       "default reference table was written by a back-scaled run and is "
@@ -570,6 +576,8 @@ for s in SEEDS:
     # single _work would have them deleting each other's field mid-run.
     rundir = f"{OUT}/_work_{SEEDS[0]:07d}" if ARGS.compact else f"{OUT}/seed_{s:05d}"
     os.makedirs(rundir, exist_ok=True)
+    if ARGS.field:
+        READY = {s: ARGS.field}
     if s not in READY:
         if ARGS.compact:
             for stale in glob.glob(f"{rundir}/deltaq*.hdf5"):

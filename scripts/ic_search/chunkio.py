@@ -80,6 +80,21 @@ def load(path, species="matter", nchunk=None, want_spectra=False):
         if "bulk" in f:
             add("bulk flow", np.linalg.norm(f["bulk"][:], axis=-1))
 
+        # sigma(R) on a top-hat, the amplitude the definition of sigma_8 uses.
+        # Named by radius so a figure can say sigma_8 rather than "the rms at
+        # R = 8". The whole-box value is one number per realization, broadcast
+        # across the pencil axis to sit beside the per-pencil columns.
+        if "sigma" in f and "sigma_R" in f:
+            SR = f["sigma_R"][:]
+            sig = f["sigma"][:]
+            for r, R in enumerate(SR):
+                add(f"sigma R={R:.0f}", sig[:, r])
+            if "sigma_box" in f:
+                sb = f["sigma_box"][:]
+                for r, R in enumerate(SR):
+                    add(f"sigma box R={R:.0f}",
+                        np.repeat(sb[:, r, None], P.shape[1], 1))
+
         # The same quantities on the pencil trimmed by a margin, and on the whole
         # box. Both are one value per seed for the box, so they are broadcast to
         # the pencil axis to sit alongside the per-pencil columns.
