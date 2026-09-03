@@ -7,10 +7,8 @@ This repository holds two things:
    ξ(r), and ψ(r). Code in `icpipe/`, `src/`, `tools/`.
 2. **A collection of LaTeX study notes** on cosmological ICs and field
    statistics, in `notes/`. Treat them as the second purpose of the repo, not
-   an appendix to the first. The dark-matter physics notes (SIDM, fuzzy dark
-   matter, field theory, dark-matter chemistry, classical mechanics) moved to
-   the `ai-notes` repository on 2026-07-28; they had no dependency on this
-   code.
+   an appendix to the first. Notes that do not depend on this pipeline have been
+   moved out over time; `notes/README.md` records which and when.
 
 ## Directory Structure
 
@@ -154,7 +152,7 @@ LaTeX write-ups in `notes/`; full list and reading order in `notes/README.md`.
 | `ic_sampling.tex` | P-sampled vs ξ-sampled ICs (Pen 1997, Sirko 2005, Hahn & Abel 2011); box window truncation |
 | `restriction_lpt.tex` | Restriction of δ and Ψ⁽¹⁾; why restricting the displacement potential is Poisson-inconsistent |
 | `music2_internals.tex` | File-and-line walkthrough of MUSIC2's δ construction and zoom noise hierarchy |
-| `ic_search.tex` | Why adopting the seed whose subvolume P(k) best matches linear theory selects an atypical region. The estimator is unbiased for theory convolved with the subvolume window, 34% below theory at the fundamental, so matching the raw theory needs an upward fluctuation. Selection displaces the subvolume's large-scale power by 1.26σ and every other property by its correlation with that power times 1.26; the displacement saturates, so a million-seed search is no worse than a thousand. 83,542 realisations at 128³. Controls: random criterion 0.000, convolved-theory criterion 0.016. Textbook register, like the other notes: the reader is an international graduate student meeting the material for the first time. Define every term, motivate before deriving, keep sentences plain. Length is not a cost |
+| `ic_search.tex` | Why adopting the seed whose subvolume P(k) best matches linear theory selects an atypical region. The estimator is unbiased for theory convolved with the subvolume window, 34% below theory at the fundamental, so matching the raw theory needs an upward fluctuation. Selection displaces the subvolume's large-scale power by 1.26σ and every other property by its correlation with that power times 1.26; the displacement saturates, so a million-seed search is no worse than a thousand. 83,542 realisations at 128³. Controls: random criterion 0.000, convolved-theory criterion 0.016. |
 | `xi_estimators.tex` | Why a direct lag sum and a zero-padded FFT are the same estimator: grid Landy–Szalay in the infinite-random limit and Slepian & Eisenstein's N = D−R convolution form, Wiener–Khinchin as a finite identity, circular vs linear autocorrelation and the padding condition d ≤ P−N, the separable N−d pair count, per-axis boundaries for pencil beams, cost scaling, and the gridding artefacts the FFT route concedes |
 
 Planning docs in `docs-claude/`: `CLAUDE_MUSIC2.md` (MUSIC2 code structure,
@@ -189,59 +187,6 @@ make -C notes notes        # PDFs only
 make -C notes clean
 ```
 
-### Prose in `.tex` and `.md` files
-
-The rules are in `~/.claude/CLAUDE.md` under `## Prose`, and they apply to
-every word written into a `.tex` or `.md` file here. They are not repeated in
-this file. The short form: write the plainest sentence that states the fact,
-then stop.
-
-Defects that reached `cosmo_stat.tex` (now in `ai-notes`) and had to be corrected sentence
-by sentence, kept here as worked examples: "the bridge between theory and
-data", "for free", "the whole game", "the price of a finite box", "the rescue
-is ergodicity", "through the lens of ordinary statistics", "each cell knows
-nothing about its neighbours", "the right-hand side mentions x nowhere",
-"even though it looked as though it might".
-
-The money-and-injury family for "a method removes something" — cost, price,
-buys, pays, damage, penalty, free — recurred six times in a first draft of
-`notes/ic_search.tex` after being corrected once in `cosmo_stat.tex`.
-Name the quantity: "removes 21% of the scatter", not "costs a fifth of the
-scatter".
-
-### Writing style for the notes
-
-The rule above applies first. What follows is specific to `notes/`.
-
-**Define every term, symbol, and name where it first appears.** This one holds in
-every note regardless of register, including the journal-register ones. A reader
-who meets `tidal shear` in a results table and finds its definition in the method
-section at the end has been failed, even if the definition is eventually there.
-Put the definitions before the results that use them.
-
-The rest of this section is for the textbook-register notes.
-
-These notes are for self-study. The reader is meeting the material for the first
-time, or returning to it after a long gap, and has nothing else in front of them.
-Write the way a good textbook written for international students reads:
-
-- Say what you are about to do before doing it.
-- Justify each non-obvious step. If a line of algebra holds because mixed partial
-  derivatives commute, say so.
-- Define every term, symbol, and name where it first appears, including where a
-  name comes from when that makes it memorable.
-- State in words what a result means once it has been derived.
-- Give a concrete worked example where a general statement is hard to picture.
-- One idea per sentence; plain word order; no inverted or fronted clauses.
-
-Length is not a cost to this reader. Having to re-read a paragraph three times
-is. A rewrite that triples the length of a compressed passage is the correct
-trade. The opening sections of `notes/kinetic_theory.tex` in the `ai-notes`
-repository (formerly §A.1 and §A.2 of `sidm.tex`) are the reference for this
-style.
-
-This is the opposite of the standard for a PR body, where the reader already
-knows the material and padding is a defect. Do not mix the two.
 
 ## Matched-noise validation (MUSIC2-anisotropic-zoom fork)
 
@@ -271,14 +216,6 @@ box would give. A ~10⁻²σ displacement residual at the patch face, decaying
 inward, does not disturb that. Bit-equality matters for code-validation figures,
 not for science runs.
 
-## Subagent and skill guidance
-
-- Run `/prose-review` on any prose document before the user reads it. It routes
-  by audience: `prose-reviewer` for the LaTeX notes and docs (reports passages
-  too compressed to follow), `pr-body-reviewer` for PR bodies and issue text
-  (reports missing evidence and padding). Shared word and sentence rules:
-  `~/.claude/skills/prose-review/register.md`.
-- Use the **Explore** agent for searches across `icpipe/`, `src/`, `scripts/`.
 
 ## Maintenance Rules
 
