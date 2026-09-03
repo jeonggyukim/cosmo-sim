@@ -42,19 +42,37 @@ ap.add_argument("--nbin", type=int, default=160)
 ap.add_argument("--out", default=os.path.join(paths.FIGS, "joint_selection.png"))
 A = ap.parse_args()
 
-crit_th, _, C, meta, _ = chunkio.load(A.data, A.species)
+crit_th, crit_wn, C, meta, _ = chunkio.load(A.data, A.species)
 nseed, npen = crit_th.shape
-crit_th = crit_th.ravel()
+crit_th, crit_wn = crit_th.ravel(), crit_wn.ravel()
 C = {n: v.ravel() for n, v in C.items()}
 for name in (A.x, A.y):
     if name not in C:
         raise SystemExit(f"no quantity named {name!r}. Available: "
                          + ", ".join(sorted(C)))
 
-order = np.argsort(crit_th)
 nk = max(1, int(round(A.keep*len(crit_th))))
 nk2 = max(1, int(round(A.keep2*len(crit_th))))
-sel = {A.keep: order[:nk], A.keep2: order[:nk2]}
+order = np.argsort(crit_th)
+
+# Three selections. The first two ask the pencil to match the raw linear theory,
+# at two cuts a factor of ten apart. The third asks it to match the theory
+# convolved with the pencil window, the curve the estimator is actually unbiased
+# for, and is the control: that target demands nothing atypical, so its cloud
+# should sit over the middle of the parent distribution on both axes. Drawn
+# first, so the selections the figure is about are not painted over by it.
+#
+# Colour follows the rest of the figures in this directory: red and orange for
+# the proposed criterion, green for the window-matched control. Blue is not free
+# here, since region_vs_box uses it for the whole box.
+SELECTIONS = [
+    (np.argsort(crit_wn)[:nk], "C2", 3.0, 0.30,
+     f"match theory $\\ast$ window, keeping {100*A.keep:g}%  (control)"),
+    (order[:nk], "C3", 3.0, 0.30,
+     f"match raw theory, keeping {100*A.keep:g}%"),
+    (order[:nk2], "C1", 11.0, 0.85,
+     f"match raw theory, keeping {100*A.keep2:g}%"),
+]
 
 
 def z(name):
@@ -137,7 +155,7 @@ axy = fig.add_subplot(gs[1, 1], sharey=ax)
 # the part of the plane the figure exists to show.
 lo_x, hi_x = np.percentile(X, [0.02, 99.98])
 lo_y, hi_y = np.percentile(Y, [0.02, 99.98])
-for idx in sel.values():
+for idx, *_ in SELECTIONS:
     lo_x, hi_x = min(lo_x, X[idx].min()), max(hi_x, X[idx].max())
     lo_y, hi_y = min(lo_y, Y[idx].min()), max(hi_y, Y[idx].max())
 pad_x, pad_y = 0.04*(hi_x - lo_x), 0.04*(hi_y - lo_y)
@@ -161,12 +179,9 @@ ax.contourf(xc, yc, H.T, levels=levels + [H.max()],
             colors=["0.90", "0.80", "0.68", "0.55"], zorder=0)
 ax.contour(xc, yc, H.T, levels=levels, colors="0.45", linewidths=0.5, zorder=1)
 
-SERIES = [(A.keep, "C3", "o", 3.0, 0.30),
-          (A.keep2, "C1", "o", 11.0, 0.85)]
-for keep, col, mk, size, al in SERIES:
-    idx = sel[keep]
-    ax.scatter(X[idx], Y[idx], s=size, marker=mk, c=col, alpha=al,
-               linewidths=0, zorder=3, label=f"kept, closest {100*keep:g}%")
+for j, (idx, col, size, al, lab) in enumerate(SELECTIONS):
+    ax.scatter(X[idx], Y[idx], s=size, marker="o", c=col, alpha=al,
+               linewidths=0, zorder=3 + j, label=lab)
 
 # ---- the prediction: in these units the conditional mean has slope rho ----
 xs = np.array(XL)
@@ -176,11 +191,10 @@ ax.axhline(0, color="0.35", lw=0.9, zorder=2)
 ax.axvline(0, color="0.35", lw=0.9, zorder=2)
 
 # Where each selection actually landed, against where the line says it should.
-for keep, col, _, _, _ in SERIES:
-    idx = sel[keep]
+for idx, col, _, _, _ in SELECTIONS:
     dx, dy = X[idx].mean(), Y[idx].mean()
-    ax.plot([dx], [dy], marker="P", ms=13, mfc=col, mec="k", mew=1.2, zorder=6)
-    ax.plot([dx], [rho*dx], marker="_", ms=17, mec="k", mew=2.4, zorder=5)
+    ax.plot([dx], [dy], marker="P", ms=13, mfc=col, mec="k", mew=1.2, zorder=8)
+    ax.plot([dx], [rho*dx], marker="_", ms=17, mec="k", mew=2.4, zorder=7)
 
 ax.set_xlim(*XL); ax.set_ylim(*YL)
 ax.set_xlabel(f"{A.x}   [standard deviations]")
@@ -193,11 +207,10 @@ by = np.linspace(*YL, 70)
 axx.hist(X, bins=bx, color="0.78", edgecolor="none", density=True)
 axy.hist(Y, bins=by, color="0.78", edgecolor="none", density=True,
          orientation="horizontal")
-for keep, col, _, _, _ in SERIES:
-    idx = sel[keep]
+for idx, col, _, _, _ in SELECTIONS:
     # The tighter cut holds a tenth as many points, so it gets half the bins;
     # a density histogram stays comparable across different bin widths.
-    step = 1 if keep == A.keep else 2
+    step = 1 if len(idx) == nk else 2
     axx.hist(X[idx], bins=bx[::step], histtype="step", lw=1.6, color=col,
              density=True)
     axy.hist(Y[idx], bins=by[::step], histtype="step", lw=1.6, color=col,
@@ -220,11 +233,12 @@ axy.set_xlabel("")
 # ---- the numbers the figure is evidence for ----
 # Inside the joint panel, in its empty lower-right corner. Put above the axes
 # instead and it lands on the marginal histogram, which shares that strip.
+SHORT = {"C2": "control", "C3": f"raw, {100*A.keep:g}%",
+         "C1": f"raw, {100*A.keep2:g}%"}
 rows = [f"$\\rho = {rho:+.3f}$"]
-for keep, _, _, _, _ in SERIES:
-    idx = sel[keep]
+for idx, col, _, _, _ in SELECTIONS:
     dx, dy = X[idx].mean(), Y[idx].mean()
-    rows.append(f"keeping {100*keep:g}%:   $\\Delta_x = {dx:+.2f}$,   "
+    rows.append(f"{SHORT[col]}:   $\\Delta_x = {dx:+.2f}$,   "
                 f"$\\rho\\Delta_x = {rho*dx:+.2f}$,   "
                 f"measured $\\Delta_y = {dy:+.2f}$")
 ax.text(0.985, 0.022, "\n".join(rows), transform=ax.transAxes, fontsize=8.8,
@@ -261,10 +275,9 @@ print(f"wrote {A.out}\n")
 print(f"{A.x}  vs  {A.y}")
 print(f"rho = {rho:+.4f}   over {len(X):,} subvolumes "
       f"({nseed:,} realizations x {npen})")
-hdr = f"{'keep':>8}{'n':>9}{'dx':>9}{'rho*dx':>10}{'dy':>9}{'dy/dx':>9}"
+hdr = f"{'selection':>16}{'n':>9}{'dx':>9}{'rho*dx':>10}{'dy':>9}{'dy/dx':>9}"
 print(hdr); print("-"*len(hdr))
-for keep, _, _, _, _ in SERIES:
-    idx = sel[keep]
+for idx, col, _, _, _ in SELECTIONS:
     dx, dy = X[idx].mean(), Y[idx].mean()
-    print(f"{100*keep:>7g}%{len(idx):>9,}{dx:>+9.3f}{rho*dx:>+10.3f}"
-          f"{dy:>+9.3f}{dy/dx:>9.3f}")
+    print(f"{SHORT[col]:>16}{len(idx):>9,}{dx:>+9.3f}{rho*dx:>+10.3f}"
+          f"{dy:>+9.3f}{dy/dx if abs(dx) > 1e-6 else np.nan:>9.3f}")
