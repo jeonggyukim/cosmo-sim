@@ -70,6 +70,22 @@ _ap.add_argument("--interior-margin", type=float, default=0.0, metavar="M",
                       "face is built partly from material outside the pencil, so the "
                       "untrimmed average is not a property of the pencil alone. 0 "
                       "measures only the whole pencil")
+_ap.add_argument("--kernel-weight", action="store_true",
+                 help="also measure every environment quantity with each cell weighted "
+                      "by the fraction of its smoothing kernel that fell inside the "
+                      "pencil. A Gaussian has no compact support, so trimming a margin "
+                      "of M radii still admits a one-sided tail of erfc(M/sqrt 2)/2 -- "
+                      "16 percent at M=1, 2.3 percent at M=2 -- while this weighting is "
+                      "continuous, keeps the whole region, and stays defined at radii "
+                      "where a margin would leave nothing")
+_ap.add_argument("--source-split", type=int, default=0, metavar="NPEN",
+                 help="for this many pencils per realization, split the region's tidal "
+                      "field into the part sourced by matter inside the region and the "
+                      "part sourced by matter outside it. Poisson is linear, so "
+                      "T[delta] = T[M delta] + T[(1-M) delta] exactly, and the two "
+                      "pieces say how much of a region's measured shear is a property "
+                      "of the region at all. Costs 8 extra FFTs per pencil per radius, "
+                      "so a few pencils over a few hundred realizations is enough")
 _ap.add_argument("--nthreads", type=int, default=None,
                  help="OpenMP threads for monofonIC. Deliberately has no default: the "
                       "right value depends on how many sweeps you intend to run at once")
@@ -341,6 +357,37 @@ else:
 MARGIN_CELLS = ([int(np.ceil(ARGS.interior_margin*R*NGRID/LBOX)) for R in ARGS.smooth]
                 if ARGS.interior_margin > 0 else [])
 
+# K2 carries a guard at the origin so that 1/K2 is finite, which is harmless for
+# delta because a zero-mean field has no DC mode to distort. A mask does have
+# one, and it is most of the mask, so anything convolved with a mask uses the
+# true k^2 instead.
+gauss_true = lambda R: np.exp(-0.5*kk**2*R**2)
+
+# Fraction of each cell's smoothing kernel that fell inside the pencil,
+# w(x) = [W_R * M](x), for cells inside the pencil. Convolution commutes with
+# translation, so this is the same array for every pencil sharing an axis and is
+# built once per (axis, radius) rather than once per pencil per seed.
+KWEIGHT = {}
+if ARGS.kernel_weight:
+    for _a in range(3):
+        _sl = pencil_slice(_a, 0, 0)
+        _M = np.zeros((NGRID,)*3)
+        _M[_sl] = 1.0
+        _Mk = np.fft.fftn(_M)
+        for _r, _R in enumerate(ARGS.smooth):
+            KWEIGHT[_a, _r] = np.real(np.fft.ifftn(_Mk*gauss_true(_R)))[_sl]
+    print("   kernel fraction retained inside the region, mean over the region:")
+    for _r, _R in enumerate(ARGS.smooth):
+        _f = np.mean([KWEIGHT[_a, _r].mean() for _a in range(3)])
+        print(f"     R = {_R:5.1f} Mpc/h   {_f:.3f}")
+
+# Pencils carrying the inside/outside source split, spread over the three axes
+# rather than taken from the front of the list, which would be one axis only.
+SPLIT_PENCILS = ([] if not ARGS.source_split else
+                 [int(round(t)) for t in
+                  np.linspace(0, len(PENCILS) - 1,
+                              min(ARGS.source_split, len(PENCILS)))])
+
 # Separation grid for xi. A periodic box makes the wrapped pairs real pairs, so
 # the circular correlation is the right one and no zero-padding is needed; the
 # survey case in notes/xi_estimators.tex needs padding because it is not periodic.
@@ -419,7 +466,9 @@ ACC = {k: [] for k in ("seed", "P_full", "P_pencil", "xi_full", "xi_pencil",
                        "shear", "dbar", "lambda",
                        "webtype", "contrast", "bulk",
                        "shear_interior", "dbar_interior", "lambda_interior",
-                       "shear_box", "dbar_box", "lambda_box", "webtype_box")}
+                       "shear_box", "dbar_box", "lambda_box", "webtype_box",
+                       "shear_kw", "dbar_kw", "webtype_kw",
+                       "shear_src", "dbar_src")}
 SKIPPED = []
 
 
@@ -453,6 +502,8 @@ def write_chunk():
             if MARGIN_CELLS:
                 f["margin_cells"] = np.array(MARGIN_CELLS)
                 f.attrs["interior_margin"] = ARGS.interior_margin
+            if SPLIT_PENCILS:
+                f["split_pencils"] = np.array(SPLIT_PENCILS)
         # Skipped seeds are recorded once, with the batch that was open when the
         # skip happened, so the totals over all files still come out right.
         f["skipped"] = np.array(SKIPPED, dtype=np.int64)
@@ -531,6 +582,14 @@ for s in SEEDS:
         shear_in = np.full((nR, len(PENCILS)), np.nan)
         dbar_in = np.full((nR, len(PENCILS)), np.nan)
         lam_in = np.full((nR, len(PENCILS), 3), np.nan)
+        # Kernel-fraction weighted, and the inside/outside source split. Both
+        # ask what part of a region's number belongs to the region; the first
+        # reweights the cells, the second decomposes the field that made them.
+        shear_kw = np.full((nR, len(PENCILS)), np.nan)
+        dbar_kw = np.full((nR, len(PENCILS)), np.nan)
+        web_kw = np.full((nR, len(PENCILS), 4), np.nan)
+        shear_src = np.full((nR, len(SPLIT_PENCILS), 3), np.nan)  # in, out, cross
+        dbar_src = np.full((nR, len(SPLIT_PENCILS), 2), np.nan)   # in, out
         bulk = np.empty((len(PENCILS), 3))        # mean Zel'dovich displacement, Mpc/h
         dk0 = np.fft.fftn(d["matter"])
         # Bulk flow: the region's mean displacement, Psi(k) = i k delta / k^2. It is
@@ -541,7 +600,7 @@ for s in SEEDS:
             bulk[n] = [psi[a][sl].mean() for a in range(3)]
         del psi
         for r, R in enumerate(ARGS.smooth):
-            dks = dk0*np.exp(-0.5*K2*R**2)
+            dks = dk0*gauss_true(R)
             dsm = np.real(np.fft.ifftn(dks))
             # The full tidal tensor T_ij = d_i d_j Phi, with laplacian Phi = delta.
             # Its eigenvalues sum to delta and decide the collapse geometry; the
@@ -552,7 +611,8 @@ for s in SEEDS:
                     T[..., a, b] = T[..., b, a] = np.real(np.fft.ifftn(KV[a]*KV[b]/K2*dks))
             # sum_ij (T_ij - delta_ij delta/3)^2 = sum_ij T_ij^2 - delta^2/3,
             # which avoids building the subtracted tensor.
-            s2 = (T*T).sum((-1, -2)) - dsm*dsm/3.0
+            TT2 = (T*T).sum((-1, -2))
+            s2 = TT2 - dsm*dsm/3.0
             if s == SEEDS[0] and r == 0:
                 print(f"   check <s^2>/<delta^2> = {s2.mean()/dsm.var():.4f} (2/3 expected)")
             # lam[..., 0] is the largest eigenvalue, the axis along which the
@@ -592,6 +652,50 @@ for s in SEEDS:
                         shear_in[r, n] = np.sqrt(s2[sli].mean())
                         dbar_in[r, n] = dsm[sli].mean()
                         lam_in[r, n] = ev[sli].mean((0, 1, 2))
+                # The same averages with each cell weighted by how much of its
+                # kernel stayed inside: full weight at the centre, about half at
+                # a face. Unlike a margin this keeps every cell and stays defined
+                # at radii where a margin would leave nothing.
+                if KWEIGHT:
+                    w = KWEIGHT[ax, r]
+                    wsum = w.sum()
+                    shear_kw[r, n] = np.sqrt((w*s2[sl]).sum()/wsum)
+                    dbar_kw[r, n] = (w*dsm[sl]).sum()/wsum
+                    for cls in range(4):
+                        web_kw[r, n, 3-cls] = w[npos[sl] == cls].sum()/wsum
+
+            # Where the region's tidal field comes from. Poisson is linear, so
+            # splitting the source at the region boundary splits the tensor,
+            # T[delta] = T[M delta] + T[(1-M) delta], with no approximation. The
+            # outside term is not an error to be removed: the tidal field at a
+            # point genuinely responds to distant matter. It is the size of that
+            # response, which is what decides whether a number measured on the
+            # region describes the region.
+            for q, ip in enumerate(SPLIT_PENCILS):
+                p = PENCILS[ip]
+                sl = pencil_slice(*p)
+                dks_in = np.fft.fftn(masked(d["matter"], p))*gauss_true(R)
+                d_in = np.real(np.fft.ifftn(dks_in))
+                d_out = dsm - d_in
+                A = np.zeros(dsm.shape)     # sum_ij T_in,ij^2
+                B = np.zeros(dsm.shape)     # sum_ij T_ij T_in,ij
+                for a in range(3):
+                    for b in range(3):
+                        t_in = np.real(np.fft.ifftn(KV[a]*KV[b]/K2*dks_in))
+                        A += t_in*t_in
+                        B += T[..., a, b]*t_in
+                # T_out = T - T_in, so its square and the cross term follow from
+                # A, B and sum_ij T_ij^2 without building a third tensor.
+                s2_in = A - d_in*d_in/3.0
+                s2_out = (TT2 - 2*B + A) - d_out*d_out/3.0
+                s2_x = 2*((B - A) - d_in*d_out/3.0)
+                shear_src[r, q] = [s2_in[sl].mean(), s2_out[sl].mean(),
+                                   s2_x[sl].mean()]
+                dbar_src[r, q] = [d_in[sl].mean(), d_out[sl].mean()]
+                if s == SEEDS[0] and r == 0 and q == 0:
+                    tot = shear_src[r, q].sum()
+                    print(f"   check source split closes to "
+                          f"{tot/s2[sl].mean():.6f} of <s^2> (1 expected)")
 
     if ARGS.compact:
         ACC["seed"].append(s)
@@ -610,6 +714,13 @@ for s in SEEDS:
                 ACC["shear_interior"].append(shear_in)
                 ACC["dbar_interior"].append(dbar_in)
                 ACC["lambda_interior"].append(lam_in)
+            if KWEIGHT:
+                ACC["shear_kw"].append(shear_kw)
+                ACC["dbar_kw"].append(dbar_kw)
+                ACC["webtype_kw"].append(web_kw)
+            if SPLIT_PENCILS:
+                ACC["shear_src"].append(shear_src)
+                ACC["dbar_src"].append(dbar_src)
     with h5py.File(f"{rundir}/pk.hdf5", "w") as f:
         f["k"] = kbin
         f["P_full"] = P_full
@@ -629,6 +740,14 @@ for s in SEEDS:
                 f["shear_interior"] = shear_in
                 f["dbar_interior"] = dbar_in
                 f["lambda_interior"] = lam_in
+            if KWEIGHT:
+                f["shear_kw"] = shear_kw
+                f["dbar_kw"] = dbar_kw
+                f["webtype_kw"] = web_kw
+            if SPLIT_PENCILS:
+                f["shear_src"] = shear_src   # <s^2> as inside, outside, cross
+                f["dbar_src"] = dbar_src     # dbar as inside, outside
+                f["split_pencils"] = np.array(SPLIT_PENCILS)
             f["smooth_R"] = np.array(ARGS.smooth)
         if ARGS.xi:
             f["r"] = rbin
