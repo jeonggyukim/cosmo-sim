@@ -98,7 +98,10 @@ a.text(0.006, 1.3/len(P_pen), f"1 pencil in {len(P_pen)}", fontsize=7.5, color="
 a.set_xlabel(r"threshold on $D$")
 a.set_ylabel("fraction of pencils below threshold")
 a.set_title("(d)  hit rate: fraction of pencils matching to better than $D$", fontsize=9.5)
-a.legend(frameon=False, fontsize=7, ncol=2, loc="lower right")
+# One column, in the order the curves are drawn: each band's pair together,
+# theory then window. Two columns filled the second before the first was read,
+# which broke that pairing.
+a.legend(fontsize=7, ncol=1, loc="upper left", framealpha=0.95)
 a.set_ylim(0.5/len(P_pen), 1.5)
 
 for lab, a in zip("abc", axes):
