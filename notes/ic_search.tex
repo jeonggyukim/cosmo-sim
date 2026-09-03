@@ -138,75 +138,44 @@ linear power spectrum is steep at large scales, rising towards small $k$, this
 averaging pulls power down from the largest scales into their neighbours and
 leaves a deficit there.
 
-\subsection{The window of a pencil, written down}
+\subsection{The window of a pencil}
 \label{sec:winform}
 
-For the pencil the window can be written in closed form, and doing so makes the
-size of the effect predictable rather than merely measured.
-
-The mask occupies a whole number of grid cells, $n_i$ of them along axis $i$ of
-an $N^3$ periodic grid. The transform of a run of $n$ consecutive ones is a
-geometric series, which sums to the \emph{Dirichlet kernel}, the periodic
-counterpart of the familiar $\sin x / x$. Taking the modulus squared and
-normalising as in Eq.~\eqref{eq:conv},
+For a mask covering $n_i$ cells along axis $i$ of an $N^3$ periodic grid, the
+transform of a run of ones is a geometric series and
 \begin{equation}
   \label{eq:winform}
   \frac{|\widetilde W(\mathbf{m})|^2}{N^6} \;=\;
   \prod_{i=1}^{3}
   \left[ \frac{\sin(\pi m_i n_i / N)}{N \sin(\pi m_i / N)} \right]^2 ,
 \end{equation}
-where $\mathbf{m}$ is the integer wavevector, $k_i = 2\pi m_i / L$, and the
-$m_i = 0$ case is the limit $n_i/N$.
+with $k_i = 2\pi m_i/L$ and the $m_i = 0$ case the limit $n_i/N$. Two features
+of this matter later.
 
-Now put in the pencil's dimensions. Transverse to the pencil, $n_x = n_y = N/8$.
-Along the pencil, however, $n_z = N$: the pencil spans the whole periodic box in
-that direction. The $z$ factor of Eq.~\eqref{eq:winform} then contains
-$\sin(\pi m_z)$, which vanishes for every integer $m_z \neq 0$, so that factor is
-a Kronecker delta $\delta_{m_z 0}$. Numerically, the fraction of the window's
-total power at $m_z \neq 0$ is zero to machine precision.
+First, the pencil spans the whole box along its length, $n_z = N$, so the $z$
+factor contains $\sin(\pi m_z)$ and vanishes for every integer $m_z \neq 0$. The
+window is a Kronecker delta in that direction: the pencil does not smear its
+long axis at all, and the entire deficit is transverse.
 
-This is worth stating plainly. \emph{The pencil does not smear its long
-direction at all.} There is no mask along that axis, so there is nothing to
-convolve with, and the entire $34\%$ deficit comes from the two transverse
-directions. The window is effectively two-dimensional.
-
-For wavenumbers well below the Nyquist frequency the Dirichlet kernel reduces to
-the ordinary sinc, and Eq.~\eqref{eq:winform} takes the more recognisable form
-\begin{equation}
-  \label{eq:winsinc}
-  |\widetilde W(\bk)|^2 \;\propto\;
-  \delta_{k_z 0} \,
-  \mathrm{sinc}^2\!\left(\frac{k_x \ell_\perp}{2}\right)
-  \mathrm{sinc}^2\!\left(\frac{k_y \ell_\perp}{2}\right),
-  \qquad \mathrm{sinc}\,x = \frac{\sin x}{x},
-\end{equation}
-with $\ell_\perp = L/8 = 87.5\Mpch$ the transverse width of the pencil. The
-first zero of each sinc sits at $k_i \ell_\perp / 2 = \pi$, that is at
+Second, the transverse factors reduce to $\mathrm{sinc}^2(k_i \ell_\perp/2)$ at
+low $k$, with $\ell_\perp = L/8 = 87.5\Mpch$ the pencil width. The first zero
+sits at
 \begin{equation}
   \label{eq:dkperp}
   \Delta k_\perp \;=\; \frac{2\pi}{\ell_\perp} \;=\; 0.072\ h\,\mathrm{Mpc}^{-1},
 \end{equation}
-which is the smallest wavenumber the pencil can resolve across itself and
-therefore the width of the smearing. The box fundamental is
-$k_f = 2\pi/L = 0.0090\ h\,\mathrm{Mpc}^{-1}$, eight times smaller. The window is
-eight times wider than the largest scale being measured, which is why the
-deficit at that scale is tens of per cent rather than a small correction.
+which sets the width of the smearing. The box fundamental is
+$k_f = 2\pi/L = 0.0090\ h\,\mathrm{Mpc}^{-1}$, eight times smaller, so the window
+is eight times wider than the largest scale being measured. That is why the
+deficit is tens of per cent and not a small correction.
 
-Two cautions on using these expressions. The continuum form
-Eq.~\eqref{eq:winsinc} and the exact form Eq.~\eqref{eq:winform} agree to $0.1\%$
-at $m = 1$ and $1.3\%$ at $m = 4$, but differ by a factor of $2.3$ near the
-Nyquist frequency, so the discrete kernel is the one to use for anything
-quantitative. And the convolution in Eq.~\eqref{eq:conv} is never evaluated
-directly, which would cost $N^6$ operations. It is done by transforming to
-configuration space, where a convolution becomes a product: $P_{\rm th}$
-transforms to $\xi$, the window $|\widetilde W|^2$ transforms to the mask's own
-autocorrelation $(W \star W)(r)$ by the Wiener--Khinchin theorem, the two are
-multiplied, and the result is transformed back. Note that the multiplying factor
-is the mask autocorrelation and not the mask itself; for a one-dimensional
-top-hat of width $n$ it is a triangle of base $2n$, not a top-hat. That same
-mask autocorrelation is what divides out of the correlation-function estimator
-in \S\ref{sec:xi-unbiased}, which is the whole reason $\xi$ escapes the deficit
-and $P(k)$ does not.
+The convolution is never evaluated directly, which would cost $N^6$ operations.
+It is done in configuration space, where convolution becomes a product:
+$P_{\rm th}$ transforms to $\xi$, $|\widetilde W|^2$ transforms to the mask
+autocorrelation $(W \star W)(r)$, the two are multiplied, and the result is
+transformed back. That same mask autocorrelation is what divides out of the
+correlation-function estimator in \S\ref{sec:xi-unbiased}, which is exactly why
+$\xi$ escapes the deficit and $P(k)$ does not.
 
 Three things about this deficit are worth separating. It is deterministic: it is
 the same in every realisation, since $W$ is fixed by the geometry and does not
@@ -399,12 +368,9 @@ grid of spacing $L/N$ can represent.
       \sum_{k \,\le\, 2\Delta k_\perp}
       \ln^2 \frac{\hat P(k)}{P_{\rm ref}(k)} \right]^{1/2} .
   \end{equation}
-  Here $N_{\rm bins}$ is the number of wavenumber bins falling in the band
-  $k \le 2\Delta k_\perp$, so that $D$ is a root-mean-square logarithmic
-  deviation and does not grow merely because more bins were summed. The
-  logarithm makes the criterion sensitive to fractional rather than absolute
-  differences, which matters because $P(k)$ varies over orders of magnitude
-  across the band.
+  $N_{\rm bins}$ is the number of bins in the band, so $D$ is a root-mean-square
+  logarithmic deviation; the logarithm makes it sensitive to fractional rather
+  than absolute differences.
 
   The proposal takes $P_{\rm ref} = P_{\rm th}$, the raw linear theory. The
   control of \S\ref{sec:controls} takes
@@ -421,25 +387,18 @@ grid of spacing $L/N$ can represent.
   $2\Delta k_\perp < k \le 0.9\,k_{\rm Ny}$, that is, the scales the criterion
   does not look at.
 
-\item[Tidal tensor.] $T_{ij} = \partial_i \partial_j \Phi$, where $\Phi$ obeys
-  $\nabla^2 \Phi = \delta_R$. Note that $\Phi$ here is not the Newtonian
-  potential in physical units: it is normalised so that $\delta_R$ sources it
-  directly, absorbing the usual factors of $4\pi G \bar\rho a^2$.
-
-  Two Fourier rules turn this into an algebraic expression. A spatial derivative
-  becomes multiplication by a wavenumber, $\partial_i \to i k_i$, so the
-  Laplacian becomes $\nabla^2 \to -k^2$. Poisson's equation then reads
-  $-k^2 \Phi(\bk) = \delta_R(\bk)$, and applying $\partial_i \partial_j$ to it
-  brings down $(ik_i)(ik_j) = -k_i k_j$, so the two minus signs cancel:
+\item[Tidal tensor.] $T_{ij} = \partial_i \partial_j \Phi$ with
+  $\nabla^2 \Phi = \delta_R$, where $\Phi$ is normalised so that $\delta_R$
+  sources it directly, absorbing the usual $4\pi G \bar\rho a^2$. With
+  $\partial_i \to i k_i$ and $\nabla^2 \to -k^2$, Poisson's equation gives
+  $\Phi(\bk) = -\delta_R(\bk)/k^2$ and the two minus signs cancel:
   \begin{equation}
     \label{eq:tidal}
     T_{ij}(\bk) \;=\; \frac{k_i k_j}{k^2}\, \delta_R(\bk) .
   \end{equation}
-  Setting $i = j$ and summing over the repeated index gives
-  $k^2 \delta_R / k^2 = \delta_R$, so the trace of $T_{ij}$ is $\delta_R$, as it
-  must be from Poisson's equation. Its eigenvalues $\lambda_1 \ge \lambda_2 \ge
-  \lambda_3$ describe how the region is being stretched or compressed along
-  three orthogonal axes.
+  Its trace is $\delta_R$, and its eigenvalues $\lambda_1 \ge \lambda_2 \ge
+  \lambda_3$ describe how the region is stretched or compressed along three
+  orthogonal axes.
 
 \item[Tidal shear.] The part of the tidal tensor that changes a region's shape
   rather than its volume, obtained by removing the trace,
@@ -451,21 +410,12 @@ grid of spacing $L/N$ can represent.
       \;=\; \Big\langle T_{ij}T_{ij} - \tfrac{1}{3}\delta_R^2 \Big\rangle_V^{1/2}.
   \end{equation}
   The ratio $\avg{s_{ij}s_{ij}} / \avg{\delta_R^2} = \tfrac{2}{3}$ exactly, for
-  any field whatever, and the one-line reason is worth seeing. Contract
-  Eq.~\eqref{eq:tidal} with itself: summing over both indices,
-  \begin{equation}
-    \label{eq:tt}
-    \sum_{ij} |T_{ij}(\bk)|^2
-    \;=\; \frac{\big(\sum_i k_i^2\big)\big(\sum_j k_j^2\big)}{k^4}\,
-          |\delta_R(\bk)|^2
-    \;=\; |\delta_R(\bk)|^2 ,
-  \end{equation}
-  because $\sum_i k_i^2 = k^2$. Every mode contributes the same to
-  $T_{ij}T_{ij}$ as it does to $\delta_R^2$, so by Parseval's theorem
-  $\avg{T_{ij}T_{ij}}_V = \avg{\delta_R^2}_V$, and subtracting the trace part in
-  Eq.~\eqref{eq:shear} leaves $1 - \tfrac{1}{3} = \tfrac{2}{3}$. The measurement
-  reproduces $0.6667$, which is therefore a check on the smoothing and
-  eigenvalue code rather than on any assumption about the field.
+  any field. Contracting Eq.~\eqref{eq:tidal} with itself gives
+  $\sum_{ij} |T_{ij}|^2 = (\sum_i k_i^2)(\sum_j k_j^2)\,|\delta_R|^2/k^4 =
+  |\delta_R|^2$, since $\sum_i k_i^2 = k^2$, so
+  $\avg{T_{ij}T_{ij}}_V = \avg{\delta_R^2}_V$ by Parseval and removing the trace
+  leaves $1 - \tfrac{1}{3}$. The measurement reproduces $0.6667$, which is
+  therefore a check on the code and not on any assumption about the field.
 
 \item[Mean density.] $\bar\delta_R = \avg{\delta_R}_V$, the smoothed density
   contrast averaged over the subvolume.
@@ -474,16 +424,11 @@ grid of spacing $L/N$ can represent.
   $T_{ij}$ are positive, a positive eigenvalue meaning collapse along that axis:
   three is a knot, two a filament, one a sheet, none a void. The four numbers
   quoted are the fractions of the subvolume's cells in each class, and they sum
-  to one by construction. This classification is due to \citet{Hahn2007}.
-
-  Unlike the shear ratio above, the expected fractions do depend on the field
-  being Gaussian. For a Gaussian field the eigenvalues of $T_{ij}$ follow the
-  distribution derived by \citet{Doroshkevich1970}, which fixes the probability
-  of a given number of them being positive independently of the shape of the
-  power spectrum, and gives $0.08$, $0.42$, $0.42$, $0.08$ for knots, filaments,
-  sheets and voids. The measurement gives $0.0799$, $0.4198$, $0.4202$,
-  $0.0801$. The derivation is not repeated here; the numbers are used as a check
-  that the classification reproduces a known analytic answer.
+  to one by construction \citep{Hahn2007}. Unlike the shear ratio above, these
+  fractions do depend on the field being Gaussian: the eigenvalue distribution
+  of \citet{Doroshkevich1970} gives $0.08$, $0.42$, $0.42$, $0.08$ independently
+  of the shape of $P(k)$, and the measurement reproduces $0.0799$, $0.4198$,
+  $0.4202$, $0.0801$.
 
 \item[Ellipticity.] The shape of the tidal ellipsoid,
   $e = (\lambda_1 - \lambda_3)/2L$ with $L = (\sum_i \lambda_i^2)^{1/2}$. The
@@ -491,19 +436,12 @@ grid of spacing $L/N$ can represent.
   for a region of average density and makes the ratio diverge; dividing by the
   norm keeps the same meaning and stays finite.
 
-\item[Bulk flow.] The mean displacement of the subvolume. In the Zel'dovich
-  approximation, which is first-order Lagrangian perturbation theory and is
-  derived in the companion note \texttt{cosmo\_ic.tex}, a particle's comoving
-  displacement $\boldsymbol\Psi$ from its starting position is the gradient of
-  the same potential that sources the density field. In Fourier space that is
-  \begin{equation}
-    \label{eq:za}
-    \boldsymbol\Psi(\bk) \;=\; \frac{i\,\bk}{k^2}\, \delta(\bk),
-  \end{equation}
-  where $i\bk$ is the gradient and $1/k^2$ inverts the Laplacian, exactly as for
-  $\Phi$ above. The number quoted is $|\avg{\boldsymbol{\Psi}}_V|$, a vector
-  average and then a magnitude, so it depends on the phases of the modes and not
-  only on their amplitudes.
+\item[Bulk flow.] $|\avg{\boldsymbol{\Psi}}_V|$, where the Zel'dovich
+  displacement $\boldsymbol\Psi(\bk) = i\,\bk\,\delta(\bk)/k^2$ is the gradient
+  of the same potential that sources the density field (first-order Lagrangian
+  perturbation theory, derived in \texttt{cosmo\_ic.tex}). The vector is
+  averaged first and the magnitude taken second, so this depends on the phases
+  of the modes and not only on their amplitudes.
 
 \item[Environment contrast.] The subvolume's mean density minus that of the
   eight subvolumes surrounding it, which asks whether the region sits in an
@@ -607,26 +545,18 @@ shifts marked alongside the measured ones.
 An obvious worry is that searching harder makes matters worse without limit. It
 does not, and the reason follows from the same identity.
 
-The displacement in the selected quantity cannot exceed what the realisation
-scatter makes available. The reason is in the form of the criterion. Equation
-\eqref{eq:criterion} measures the distance of a subvolume's spectrum from a
-fixed target curve, not how far above that curve it lies, so a subvolume that
-overshoots the target is scored as badly as one that undershoots it. Once a
-search has found realisations whose subvolume power reaches the raw theory,
-searching further finds realisations that match that curve slightly more
-closely; it does not find realisations with progressively more power, because
-more power would score worse. The displacement saturates near $1.3\sigma$, and
-by Eq.~\eqref{eq:rho} everything else saturates at $\rho \times 1.3$.
+The reason is in the form of the criterion. Equation~\eqref{eq:criterion}
+measures distance from a fixed target curve, not height above it, so a subvolume
+that overshoots is scored as badly as one that undershoots. Once the search
+finds realisations whose power reaches the raw theory, searching further finds
+ones that match more closely, not ones with more power. The displacement
+saturates near $1.3\sigma$, and by Eq.~\eqref{eq:rho} everything else saturates
+at $\rho \times 1.3$.
 
-This is why the search behaves differently from an idealised selection. Suppose
-the criterion could act directly on the large-scale power and simply keep the
-largest of $N$ independent draws. The expected value of that maximum is a
-classical result of extreme-value statistics: for a standard Gaussian it grows
-roughly as $\sqrt{2\ln N}$. That growth is slow, but it never stops. Keeping the
-best of a million draws would reach about $4.9\sigma$, against $1.3\sigma$ here.
-The measured behaviour is bounded instead, because the criterion acts on a noisy
-proxy for the quantity of interest and rewards proximity to a target rather than
-excess.
+Contrast an idealised selection acting directly on the power and keeping the
+largest of $N$ draws. By extreme-value statistics that maximum grows as
+$\sqrt{2\ln N}$, slowly but without bound, reaching $4.9\sigma$ at a million
+draws against the $1.3\sigma$ measured here.
 
 \begin{table}[htbp]
   \centering
@@ -663,19 +593,16 @@ the result is a property of the field.
   \label{fig:search}
 \end{figure}
 
-The same invariance holds against the tolerance rather than the search size.
-Tightening the retained fraction from a quarter to two parts in ten thousand, a
-range of $1250$, changes the shift in the large-scale power by $42\%$, from
-$0.945\sigma$ to $1.338\sigma$, while the ratio for the tidal shear stays
-between $0.43$ and $0.50$ against $\rho = 0.451$, and the ratio for the void
-fraction between $0.28$ and $0.33$ against $\rho = 0.288$. Nothing in the
-conclusion depends on where the threshold is placed.
+The same invariance holds against the tolerance. Tightening the retained
+fraction from a quarter to two parts in ten thousand, a range of $1250$, moves
+the shift in large-scale power only from $0.945\sigma$ to $1.338\sigma$, while
+the ratio for the tidal shear stays between $0.43$ and $0.50$ against
+$\rho = 0.451$. Nothing in the conclusion depends on where the threshold is
+placed.
 
-In plain terms: the criterion biases the ensemble by a fraction of its
-natural spread. A single selected region is not physically extreme, and its
-properties usually overlap the range spanned by the ordinary population. What is
-not defensible is calling such a region typical, or treating the match as
-evidence that it is.
+In plain terms: the criterion biases the ensemble by a fraction of its natural
+spread. A single selected region is not physically extreme and usually overlaps
+the ordinary population. What is not defensible is calling it typical.
 
 \section{Two controls}
 \label{sec:controls}
@@ -735,35 +662,25 @@ Tables~\ref{tab:rho} and~\ref{tab:controls} list several properties, which
 invites reading them as several independent confirmations. They are fewer than
 they look, and the correlation matrix says how many.
 
-The four cosmic-web fractions sum to unity at every cell, so only three of them
-can be independent; measured, they sum to $1.0000$ with zero scatter, and the
-correlation matrix has two exactly vanishing eigenvalues, one per smoothing
-radius. The two smoothing radii largely repeat each other, the shear at
-$R = 20$ and $R = 40\Mpch$ correlating at $0.76$.
-
-A convenient way to count how many independent directions a set of correlated
-quantities really spans is the \emph{participation ratio}, built from the
-eigenvalues $\lambda_i$ of their correlation matrix:
+The four web fractions sum to unity at every cell, so the correlation matrix has
+two exactly vanishing eigenvalues, one per smoothing radius, and the two radii
+largely repeat each other: the shear at $R = 20$ and $R = 40\Mpch$ correlates at
+$0.76$. Count the independent directions with the \emph{participation ratio},
+built from the eigenvalues $\lambda_i$ of the correlation matrix,
 \begin{equation}
   \label{eq:participation}
-  N_{\rm eff} \;=\; \frac{\big(\sum_i \lambda_i\big)^2}{\sum_i \lambda_i^2}.
+  N_{\rm eff} \;=\; \frac{\big(\sum_i \lambda_i\big)^2}{\sum_i \lambda_i^2},
 \end{equation}
-If all $n$ eigenvalues were equal, meaning the quantities were mutually
-uncorrelated and each carried its own information, $N_{\rm eff}$ would equal
-$n$. If one eigenvalue dominated, meaning every quantity was a copy of a single
-underlying one, $N_{\rm eff}$ would equal $1$.
-
-The fifteen quantities entering the matrix are the two power ratios, the tidal
-shear at each of the two smoothing radii, the mean density at each radius, the
-four cosmic-web fractions at each radius, and the bulk flow. Of these, three
-eigenvalues exceed unity and $N_{\rm eff} = 3.49$.
+which equals $n$ if the $n$ quantities are uncorrelated and $1$ if they are all
+copies of one. The fifteen quantities here are the two power ratios, and the
+shear, mean density and four web fractions at each of two radii, plus the bulk
+flow. Three eigenvalues exceed unity and $N_{\rm eff} = 3.49$.
 
 The three surviving directions are interpretable, and this is the useful part.
-The tidal shear correlates with the web fractions at between $-0.01$ and
-$-0.09$, so the shear and the web composition are nearly orthogonal to one
-another while both correlate with the selected power. They are therefore two
-genuinely independent confirmations, which is stronger evidence than a dozen
-correlated ones. The bulk flow is the third direction and does not move.
+The shear correlates with the web fractions at between $-0.01$ and $-0.09$, so
+the two are nearly orthogonal to each other while both correlate with the
+selected power: two genuinely independent confirmations rather than a dozen
+correlated ones. The bulk flow is the third direction, and does not move.
 
 \begin{figure}[htbp]
   \centering
@@ -804,84 +721,57 @@ correlation matrix identifies them.
 \section{Scoring a region for typicality}
 \label{sec:typicality}
 
-Everything so far says what a bad criterion does. The natural next question is
-whether a good one exists: if a region can be chosen for having too much power,
-can it instead be chosen for being ordinary in many properties at once? This
-section answers that, because the answer is not the obvious one and the obvious
-attempt fails in an instructive way.
+If a region can be chosen badly, can it be chosen well: not for matching a
+curve, but for being ordinary in many properties at once? The obvious attempt
+fails, and instructively.
 
 \subsection{The obvious score, and why it is wrong}
 \label{sec:blandness}
 
-Write $\Delta_Q$ for the displacement of quantity $Q$ in units of its own
-scatter, as in \S\ref{sec:conditioning}, and collect the displacements of $d$
-measured quantities into a vector $\boldsymbol\Delta$. The obvious score is the
-squared length of that vector,
+Collect the displacements $\Delta_Q$ of $d$ measured quantities into a vector
+$\boldsymbol\Delta$ and score a region by the squared length,
 \begin{equation}
   \label{eq:naive}
   S_{\rm naive} \;=\; \sum_{Q} \Delta_Q^2 ,
 \end{equation}
-and the obvious rule is to keep the region with the smallest $S_{\rm naive}$:
-the region closest to the mean in every quantity simultaneously.
+keeping the smallest: the region closest to the mean in everything at once.
 
 That rule does not select a typical region. It selects an unusually featureless
-one, and the reason is a fact about high-dimensional distributions that is worth
-stating carefully because it is not intuitive.
-
-For a single Gaussian variable, the most likely value is the mean. For $d$
-independent Gaussian variables, the most likely value of the \emph{vector} is
-still the origin, but almost no realisation is near it. The reason is that the
-volume available at radius $r$ grows as $r^{d-1}$, and that growth beats the
-falling probability density until $r \approx \sqrt{d}$. The probability mass
-therefore sits in a thin shell at radius $\sqrt{d}$, not at the centre. In
-$d = 13$ dimensions a random region has $\sum_Q \Delta_Q^2 \approx 13$, and a
-region with $\sum_Q \Delta_Q^2 \approx 0$ is as unusual as one with
-$\sum_Q \Delta_Q^2 \approx 26$. Choosing the minimum chooses an outlier, in the
-one direction nobody thinks to check.
-
-A concrete picture may help. Ask for a person of exactly average height,
-exactly average weight, exactly average arm span and exactly average shoe size,
-all at once. Each requirement alone is unremarkable. Together they describe
-somebody who does not exist, because real people scatter in every measurement
-and the person who scatters in none is the rarest of all.
+one. For a single Gaussian variable the most likely value is the mean, but for
+$d$ of them almost no realisation is near the origin, because the volume at
+radius $r$ grows as $r^{d-1}$ and beats the falling density until
+$r \approx \sqrt{d}$. The probability mass sits in a shell at $\sqrt{d}$. With
+$d = 13$, a random region has $\sum_Q \Delta_Q^2 \approx 13$, and a region at
+$0$ is as unusual as one at $26$. Minimising chooses an outlier, in the one
+direction nobody checks.
 
 \subsection{Two corrections}
 \label{sec:mahalanobis}
 
-The first correction concerns weighting. Equation~\eqref{eq:naive} adds the
-quantities as though they were independent, and they are not: \S\ref{sec:independence}
-found that fifteen measured quantities span about three independent directions,
-and that the four cosmic-web fractions sum to unity so exactly that the
-correlation matrix has vanishing eigenvalues. A sum over correlated quantities
-counts whichever thing happens to have been measured most often. The remedy is
-standard, and is the same one used for any distance between correlated
-measurements: whiten by the correlation matrix $\mathsf{C}$, which gives the
-squared Mahalanobis distance
+Equation~\eqref{eq:naive} adds the quantities as though independent, and
+\S\ref{sec:independence} showed they are not: fifteen quantities span about
+three independent directions, and the web fractions sum to unity so the
+correlation matrix is singular. Whiten by the correlation matrix $\mathbf{C}$,
+giving the squared Mahalanobis distance
 \begin{equation}
   \label{eq:mahal}
-  S_{\rm M} \;=\; \boldsymbol\Delta^{\mathsf T}\, \mathsf{C}^{-1}\,
-                  \boldsymbol\Delta .
+  S_{\rm M} \;=\; \boldsymbol\Delta^{\rm T}\, \mathbf{C}^{-1}\,
+                  \boldsymbol\Delta ,
 \end{equation}
-Because $\mathsf{C}$ is singular here, the inverse is taken on the subspace
-spanned by its non-zero eigenvalues, of which there are $d_{\rm eff} = 13$ for
-the fifteen quantities used. For a Gaussian field $S_{\rm M}$ follows a
-$\chi^2$ distribution with $d_{\rm eff}$ degrees of freedom, whose mean is
-$d_{\rm eff}$.
+with the inverse taken on the non-degenerate subspace, of dimension
+$d_{\rm eff} = 13$ here. For a Gaussian field $S_{\rm M}$ follows $\chi^2$ with
+$d_{\rm eff}$ degrees of freedom, so its mean is $d_{\rm eff}$.
 
-The second correction follows from \S\ref{sec:blandness}. Do not minimise the
-score. Ask instead for a region at the typical distance,
+Then do not minimise it. Ask for a region at the typical distance,
 \begin{equation}
   \label{eq:shell}
   S_{\rm shell} \;=\; \big| S_{\rm M} - d_{\rm eff} \big| ,
 \end{equation}
-which keeps regions on the shell where the probability mass lives rather than at
-the centre where it does not.
+which keeps regions on the shell where the mass is rather than at the centre
+where it is not.
 
 \subsection{What each score actually does}
 \label{sec:scores-measured}
-
-Table~\ref{tab:typicality} keeps the closest one per cent under each rule and
-reports what the kept regions look like.
 
 \begin{table}[htbp]
   \centering
@@ -922,18 +812,15 @@ score, corrected in both ways, does what was wanted of it.
 \subsection{But a random draw already does this}
 \label{sec:random}
 
-The last row of Table~\ref{tab:typicality} is the one that decides the matter. A
-seed drawn at random, with no score and no search, shifts every quantity by less
-than $0.02\sigma$ and retains the scatter to within two per cent. It is better
-than the best score, and it is better for a reason that no amount of work on the
-score can overcome: a random draw is unbiased by construction, for every
-quantity, including the ones nobody thought to measure.
-
-So the honest recommendation for a region intended to be representative is to
-take a random seed. That answer is unsatisfying only because it looks like doing
-nothing, and doing nothing is exactly right here. Every criterion added is a
-condition imposed on the field, and \S\ref{sec:general} says every condition
-displaces everything correlated with it.
+The last row of Table~\ref{tab:typicality} decides the matter. A seed drawn at
+random, with no score and no search, shifts every quantity by less than
+$0.02\sigma$ and retains the scatter to within two per cent. It beats the best
+score, for a reason no work on the score can overcome: a random draw is unbiased
+by construction, for every quantity, including the ones nobody thought to
+measure. So the recommendation for a region intended to be representative is to
+take a random seed. Every criterion added is a condition imposed on the field,
+and \S\ref{sec:general} says every condition displaces everything correlated
+with it.
 
 The score is nonetheless worth computing, in two situations.
 
@@ -943,25 +830,17 @@ $S_{\rm M}$ near $d_{\rm eff}$ and small individual displacements is
 demonstrably ordinary; one with $S_{\rm M} = 30$ is not. This is
 recommendation~4 of \S\ref{sec:recommendations} made into a number.
 
-The two halves of that diagnostic are not interchangeable, and it is worth
-seeing why, because the scalar alone is the tempting thing to quote. A
-$\chi^2$ distribution with $d_{\rm eff} = 13$ degrees of freedom has mean $13$
-and standard deviation $\sqrt{2 d_{\rm eff}} = 5.1$. Displacing one direction
-out of thirteen by $1.27\sigma$ adds about $1.6$ to $S_{\rm M}$, which is a
-third of that standard deviation. Table~\ref{tab:typicality} bears this out: the
-regions selected by matching the raw theory have $S_{\rm M} = 13.7$ against
-$13.0$ for a random region, a difference of $0.14$ standard deviations. The
-scalar score is, in other words, almost blind to the very bias this note is
-about.
-
-That is not a defect of $S_{\rm M}$ but a statement about what it measures. It
-asks whether a region is at the right \emph{distance} from the mean, and the
-selection studied here leaves the distance almost unchanged while rotating the
-region to a particular \emph{direction}. A distance cannot see a direction.
-$S_{\rm M}$ catches the failure of \S\ref{sec:blandness}, where the distance
-collapses to $3.3$; the individual $\Delta_Q$ catch the failure of
-\S\ref{sec:selects}, where it does not move. Report both, or the report misses
-one of the two ways a region can be atypical.
+The two halves are not interchangeable, and the scalar alone is the tempting
+thing to quote. A $\chi^2$ with $d_{\rm eff} = 13$ has standard deviation
+$\sqrt{2 d_{\rm eff}} = 5.1$, so displacing one direction out of thirteen by
+$1.27\sigma$ adds only $1.6$ to $S_{\rm M}$. Table~\ref{tab:typicality} bears
+this out: the raw-theory selection sits at $S_{\rm M} = 13.7$ against $13.0$ for
+a random region, a difference of $0.14$ standard deviations. The scalar score is
+almost blind to the bias this note is about, because it asks whether a region is
+at the right \emph{distance} from the mean while this selection changes only the
+\emph{direction}. $S_{\rm M}$ catches the failure of \S\ref{sec:blandness},
+where the distance collapses to $3.3$; the individual $\Delta_Q$ catch the
+failure of \S\ref{sec:selects}, where it does not move. Report both.
 
 \emph{As a tie-break under a constraint.} Often the science requires a
 particular region: a halo of a given mass, a protocluster, a void. That
@@ -998,38 +877,26 @@ rather than for convenience.
 \label{sec:ztarget}
 
 This section is not about selection. It records a property of the initial
-conditions used here that is not obvious in advance, and that anyone measuring
-the two matter components separately will meet.
+conditions used here that anyone measuring the two matter components separately
+will meet.
 
-In the runs above the baryon and the cold dark matter fields carry the same
-acoustic oscillations, differing only by a smooth offset of a few tenths of a
-per cent. Physically one would expect them to differ: before recombination the
-baryons are held up by radiation pressure while the cold dark matter is not, so
-at high redshift the two fields should look quite different. That they do not is
-not a defect of the transfer function code, and switching between CLASS and a
-tabulated CAMB file does not change it. It follows from the way the initial
-fields are constructed, by a procedure called back-scaling, which the next
-paragraph defines.
-
-Back-scaling is the default in monofonIC and in most initial-conditions codes.
-Rather than evaluating the transfer functions at the starting redshift of the
-simulation, the code evaluates them at a target redshift $z_{\rm target} = 0$
-and then scales the resulting field back to the starting redshift by dividing by
-the linear growth factor. By $z = 0$ the baryons have long since fallen into the
+In the runs above the baryon and cold dark matter fields carry the same acoustic
+oscillations, differing only by a smooth offset of a few tenths of a per cent.
+One would expect them to differ, since before recombination the baryons are held
+up by radiation pressure and the cold dark matter is not. That they do not is
+not a defect of the transfer function code. It follows from \emph{back-scaling},
+the default in monofonIC and most initial-conditions codes: rather than
+evaluating the transfer functions at the starting redshift, the code evaluates
+them at $z_{\rm target} = 0$ and divides by the linear growth factor to reach
+the starting redshift. By $z = 0$ the baryons have long since fallen into the
 cold dark matter potentials, so the two transfer functions have nearly converged
-there. Multiplying both by the same growth factor preserves that near-equality,
-and the acoustic features, which live in the common part, come out identical in
-the two components.
+there, and one common growth factor preserves that near-equality.
 
-monofonIC already provides the alternative. Setting
-\texttt{[cosmology] ztarget} equal to \texttt{zstart} takes the transfer
-functions at the starting redshift itself, where the baryons have not yet caught
-up, and makes the back-scaling factor unity. Call this the \emph{forward}
-convention in what follows, since the transfer functions are carried forward to
-the starting redshift rather than back-scaled to it from $z = 0$. Measured at
-$N = 256^3$,
-$L = 700\Mpch$, $z = 200$, from the same white noise, over
-$k = 0.02$--$0.5\ h\,\mathrm{Mpc}^{-1}$:
+Setting \texttt{[cosmology] ztarget} equal to \texttt{zstart} takes the transfer
+functions at the starting redshift itself, where the baryons have not caught up,
+and makes the back-scaling factor unity. Call this the \emph{forward}
+convention. Measured at $N = 256^3$, $L = 700\Mpch$, $z = 200$, from the same
+white noise, over $k = 0.02$--$0.5\ h\,\mathrm{Mpc}^{-1}$:
 
 \begin{table}[htbp]
   \centering
@@ -1068,14 +935,11 @@ at $z = 0$, but the split between the two components at the starting redshift is
 then not the physical one. The forward field is the true field at the starting
 redshift, with the physical split, and carries no such guarantee about $z = 0$.
 
-For the measurements in this note the choice does not matter, and that is worth
-stating rather than assuming. The window convolution of \S\ref{sec:window} is
-linear and acts on whichever field is supplied, and the conditioning identity of
-\S\ref{sec:conditioning} involves correlations between quantities rather than
-the overall normalisation. The measurements here use the total matter field,
-which is the same under both conventions up to the growth factor. The choice
-matters for anyone comparing the two components to each other rather than
-working with the combined total matter field.
+For the measurements in this note the choice does not matter: they use the total
+matter field, which is the same under both conventions up to the growth factor,
+and both the window convolution and the conditioning identity are unaffected by
+an overall normalisation. It matters only for someone comparing the two
+components to each other.
 
 \section{Recommendations}
 \label{sec:recommendations}
