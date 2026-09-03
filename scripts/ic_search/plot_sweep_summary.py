@@ -223,9 +223,16 @@ a.legend(frameon=False, fontsize=8, loc="upper right")
 # spanning less than two decades they collide into unreadable overlap.
 for a in ax.ravel():
     a.xaxis.set_minor_formatter(NullFormatter())
+# The axis is widened past the measured band so that both reference wavenumbers
+# fall inside it. Set to the data range, k_fund sits off the left edge and k_Ny
+# lands on the right frame, where neither line can be seen.
+KFUND = 2*np.pi/L
 for a in ax[:2].ravel():
-    a.axvline(kny, ls=":", color="0.6", zorder=0)
-    a.set_xlim(k.min(), k.max())
+    for kv, lab in ((KFUND, r"$k_{\rm fund}$"), (kny, r"$k_{\rm Ny}$")):
+        a.axvline(kv, ls=":", color="0.55", lw=1.0, zorder=0)
+        a.text(kv, 0.02, " " + lab, transform=a.get_xaxis_transform(),
+               fontsize=8, color="0.4", ha="left")
+    a.set_xlim(0.7*KFUND, 1.4*kny)
 
 if HAVE_XI:
     xi_th = xi_theory_curve()
