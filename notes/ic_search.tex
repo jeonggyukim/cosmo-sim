@@ -26,10 +26,10 @@
 
 \begin{abstract}
 A subvolume of a simulation box does not measure the linear power spectrum. Its
-estimator is unbiased for the theory convolved with the subvolume's own window,
-which for the geometry used here lies $35\%$ below the theory at the largest
-scale it can measure. Choosing an initial-conditions seed because its subvolume
-spectrum matches
+estimator is unbiased for the window-convolved theory, the linear theory
+convolved with the subvolume's own window, which for the geometry used here lies
+$35\%$ below the raw theory at the largest scale the subvolume can measure.
+Choosing an initial-conditions seed because its subvolume spectrum matches
 the unconvolved theory therefore selects realisations whose large-scale power is
 anomalously high, by construction rather than by accident. We measure what this
 does using $83\,542$ independent realisations at $N = 128^3$,
@@ -40,7 +40,8 @@ $0.35\sigma$, the mean density, whose correlation is $0.001$, not at all. The
 displacement saturates, because the realisation scatter bounds how far the power
 can be pushed, so a search over a million seeds is no worse than one over a
 thousand. Two controls confirm the cause: a randomly permuted criterion produces
-$0.000 \pm 0.045$ in every property, and selecting against the convolved theory,
+$0.000 \pm 0.045$ in every property, and selecting against the window-convolved
+theory,
 which asks for nothing atypical, produces $0.016$. Fitting an amplitude with the
 window in the model returns $A = 0.9995 \pm 0.0765$ over all subvolumes with no
 search at all, while the selected subvolumes have $A = 1.065$. The result is not
@@ -147,7 +148,19 @@ sets $\bk'' = \bk'$ and removes the second integral:
 where $\ast$ denotes convolution, $\hat P$ is the spectrum the region measures,
 and $P_{\rm th}$ is the power spectrum linear theory predicts for the unmasked
 field. The quantity $|\widetilde W|^2$ is called the \emph{window function} of
-the region.
+the region. Note that the window function is the squared modulus of the mask's
+transform, not the mask itself; some authors reserve ``window function'' for
+$W(\bx)$ and call $|\widetilde W|^2$ the window power, so the convention is
+worth stating.
+
+The right-hand side of Eq.~\eqref{eq:conv} is used constantly below, and is
+named once here: the \emph{window-convolved theory}, written
+$P_{\rm th} \ast |\widetilde W|^2$. Two points of usage matter. It is the
+\emph{theory} that is convolved, producing a model to compare the measurement
+against; nothing is ever done to the measurement itself, which is the whole
+recommendation of this note. And the unmodified $P_{\rm th}$ is called the
+\emph{raw} or \emph{unconvolved} theory, which is the curve the proposed
+criterion asks a subvolume to match.
 
 In words, Eq.~\eqref{eq:conv} says that the spectrum measured at a wavenumber
 $\bk$ is not $P_{\rm th}(\bk)$ but a weighted average of $P_{\rm th}$ over
@@ -309,10 +322,11 @@ at $k_{\rm eq}$, where the theory turns over.
 
 Equation~\eqref{eq:conv} is a statement about an ensemble average, so it can be
 tested by averaging many measurements and comparing. Averaging $2\,005\,008$
-subvolume measurements against the convolved curve gives a ratio of
+subvolume measurements against the window-convolved theory gives a ratio of
 $0.9996 \pm 0.0001$, and averaging the full-box measurements against the
 unconvolved theory gives $0.99994 \pm 0.00002$. The estimator is unbiased for
-the convolved theory and biased against the raw theory, exactly as the equation
+the window-convolved theory and biased against the raw theory, exactly as the
+equation
 says.
 
 The measurement is therefore not failing to reach the theory. It is succeeding
@@ -420,7 +434,16 @@ lattice wavenumbers $\bk = 2\pi\mathbf{m}/L$ and sets every mode below the
 fundamental $k_f = 2\pi/L$ to zero. That is truncation and sparse sampling
 rather than convolution. No power is moved between neighbouring modes; power on
 scales larger than the box is simply absent. The consequence is a shortfall
-rather than a smearing, and it is large: \citet{Gelb1994} found $\sigma_8$
+rather than a smearing.
+
+This is worth keeping straight in wording as well as in physics. A subvolume's
+spectrum is \emph{window-convolved} in the sense of Eq.~\eqref{eq:conv}, and the
+term is used throughout this note for that. A conventionally generated periodic
+box is \emph{not}: it is truncated. Calling the finite-box effect a window
+convolution misdescribes it, and misses \citet{Pen1997}'s actual point, which is
+that convolving is the thing one should do \emph{instead} of truncating.
+
+The shortfall is large: \citet{Gelb1994} found $\sigma_8$
 systematically $40\%$ below the analytic value for $L = 51.2$~Mpc, requiring
 $L = 100$~Mpc to reduce the error to $10\%$, and \citet{Pen1997} reports $60\%$
 error at $L = 16\Mpch$ where convolving first gives $7\%$.
@@ -567,9 +590,9 @@ grid of spacing $L/N$ can represent.
   closer match, and a selection keeps the subvolumes with the smallest $D$.
 
 \item[Large-scale power.] The mean ratio of the measured spectrum to the
-  convolved theory over the same band the criterion uses,
+  window-convolved theory over the same band the criterion uses,
   $\avg{\hat P / (P_{\rm th} \ast |\widetilde W|^2)}_{k \le 2\Delta k_\perp}$.
-  It is quoted against the convolved curve so that a value of one means an
+  It is quoted against the window-convolved theory so that a value of one means an
   ordinary region, not a matching one.
 
 \item[Small-scale power.] The same ratio over
@@ -717,11 +740,11 @@ shifts marked alongside the measured ones.
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{selection_summary.pdf}
-  \caption{Left: the convolved theory and the mean of all $2\,005\,008$
+  \caption{Left: the window-convolved theory and the mean of all $2\,005\,008$
   subvolume measurements lie together well below the linear theory at large
   scales, while the selected one per cent instead follow the theory curve.
   Right: the shift in each property for the proposed criterion, for the same
-  selection made against the convolved theory, and for a randomly permuted
+  selection made against the window-convolved theory, and for a randomly permuted
   criterion. The short vertical marks are not fits but the shifts predicted by
   Eq.~\eqref{eq:rho}. The dotted lines mark one standard deviation of the
   natural region-to-region scatter.}
@@ -806,7 +829,7 @@ The geometry, the estimator and the selection arithmetic add no shift of their
 own.
 
 \emph{Is it the act of selecting, or the curve being matched?} Change only the
-target: select against the theory convolved with the window, which is the curve
+target: select against the window-convolved theory, which is the curve
 the estimator is unbiased for. That target requires nothing atypical, so it
 should do nothing.
 
@@ -817,7 +840,7 @@ should do nothing.
   \label{tab:controls}
   \begin{tabular}{lrrr}
     \toprule
-    property & raw theory & convolved theory & random \\
+    property & raw theory & window-convolved & random \\
     \midrule
     large-scale power             & $+1.259$ & $+0.016$ & $+0.000$ \\
     tidal shear, $R = 20\Mpch$    & $+0.617$ & $+0.056$ & $+0.000$ \\
