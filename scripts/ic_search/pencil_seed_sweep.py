@@ -70,6 +70,19 @@ _ap.add_argument("--interior-margin", type=float, default=0.0, metavar="M",
                       "face is built partly from material outside the pencil, so the "
                       "untrimmed average is not a property of the pencil alone. 0 "
                       "measures only the whole pencil")
+_ap.add_argument("--powerspec", default=None, metavar="FILE",
+                 help="monofonIC *_input_powerspec.txt to take the theory from. The "
+                      "default reference table was written by a back-scaled run and is "
+                      "the right theory only for runs that back-scale too, so a run "
+                      "with --ztarget needs the table that run itself wrote")
+_ap.add_argument("--ztarget", default=None, metavar="Z",
+                 help="monofonIC [cosmology] ztarget: a redshift, or the word zstart "
+                      "to take the transfer functions at the starting redshift and "
+                      "apply no back-scaling. Back-scaling builds the baryon and cold "
+                      "dark matter fields from one matter field scaled by one growth "
+                      "factor, so the two species come out nearly identical and a "
+                      "comparison between them measures nothing. Only a forward run "
+                      "separates them. Default leaves the template's value alone")
 _ap.add_argument("--kernel-weight", action="store_true",
                  help="also measure every environment quantity with each cell weighted "
                       "by the fraction of its smoothing kernel that fell inside the "
@@ -161,6 +174,8 @@ OUT = ARGS.out
 paths.require(paths.REF_CONF, paths.REF_POWERSPEC, binary=True)
 os.makedirs(OUT, exist_ok=True)
 tpl = open(TPL).read()
+_m = re.search(r"^zstart\s*=\s*([0-9.eE+-]+)", tpl, flags=re.M)
+ZSTART_TPL = float(_m.group(1)) if _m else 200.0
 
 
 def eigvals_sym3(T):
@@ -227,6 +242,12 @@ def run_ic(seeds, rundir):
     c = re.sub(r"^NumThreads.*$", f"NumThreads      = {NTHREADS}", c, flags=re.M)
     c = re.sub(r"^DoFixing.*$", f"DoFixing        = {ARGS.dofixing}", c, flags=re.M)
     c = re.sub(r"^filename.*$", f"filename        = {base}", c, flags=re.M)
+    if ARGS.ztarget is not None:
+        # Every occurrence, not the first: a template carrying a second ztarget
+        # further down would otherwise override the one written here, which
+        # monofonIC reports only as a "Redeclaration overwrites" warning.
+        zt = ZSTART_TPL if ARGS.ztarget == "zstart" else float(ARGS.ztarget)
+        c = re.sub(r"^ztarget.*$", f"ztarget         = {zt:g}", c, flags=re.M)
     if len(seeds) > 1:
         c = re.sub(r"^\[setup\]", f"[setup]\nSeedCount       = {len(seeds)}",
                    c, flags=re.M)
@@ -424,7 +445,11 @@ W0 = np.zeros((NGRID,)*3); W0[pencil_slice(*PENCILS[0])] = 1.0
 fvol = W0.mean()
 
 # ---- theory and the window-convolved theory ---------------------------------
-th = np.loadtxt(paths.REF_POWERSPEC)
+# The reference table was written by a back-scaled run, so it is the right theory
+# only for runs that back-scale as well. --ztarget changes which redshift the
+# transfer functions are taken at, and the theory has to move with it or the
+# comparison is between two different fields.
+th = np.loadtxt(ARGS.powerspec or paths.REF_POWERSPEC)
 kth = th[:, 0]
 g = kk > 0
 Wk2 = np.abs(np.fft.fftn(W0)/NGRID**3)**2
@@ -487,6 +512,10 @@ def write_chunk():
     tag = f"{ACC['seed'][0]:06d}_{len(ACC['seed']):05d}"
     with h5py.File(f"{OUT}/chunk_{tag}.hdf5", "w") as f:
         f["k"] = kbin
+        # Modes per band, so a reader can tell an excursion from a discrepancy:
+        # a Gaussian field scatters by sqrt(2/nmodes) about its mean, and the
+        # lowest bands hold only a handful of modes.
+        f["nmodes"] = nmodes
         for key, v in ACC.items():
             if v:
                 f[key] = np.array(v)
@@ -777,8 +806,13 @@ for s in SEEDS:
 
 if ARGS.compact:
     write_chunk()
-    import shutil
-    shutil.rmtree(f"{OUT}/_work_{SEEDS[0]:07d}", ignore_errors=True)
+    # --keep-fields spares the field itself above, so it must spare the directory
+    # holding it too, along with the config and the transfer-function table
+    # monofonIC wrote beside it. Those are what a figure needs to reproduce a
+    # single realization.
+    if not ARGS.keep_fields:
+        import shutil
+        shutil.rmtree(f"{OUT}/_work_{SEEDS[0]:07d}", ignore_errors=True)
 
 if SKIPPED:
     print(f"skipped {len(SKIPPED)} of {len(SEEDS)} seeds: "

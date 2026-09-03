@@ -136,7 +136,8 @@ ax.axhline(0.0, color="0.35", lw=1.0)
 ax.set_xlim(SIZES[0]*0.75, SIZES[-1]*1.25)
 ax.set_xscale("log")
 ax.set_xlabel("number of seeds searched, keeping the best one")
-ax.set_ylabel("shift of the selected region  [standard deviations]")
+ax.set_ylabel(f"shift {chunkio.SHIFT_SYMBOL} of the selected region"
+              "  [standard deviations]")
 ax.legend(fontsize=8.5, framealpha=0.95, loc="lower right", ncol=2)
 ax.grid(alpha=0.25)
 ax.set_title("Searching harder stops helping", fontsize=10.5)
@@ -164,6 +165,7 @@ fig.suptitle(f"{nseed:,} realizations. Left: each point repeats the search "
              f"Right: the same shifts divided by the shift in the quantity being "
              f"selected on; dashed lines are each property's correlation with it.",
              fontsize=9.8, y=0.995)
+chunkio.annotate_shift(fig)
 fig.tight_layout(rect=(0, 0, 1, 0.90))
 fig.savefig(A.out)
 print(f"wrote {A.out}\n")

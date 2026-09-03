@@ -138,7 +138,8 @@ axR.text(1.0, len(SHOW) - 0.4, " 1 sd of the scatter\n between regions",
          fontsize=8, color="0.4", va="top", ha="left")
 axR.set_yticks(y)
 axR.set_yticklabels([n.replace("\n", " ") for n in SHOW], fontsize=8.5)
-axR.set_xlabel("shift of the selected regions  [standard deviations]")
+axR.set_xlabel(f"shift {chunkio.SHIFT_SYMBOL} of the selected regions"
+               "  [standard deviations]")
 axR.legend(fontsize=9, loc="lower right", framealpha=0.95)
 axR.set_title("Everything that moves, moves by exactly how much it tracks\n"
               "the quantity being selected on", fontsize=10.5)
@@ -148,6 +149,7 @@ fig.suptitle(f"Selecting a pencil subvolume on its power spectrum: "
              f"{nseed} realizations, $N={int(N)}^3$, $L={L:g}$ Mpc/$h$, 2LPT, "
              f"$\\delta(q)$ matter, pencil = $(L/8)^2\\times L$, keeping {100*A.keep:g}%",
              fontsize=11)
+chunkio.annotate_shift(fig)
 fig.tight_layout(rect=(0, 0, 1, 0.94))
 fig.savefig(A.out, dpi=300)
 print(f"wrote {A.out}")

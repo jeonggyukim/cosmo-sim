@@ -76,6 +76,11 @@ STEPS = [
      ["plot_region_vs_box.py", "--data", A.data, "--keep", K,
       "--out", os.path.join(OUT, "region_vs_box.png")],
      "region_vs_box.txt"),
+    ("whole box against pencil, in P(k) and in xi",
+     ["plot_box_vs_pencil.py", "--data", A.data,
+      "--out-pk", os.path.join(OUT, "pk_box_vs_pencil.png"),
+      "--out-xi", os.path.join(OUT, "xi_box_vs_pencil.png")],
+     "box_vs_pencil.txt"),
 ]
 
 print(f"sweep  {A.data}")

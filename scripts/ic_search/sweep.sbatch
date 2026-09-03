@@ -8,6 +8,11 @@
 #
 #   sbatch --array=0-399 --export=ALL,NPER=250,SEEDBASE=100000,RUNTAG=big sweep.sbatch
 #
+# With the correlation function and the boundary measurements:
+#
+#   sbatch --array=0-199 --export=ALL,NPER=100,SEEDBASE=400000,RUNTAG=xi20k,\
+# XI=yes,KWEIGHT=yes,SPLIT=3 sweep.sbatch
+#
 # gives 400 x 250 = 100,000 seeds. Seed ranges are derived from the task index,
 # so they cannot overlap. Keep SEEDBASE distinct between runs that will later be
 # merged; merge_sweeps.py refuses duplicate seeds.
@@ -20,6 +25,12 @@
 #   BATCH     seeds per monofonIC call        (default 25; 1 = one call per seed)
 #   SMOOTHFRAC smoothing radii as fractions of the pencil width (default 0.1 0.25 0.5)
 #   MARGIN    interior margin in smoothing radii (default 1.0)
+#   XI        yes to also measure xi(r) for the box and each pencil (default no)
+#   RMAX      largest separation for xi, Mpc/h        (default 250)
+#   NRBIN     separation bins for xi                  (default 50)
+#   KWEIGHT   yes to add the kernel-fraction weighted quantities (default no)
+#   SPLIT     pencils per realization carrying the inside/outside tidal source
+#             split; 0 disables it                    (default 0)
 #   RUNTAG    subdirectory under data/        (default run)
 #   WORKDIR   root holding scripts/ ref/ build/ data/ logs/
 #   PYTHON    interpreter with numpy and h5py
@@ -53,6 +64,19 @@ module load gnu12/12.2.0 openmpi4/4.1.5 fftw/3.3.10 hdf5/1.14.0 gsl/2.7.1
 : "${SMOOTHFRAC:=0.1 0.25 0.5}"
 : "${MARGIN:=1.0}"
 : "${RUNTAG:=run}"
+: "${XI:=no}"
+: "${RMAX:=250}"
+: "${NRBIN:=50}"
+: "${KWEIGHT:=no}"
+: "${SPLIT:=0}"
+
+# Assembled rather than passed inline so that an option left at its default adds
+# no flag at all, and a run that wants none of these is byte-for-byte the command
+# earlier runs used.
+EXTRA=()
+[ "$XI" = yes ] && EXTRA+=(--xi --rmax "$RMAX" --nrbin "$NRBIN")
+[ "$KWEIGHT" = yes ] && EXTRA+=(--kernel-weight)
+[ "$SPLIT" -gt 0 ] 2>/dev/null && EXTRA+=(--source-split "$SPLIT")
 
 export MONOFONIC_TESTS=$WORKDIR
 export MONOFONIC_REF=$WORKDIR/ref
@@ -74,4 +98,4 @@ exec $PYTHON pencil_seed_sweep.py \
     --species matter --npencils 24 --environment \
     --smooth-frac $SMOOTHFRAC --interior-margin "$MARGIN" \
     --nthreads 1 --compact --flush-every "$FLUSH" --batch-seeds "$BATCH" \
-    --out "$OUT"
+    "${EXTRA[@]}" --out "$OUT"

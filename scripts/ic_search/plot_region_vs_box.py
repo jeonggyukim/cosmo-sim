@@ -93,7 +93,7 @@ for yy in y[:-1]:
 ax.set_yticks(y)
 ax.set_yticklabels([r[0] for r in rows])
 ax.set_ylim(y.min() - 0.6, y.max() + 0.6)
-ax.set_xlabel("shift  [standard deviations]")
+ax.set_xlabel(f"shift {chunkio.SHIFT_SYMBOL}  [standard deviations]")
 ax.legend(framealpha=0.95, loc="lower right")
 ax.grid(axis="x", alpha=0.25)
 note = ("" if not dropped else
@@ -104,6 +104,7 @@ ax.set_title(f"Two ways of choosing a region, and the box that contains it{note}
              f"$N={int(N)}^3$, $L={L:g}$ Mpc/$h$, keeping the closest "
              f"{100*A.keep:g}%", pad=14, fontsize=13.5)
 
+chunkio.annotate_shift(fig)
 fig.tight_layout()
 fig.savefig(A.out)
 print(f"wrote {A.out}\n")

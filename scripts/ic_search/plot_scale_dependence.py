@@ -74,7 +74,8 @@ ax.text(lperp*0.93, 0.03, "region width ", transform=ax.get_xaxis_transform(),
 
 ax.set_xscale("log")
 ax.set_xlabel("smoothing radius  [Mpc/$h$]")
-ax.set_ylabel("shift of the pencil zoom-in region  [standard deviations]")
+ax.set_ylabel(f"shift {chunkio.SHIFT_SYMBOL} of the pencil zoom-in region"
+              "  [standard deviations]")
 
 top = ax.secondary_xaxis(
     "top", functions=(lambda r: chunkio.MASS_PER_R3*np.maximum(r, 1e-6)**3,
@@ -88,6 +89,7 @@ ax.set_title(f"The distortion is largest on cluster scales\n"
              f"$N={int(N)}^3$, $L={L:g}$ Mpc/$h$, keeping the closest "
              f"{100*A.keep:g}%", pad=42)
 
+chunkio.annotate_shift(fig)
 fig.tight_layout()
 fig.savefig(A.out)
 print(f"wrote {A.out}\n")

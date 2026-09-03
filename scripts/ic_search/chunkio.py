@@ -118,6 +118,22 @@ def load(path, species="matter", nchunk=None, want_spectra=False):
             np.concatenate(spec) if want_spectra else None)
 
 
+# The quantity every selection figure plots, named once here so the figures can
+# show its definition rather than leaving the reader to infer it from an axis
+# label. Q is whichever property is being measured; the average runs over the
+# subvolumes the criterion retains, and sigma_Q over all of them, so a shift of 1
+# means the selection moved Q by one standard deviation of its own scatter.
+SHIFT_SYMBOL = r"$\Delta_Q$"
+SHIFT_DEF = (r"$\Delta_Q \equiv \left(\langle Q\rangle_{\rm selected}"
+             r" - \langle Q\rangle_{\rm all}\right)/\sigma_Q$")
+
+
+def annotate_shift(fig, x=0.005, y=0.005, fontsize=10.5):
+    """Write the definition of the shift into a corner of the figure."""
+    fig.text(x, y, SHIFT_DEF, fontsize=fontsize, color="0.35",
+             ha="left", va="bottom")
+
+
 def selection_stats(crit, cols, keep):
     """Helpers for asking what a selection does, shared by the plotting scripts.
 
