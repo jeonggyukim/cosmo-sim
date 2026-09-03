@@ -23,17 +23,33 @@ A = ap.parse_args()
 PNG = A.png or os.path.join(
     paths.FIGS, f"deviation_stats_{os.path.basename(A.data.rstrip(os.sep))}_{A.species}.png")
 
-with h5py.File(f"{A.data}/theory.hdf5") as f:
+# Two layouts: one directory per seed for small local runs, one chunk file per
+# batch for cluster arrays. Each chunk carries its own copy of the theory, so a
+# directory of chunks needs no shared theory.hdf5.
+chunks = sorted(glob.glob(f"{A.data}/chunk_*.hdf5"))
+per_seed = sorted(glob.glob(f"{A.data}/seed_*/pk.hdf5"))
+if not chunks and not per_seed:
+    raise SystemExit(f"no chunk_*.hdf5 or seed_*/pk.hdf5 under {A.data}")
+
+ref = chunks[0] if chunks else f"{A.data}/theory.hdf5"
+with h5py.File(ref) as f:
     sp_names = [x.decode() if isinstance(x, bytes) else str(x) for x in f.attrs["species"]]
     SP = sp_names.index(A.species)
     k, P_th, P_win = f["k"][:], f["P_theory"][SP], f["P_win"][SP]
     kny, dkperp, L, N = (f.attrs[x] for x in ("kny", "dkperp", "L", "N"))
 
 P_pen, seeds = [], []
-for fn in sorted(glob.glob(f"{A.data}/seed_*/pk.hdf5")):
+zstart, Dplus = 200.0, float("nan")
+for fn in (chunks or per_seed):
     with h5py.File(fn) as f:
-        P_pen.append(f["P_pencil"][SP]); seeds.append(int(f.attrs["seed"]))
-        zstart, Dplus = float(f.attrs["zstart"]), float(f.attrs["Dplus"])
+        if chunks:
+            pp = f["P_pencil"][:, SP]              # (nseed, npencil, nk)
+            P_pen.append(pp.reshape(-1, pp.shape[-1]))
+            seeds.extend(int(x) for x in f["seed"][:])
+        else:
+            P_pen.append(f["P_pencil"][SP])
+            seeds.append(int(f.attrs["seed"]))
+            zstart = float(f.attrs["zstart"]); Dplus = float(f.attrs["Dplus"])
         dofix = f.attrs.get("dofixing", "yes")
         dofix = dofix.decode() if isinstance(dofix, bytes) else str(dofix)
 P_pen = np.concatenate(P_pen)
