@@ -138,6 +138,76 @@ linear power spectrum is steep at large scales, rising towards small $k$, this
 averaging pulls power down from the largest scales into their neighbours and
 leaves a deficit there.
 
+\subsection{The window of a pencil, written down}
+\label{sec:winform}
+
+For the pencil the window can be written in closed form, and doing so makes the
+size of the effect predictable rather than merely measured.
+
+The mask occupies a whole number of grid cells, $n_i$ of them along axis $i$ of
+an $N^3$ periodic grid. The transform of a run of $n$ consecutive ones is a
+geometric series, which sums to the \emph{Dirichlet kernel}, the periodic
+counterpart of the familiar $\sin x / x$. Taking the modulus squared and
+normalising as in Eq.~\eqref{eq:conv},
+\begin{equation}
+  \label{eq:winform}
+  \frac{|\widetilde W(\mathbf{m})|^2}{N^6} \;=\;
+  \prod_{i=1}^{3}
+  \left[ \frac{\sin(\pi m_i n_i / N)}{N \sin(\pi m_i / N)} \right]^2 ,
+\end{equation}
+where $\mathbf{m}$ is the integer wavevector, $k_i = 2\pi m_i / L$, and the
+$m_i = 0$ case is the limit $n_i/N$.
+
+Now put in the pencil's dimensions. Transverse to the pencil, $n_x = n_y = N/8$.
+Along the pencil, however, $n_z = N$: the pencil spans the whole periodic box in
+that direction. The $z$ factor of Eq.~\eqref{eq:winform} then contains
+$\sin(\pi m_z)$, which vanishes for every integer $m_z \neq 0$, so that factor is
+a Kronecker delta $\delta_{m_z 0}$. Numerically, the fraction of the window's
+total power at $m_z \neq 0$ is zero to machine precision.
+
+This is worth stating plainly. \emph{The pencil does not smear its long
+direction at all.} There is no mask along that axis, so there is nothing to
+convolve with, and the entire $34\%$ deficit comes from the two transverse
+directions. The window is effectively two-dimensional.
+
+For wavenumbers well below the Nyquist frequency the Dirichlet kernel reduces to
+the ordinary sinc, and Eq.~\eqref{eq:winform} takes the more recognisable form
+\begin{equation}
+  \label{eq:winsinc}
+  |\widetilde W(\bk)|^2 \;\propto\;
+  \delta_{k_z 0} \,
+  \mathrm{sinc}^2\!\left(\frac{k_x \ell_\perp}{2}\right)
+  \mathrm{sinc}^2\!\left(\frac{k_y \ell_\perp}{2}\right),
+  \qquad \mathrm{sinc}\,x = \frac{\sin x}{x},
+\end{equation}
+with $\ell_\perp = L/8 = 87.5\Mpch$ the transverse width of the pencil. The
+first zero of each sinc sits at $k_i \ell_\perp / 2 = \pi$, that is at
+\begin{equation}
+  \label{eq:dkperp}
+  \Delta k_\perp \;=\; \frac{2\pi}{\ell_\perp} \;=\; 0.072\ h\,\mathrm{Mpc}^{-1},
+\end{equation}
+which is the smallest wavenumber the pencil can resolve across itself and
+therefore the width of the smearing. The box fundamental is
+$k_f = 2\pi/L = 0.0090\ h\,\mathrm{Mpc}^{-1}$, eight times smaller. The window is
+eight times wider than the largest scale being measured, which is why the
+deficit at that scale is tens of per cent rather than a small correction.
+
+Two cautions on using these expressions. The continuum form
+Eq.~\eqref{eq:winsinc} and the exact form Eq.~\eqref{eq:winform} agree to $0.1\%$
+at $m = 1$ and $1.3\%$ at $m = 4$, but differ by a factor of $2.3$ near the
+Nyquist frequency, so the discrete kernel is the one to use for anything
+quantitative. And the convolution in Eq.~\eqref{eq:conv} is never evaluated
+directly, which would cost $N^6$ operations. It is done by transforming to
+configuration space, where a convolution becomes a product: $P_{\rm th}$
+transforms to $\xi$, the window $|\widetilde W|^2$ transforms to the mask's own
+autocorrelation $(W \star W)(r)$ by the Wiener--Khinchin theorem, the two are
+multiplied, and the result is transformed back. Note that the multiplying factor
+is the mask autocorrelation and not the mask itself; for a one-dimensional
+top-hat of width $n$ it is a triangle of base $2n$, not a top-hat. That same
+mask autocorrelation is what divides out of the correlation-function estimator
+in \S\ref{sec:xi-unbiased}, which is the whole reason $\xi$ escapes the deficit
+and $P(k)$ does not.
+
 Three things about this deficit are worth separating. It is deterministic: it is
 the same in every realisation, since $W$ is fixed by the geometry and does not
 depend on the random field. It therefore does not average away when more
@@ -313,10 +383,11 @@ Each quantity below is reduced to a single number per subvolume, so that a
 selection can be asked what it does to that number. Two conventions are used
 throughout. Angle brackets $\avg{\cdot}_V$ denote an average over the cells of
 the subvolume, and $\delta_R$ is the density contrast smoothed with a Gaussian of
-radius $R$. The transverse width of the subvolume is $\ell_\perp = L/8 =
-87.5\Mpch$, which sets the smallest wavenumber it can resolve across itself,
-$\Delta k_\perp = 2\pi/\ell_\perp = 0.072\ h\,\mathrm{Mpc}^{-1}$. The Nyquist
-wavenumber of the grid is $k_{\rm Ny} = \pi N / L$.
+radius $R$. The transverse width $\ell_\perp = L/8 = 87.5\Mpch$ and the
+wavenumber it sets, $\Delta k_\perp = 2\pi/\ell_\perp =
+0.072\ h\,\mathrm{Mpc}^{-1}$, are those of Eq.~\eqref{eq:dkperp}. The Nyquist
+wavenumber of the grid is $k_{\rm Ny} = \pi N / L$, the largest wavenumber a
+grid of spacing $L/N$ can represent.
 
 \begin{description}
 \item[The criterion.] The distance of a measured subvolume spectrum
