@@ -801,6 +801,199 @@ large-scale power and shows no shift at any search size or tolerance. A criterio
 is safe for exactly those quantities it does not correlate with, and the
 correlation matrix identifies them.
 
+\section{Scoring a region for typicality}
+\label{sec:typicality}
+
+Everything so far says what a bad criterion does. The natural next question is
+whether a good one exists: if a region can be chosen for having too much power,
+can it instead be chosen for being ordinary in many properties at once? This
+section answers that, because the answer is not the obvious one and the obvious
+attempt fails in an instructive way.
+
+\subsection{The obvious score, and why it is wrong}
+\label{sec:blandness}
+
+Write $\Delta_Q$ for the displacement of quantity $Q$ in units of its own
+scatter, as in \S\ref{sec:conditioning}, and collect the displacements of $d$
+measured quantities into a vector $\boldsymbol\Delta$. The obvious score is the
+squared length of that vector,
+\begin{equation}
+  \label{eq:naive}
+  S_{\rm naive} \;=\; \sum_{Q} \Delta_Q^2 ,
+\end{equation}
+and the obvious rule is to keep the region with the smallest $S_{\rm naive}$:
+the region closest to the mean in every quantity simultaneously.
+
+That rule does not select a typical region. It selects an unusually featureless
+one, and the reason is a fact about high-dimensional distributions that is worth
+stating carefully because it is not intuitive.
+
+For a single Gaussian variable, the most likely value is the mean. For $d$
+independent Gaussian variables, the most likely value of the \emph{vector} is
+still the origin, but almost no realisation is near it. The reason is that the
+volume available at radius $r$ grows as $r^{d-1}$, and that growth beats the
+falling probability density until $r \approx \sqrt{d}$. The probability mass
+therefore sits in a thin shell at radius $\sqrt{d}$, not at the centre. In
+$d = 13$ dimensions a random region has $\sum_Q \Delta_Q^2 \approx 13$, and a
+region with $\sum_Q \Delta_Q^2 \approx 0$ is as unusual as one with
+$\sum_Q \Delta_Q^2 \approx 26$. Choosing the minimum chooses an outlier, in the
+one direction nobody thinks to check.
+
+A concrete picture may help. Ask for a person of exactly average height,
+exactly average weight, exactly average arm span and exactly average shoe size,
+all at once. Each requirement alone is unremarkable. Together they describe
+somebody who does not exist, because real people scatter in every measurement
+and the person who scatters in none is the rarest of all.
+
+\subsection{Two corrections}
+\label{sec:mahalanobis}
+
+The first correction concerns weighting. Equation~\eqref{eq:naive} adds the
+quantities as though they were independent, and they are not: \S\ref{sec:independence}
+found that fifteen measured quantities span about three independent directions,
+and that the four cosmic-web fractions sum to unity so exactly that the
+correlation matrix has vanishing eigenvalues. A sum over correlated quantities
+counts whichever thing happens to have been measured most often. The remedy is
+standard, and is the same one used for any distance between correlated
+measurements: whiten by the correlation matrix $\mathsf{C}$, which gives the
+squared Mahalanobis distance
+\begin{equation}
+  \label{eq:mahal}
+  S_{\rm M} \;=\; \boldsymbol\Delta^{\mathsf T}\, \mathsf{C}^{-1}\,
+                  \boldsymbol\Delta .
+\end{equation}
+Because $\mathsf{C}$ is singular here, the inverse is taken on the subspace
+spanned by its non-zero eigenvalues, of which there are $d_{\rm eff} = 13$ for
+the fifteen quantities used. For a Gaussian field $S_{\rm M}$ follows a
+$\chi^2$ distribution with $d_{\rm eff}$ degrees of freedom, whose mean is
+$d_{\rm eff}$.
+
+The second correction follows from \S\ref{sec:blandness}. Do not minimise the
+score. Ask instead for a region at the typical distance,
+\begin{equation}
+  \label{eq:shell}
+  S_{\rm shell} \;=\; \big| S_{\rm M} - d_{\rm eff} \big| ,
+\end{equation}
+which keeps regions on the shell where the probability mass lives rather than at
+the centre where it does not.
+
+\subsection{What each score actually does}
+\label{sec:scores-measured}
+
+Table~\ref{tab:typicality} keeps the closest one per cent under each rule and
+reports what the kept regions look like.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Selecting for typicality, keeping the closest one per cent of
+  $467\,904$ subvolumes. A random region has $\sum\Delta^2 = 15.0$ and
+  $S_{\rm M} = 13.0$. The last three columns give the spread of each quantity
+  within the kept sample divided by its spread over all subvolumes, so $1.00$
+  means the selection left the scatter alone.}
+  \label{tab:typicality}
+  \begin{tabular}{lrrrrrr}
+    \toprule
+    & & & \multicolumn{2}{c}{shift} & \multicolumn{2}{c}{retained spread} \\
+    \cmidrule(lr){4-5}\cmidrule(lr){6-7}
+    rule & $\sum\Delta^2$ & $S_{\rm M}$ & shear & power & shear & power \\
+    \midrule
+    minimise $S_{\rm naive}$   & $1.6$  & $5.8$  & $+0.06$ & $-0.16$ & $0.38$ & $0.35$ \\
+    minimise $S_{\rm M}$       & $4.2$  & $3.3$  & $-0.07$ & $-0.25$ & $0.50$ & $0.49$ \\
+    target the shell, Eq.~\eqref{eq:shell} & $14.5$ & $13.0$ & $-0.01$ & $-0.07$ & $1.03$ & $0.89$ \\
+    match the raw theory       & $16.6$ & $13.7$ & $+0.89$ & $+1.27$ & $0.68$ & $0.25$ \\
+    draw at random             & $15.2$ & $13.0$ & $-0.02$ & $+0.01$ & $0.99$ & $1.02$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Read the shift columns alone and both minimising rules look like successes: no
+quantity moves by more than a quarter of its scatter, far better than the
+$+1.27$ of the criterion this note is about. The spread columns show what that
+reading misses. The kept regions retain only a third to a half of the natural
+scatter in every quantity. They are not typical regions; they are regions with
+much less internal structure than any real region has. A simulation started from
+one of them would be smoother than the universe, in a way no table of means
+would reveal.
+
+Targeting the shell removes the problem. Every shift falls below $0.07\sigma$
+and the retained spread is within three to eleven per cent of the parent. The
+score, corrected in both ways, does what was wanted of it.
+
+\subsection{But a random draw already does this}
+\label{sec:random}
+
+The last row of Table~\ref{tab:typicality} is the one that decides the matter. A
+seed drawn at random, with no score and no search, shifts every quantity by less
+than $0.02\sigma$ and retains the scatter to within two per cent. It is better
+than the best score, and it is better for a reason that no amount of work on the
+score can overcome: a random draw is unbiased by construction, for every
+quantity, including the ones nobody thought to measure.
+
+So the honest recommendation for a region intended to be representative is to
+take a random seed. That answer is unsatisfying only because it looks like doing
+nothing, and doing nothing is exactly right here. Every criterion added is a
+condition imposed on the field, and \S\ref{sec:general} says every condition
+displaces everything correlated with it.
+
+The score is nonetheless worth computing, in two situations.
+
+\emph{As a diagnostic.} When a region has been chosen for any reason, compute
+$S_{\rm M}$ and the individual $\Delta_Q$ for it and report them. A region with
+$S_{\rm M}$ near $d_{\rm eff}$ and small individual displacements is
+demonstrably ordinary; one with $S_{\rm M} = 30$ is not. This is
+recommendation~4 of \S\ref{sec:recommendations} made into a number.
+
+The two halves of that diagnostic are not interchangeable, and it is worth
+seeing why, because the scalar alone is the tempting thing to quote. A
+$\chi^2$ distribution with $d_{\rm eff} = 13$ degrees of freedom has mean $13$
+and standard deviation $\sqrt{2 d_{\rm eff}} = 5.1$. Displacing one direction
+out of thirteen by $1.27\sigma$ adds about $1.6$ to $S_{\rm M}$, which is a
+third of that standard deviation. Table~\ref{tab:typicality} bears this out: the
+regions selected by matching the raw theory have $S_{\rm M} = 13.7$ against
+$13.0$ for a random region, a difference of $0.14$ standard deviations. The
+scalar score is, in other words, almost blind to the very bias this note is
+about.
+
+That is not a defect of $S_{\rm M}$ but a statement about what it measures. It
+asks whether a region is at the right \emph{distance} from the mean, and the
+selection studied here leaves the distance almost unchanged while rotating the
+region to a particular \emph{direction}. A distance cannot see a direction.
+$S_{\rm M}$ catches the failure of \S\ref{sec:blandness}, where the distance
+collapses to $3.3$; the individual $\Delta_Q$ catch the failure of
+\S\ref{sec:selects}, where it does not move. Report both, or the report misses
+one of the two ways a region can be atypical.
+
+\emph{As a tie-break under a constraint.} Often the science requires a
+particular region: a halo of a given mass, a protocluster, a void. That
+constraint cannot be avoided and should not be, but it usually leaves many
+candidates. Among them, Eq.~\eqref{eq:shell} picks one that is unremarkable in
+everything the constraint does not fix. The constraint's own bias remains and
+must still be reported; what the score removes is the additional, unintended
+bias that an arbitrary choice among the candidates would have added.
+
+\subsection{Which quantities belong in the score}
+\label{sec:which-Q}
+
+The score is only as good as its list of quantities, and no list is complete. A
+region can be typical in everything measured and unusual in something else. The
+list should therefore be chosen from the science the simulation is for: include
+the properties of the initial region that the intended measurement is sensitive
+to.
+
+Two rules make the choice concrete. First, include a quantity if the science
+depends on it, even when it correlates with something already in the list; the
+whitening in Eq.~\eqref{eq:mahal} handles the redundancy, so nothing is
+double-counted. Second, choose the smoothing radii from the mass scale the
+science concerns, using
+\begin{equation}
+  \label{eq:mass}
+  M(R) \;=\; \frac{4\pi}{3}\,\Omega_m \rho_{\rm crit} R^3
+  \;\approx\; 3.5\times10^{11}
+  \left(\frac{R}{1\,\mathrm{Mpc}/h}\right)^3 h^{-1} M_\odot ,
+\end{equation}
+so that a radius is chosen to enclose the mass of the objects being studied
+rather than for convenience.
+
 \section{A related point: which redshift the transfer functions are taken at}
 \label{sec:ztarget}
 
