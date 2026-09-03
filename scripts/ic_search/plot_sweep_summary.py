@@ -224,7 +224,7 @@ if HAVE_XI:
     lperp = L/8.0
     # Only where the theory is safely away from its zero crossing near 80 Mpc/h:
     # a ratio to a vanishing denominator measures the crossing, not the estimator.
-    gx = (rbin > 0) & (rbin <= lperp) & (xi_th > 0)
+    gx = (rbin > 0) & (rbin <= min(200.0, rbin.max())) & (xi_th > 0)
     mx = X_pen.mean(0)
     print(f"\npencils : xi mean/theory over r < {lperp:.0f} Mpc/h "
           f"{np.average((mx/xi_th)[gx], weights=np.abs(xi_th[gx])):.4f}; "
@@ -258,9 +258,11 @@ if HAVE_XI:
     a.set_title(r"(f)  pencils scatter about 1: there is no window to subtract",
                 fontsize=10)
     a.legend(frameon=False, fontsize=8, loc="upper right")
+    rhi = min(200.0, rbin.max())
     for a in ax[2]:
+        a.axvspan(lperp, rhi, color="0.85", alpha=0.45, lw=0, zorder=0)
         a.axvline(lperp, ls="--", color="C1", lw=1)
-        a.set_xlim(rbin[gx].min(), lperp)
+        a.set_xlim(L/N, rhi)
 
 fig.suptitle(rf"Seed sweep: {nseed} monofonIC realisations $\times$ {npen} disjoint pencils "
              rf"$= {len(P_pen)}$ pencil spectra"

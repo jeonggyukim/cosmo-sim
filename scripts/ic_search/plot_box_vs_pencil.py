@@ -47,9 +47,9 @@ ap.add_argument("--species", nargs="+", default=None,
 ap.add_argument("--compare", default="matter",
                 help="species used for the whole-box against pencil row")
 ap.add_argument("--rmax", type=float, default=None,
-                help="largest separation shown, in Mpc/h. Default is the image of "
-                     "the P(k) panel's low-k edge under r = 2 pi / k, clipped to the "
-                     "largest separation the sweep measured")
+                help="largest separation shown, in Mpc/h (default 200, which puts the "
+                     "acoustic peak well inside the frame). The lower limit is always one "
+                     "grid cell, below which nothing is resolved")
 ap.add_argument("--out-pk", default=os.path.join(paths.FIGS, "pk_box_vs_pencil.png"))
 ap.add_argument("--out-xi", default=os.path.join(paths.FIGS, "xi_box_vs_pencil.png"))
 A = ap.parse_args()
@@ -92,16 +92,18 @@ nseed, npen = XP.shape[0], XP.shape[2]
 width = L/frac
 KFUND = 2*np.pi/L
 KLO, KHI = 0.7*KFUND, 1.4*kny
-# The separation axis is the image of the wavenumber axis under r = 2 pi / k, so
-# the two rows of a figure cover the same physical scales with the same margins:
-# the left edge is the Nyquist wavenumber and the right edge the fundamental,
-# each carrying the same factor of margin as the P(k) panels. The association is
-# a convention rather than an identity, since xi and P are integral transforms of
-# one another and no single k maps to a single r, but it is what lets the two be
-# read against each other. The upper end is then clipped to the largest
-# separation measured, which is well inside it.
-RLO = 2*np.pi/KHI
-RHI = min(2*np.pi/KLO, r.max()) if A.rmax is None else A.rmax
+# The separation range is set by what the measurement resolves, not by mapping
+# the wavenumber axis through r = 2 pi / k: that mapping fixes no upper limit
+# here, since 2 pi / (0.7 k_fund) is the box itself.
+#
+# Below one grid cell there is nothing to resolve, so the cell size is the floor.
+# The ceiling puts the acoustic peak near 103 Mpc/h well inside the frame, which
+# is the most visible feature xi has and the one that separates the species. Past
+# the pencil's transverse width a pencil holds no transverse pairs at all, only
+# pairs strung along its long axis: the estimator stays unbiased there but its
+# variance climbs without bound, so that stretch is shaded rather than trusted.
+RLO = L/N
+RHI = min(A.rmax if A.rmax is not None else 200.0, r.max())
 
 if nmodes is None:
     # Chunks written before nmodes was recorded: rebuild it from the sweep's own
@@ -201,9 +203,11 @@ def decorate_r(a):
     a.set_xlabel("$r$  [Mpc/$h$]")
     a.set_xlim(RLO, RHI)
     if RLO < width < RHI:
+        a.axvspan(width, RHI, color="0.85", alpha=0.45, lw=0, zorder=0)
         a.axvline(width, color="0.55", lw=1.0, ls=":")
-        a.text(width, 0.02, " pencil width", transform=a.get_xaxis_transform(),
-               fontsize=10, color="0.4", ha="left")
+        a.text(width, 0.03, " pencil width:\n few transverse\n pairs beyond",
+               transform=a.get_xaxis_transform(), fontsize=9, color="0.4",
+               ha="left", va="bottom")
     a.grid(alpha=0.25)
 
 
@@ -296,7 +300,7 @@ decorate_r(a)
 a = ax[0, 1]
 for sp in SP:
     i, xt = IDX[sp], XI_TH[sp]
-    g = fin & (xt > 0) & (r <= width)
+    g = fin & (xt > 0) & (r <= RHI)
     a.semilogx(r[g], (XF[:, i].mean(0)/xt - 1.0)[g], color=COL[sp], marker="o",
                label=NAME[sp], **MK)
 a.axhline(0.0, color="0.3", lw=1.0)
@@ -323,7 +327,7 @@ a.legend(framealpha=0.95, loc="lower left")
 decorate_r(a)
 
 a = ax[1, 1]
-g = fin & (xt > 0) & (r <= width)
+g = fin & (xt > 0) & (r <= RHI)
 a.semilogx(r[g], (xb/xt - 1.0)[g], color=BOXC, marker="o", label="whole box", **MK)
 a.fill_between(r[g], ((xpm - xpe)/xt - 1.0)[g], ((xpm + xpe)/xt - 1.0)[g],
                color=PENC, alpha=0.20, lw=0)
@@ -348,7 +352,7 @@ print(f"{'species':<14}{'P box/theory':>14}{'P pen/theory':>14}{'window/theory':
       f"{'xi box/theory':>15}{'xi pen/theory':>15}")
 for sp in SP:
     i, xt = IDX[sp], XI_TH[sp]
-    g = fin & (xt > 0) & (r <= width)
+    g = fin & (xt > 0) & (r <= RHI)
     w = np.abs(xt[g])
     print(f"{NAME[sp]:<14}{(PF[:, i].mean(0)/P_TH[i])[lo].mean():>14.4f}"
           f"{(PP[:, i].mean((0,1))/P_TH[i])[lo].mean():>14.4f}"
