@@ -27,8 +27,9 @@
 \begin{abstract}
 A subvolume of a simulation box does not measure the linear power spectrum. Its
 estimator is unbiased for the theory convolved with the subvolume's own window,
-which for the geometry used here lies $34\%$ below the theory at the fundamental
-mode. Choosing an initial-conditions seed because its subvolume spectrum matches
+which for the geometry used here lies $35\%$ below the theory at the largest
+scale it can measure. Choosing an initial-conditions seed because its subvolume
+spectrum matches
 the unconvolved theory therefore selects realisations whose large-scale power is
 anomalously high, by construction rather than by accident. We measure what this
 does using $83\,542$ independent realisations at $N = 128^3$,
@@ -146,28 +147,65 @@ and $P_{\rm th}$ is the power spectrum linear theory predicts for the unmasked
 field. The quantity $|\widetilde W|^2$ is called the \emph{window function} of
 the region.
 
-What Eq.~\eqref{eq:conv} says in words is that the measured spectrum at a given
-wavenumber is a weighted average of the true spectrum over a range of nearby
-wavenumbers, with $|\widetilde W|^2$ supplying the weights. The width of that
-range is set by the size of the region: a small region has a broad
-$|\widetilde W|^2$ and averages over a wide range of wavenumbers. Because the
-linear power spectrum is steep at large scales, rising towards small $k$, this
-averaging pulls power down from the largest scales into their neighbours and
-leaves a deficit there.
+In words, Eq.~\eqref{eq:conv} says that the spectrum measured at a wavenumber
+$\bk$ is not $P_{\rm th}(\bk)$ but a weighted average of $P_{\rm th}$ over
+neighbouring wavenumbers, with $|\widetilde W|^2$ supplying the weights. The
+width of that averaging is set by the size of the region: the smaller the
+region, the broader $|\widetilde W|^2$ is and the wider the range of $P_{\rm th}$
+that gets mixed in. For the pencil, \S\ref{sec:winform} shows that width is
+$\Delta k_\perp = 0.072\ h\,\mathrm{Mpc}^{-1}$.
+
+Whether that average comes out above or below $P_{\rm th}(\bk)$ depends on the
+shape of the spectrum, so it is worth following through with numbers. Two
+things combine. First, the amount of $k$-space lying a distance $q$ from the
+centre of the window grows with $q$, so the average is weighted towards the
+outer part of the range rather than towards the centre. Second, the linear
+spectrum used here peaks at $k_{\rm eq} = 0.020\ h\,\mathrm{Mpc}^{-1}$ and falls
+steeply above it: by $k = \Delta k_\perp$ it has dropped to $38\%$ of its value
+at the largest scale the pencil can measure.
+
+Putting those together: when the window is centred on the largest scale, it
+reaches out to wavenumbers where the theory is two and a half times smaller, and
+most of the $k$-space it covers lies there. The average is therefore pulled well
+below the theory at that scale. Measured, the ratio at the first bin is $0.65$.
 
 \subsection{The window of a pencil}
 \label{sec:winform}
 
-For a mask covering $n_i$ cells along axis $i$ of an $N^3$ periodic grid, the
-transform of a run of ones is a geometric series and
+The window can be written down exactly. Take one axis first. The mask covers
+$n$ cells of the $N$ along that axis, so it is $1$ for $j = 0, \dots, n-1$ and
+$0$ elsewhere, and its discrete transform is a sum of $n$ terms,
+\begin{equation}
+  \label{eq:geo}
+  \widetilde W(m) \;=\; \sum_{j=0}^{n-1} e^{-2\pi i\, jm/N}
+  \;=\; \frac{1 - e^{-2\pi i\, mn/N}}{1 - e^{-2\pi i\, m/N}} ,
+\end{equation}
+where the second step is the sum of a geometric series with ratio
+$e^{-2\pi i m/N}$. To turn that ratio of complex numbers into something real,
+use $1 - e^{-i\theta} = e^{-i\theta/2}\,(e^{i\theta/2} - e^{-i\theta/2})
+= e^{-i\theta/2}\,2i\sin(\theta/2)$ on the numerator and the denominator
+separately, with $\theta = 2\pi mn/N$ above and $\theta = 2\pi m/N$ below. The
+factors of $2i$ cancel and the exponentials combine into one phase,
+\begin{equation}
+  \label{eq:dirichlet}
+  \widetilde W(m) \;=\; e^{-i\pi m (n-1)/N}\,
+  \frac{\sin(\pi m n/N)}{\sin(\pi m/N)} .
+\end{equation}
+This is the \emph{Dirichlet kernel}, the periodic counterpart of $\sin x/x$.
+Taking the modulus squared discards the phase.
+
+The mask is a product of one such run per axis, so its transform factorises and
+the three axes simply multiply. Dividing by $N^3$ to match the normalisation of
+Eq.~\eqref{eq:conv},
 \begin{equation}
   \label{eq:winform}
   \frac{|\widetilde W(\mathbf{m})|^2}{N^6} \;=\;
   \prod_{i=1}^{3}
   \left[ \frac{\sin(\pi m_i n_i / N)}{N \sin(\pi m_i / N)} \right]^2 ,
 \end{equation}
-with $k_i = 2\pi m_i/L$ and the $m_i = 0$ case the limit $n_i/N$. Two features
-of this matter later.
+with $k_i = 2\pi m_i/L$. At $m_i = 0$ both sine functions vanish and the ratio
+must be taken as a limit: for small $\theta$, $\sin\theta \to \theta$, so the
+factor tends to $n_i/N$. Two features of Eq.~\eqref{eq:winform} matter later.
 
 First, the pencil spans the whole box along its length, $n_z = N$, so the $z$
 factor contains $\sin(\pi m_z)$ and vanishes for every integer $m_z \neq 0$. The
@@ -198,8 +236,9 @@ Three things about this deficit are worth separating. It is deterministic: it is
 the same in every realisation, since $W$ is fixed by the geometry and does not
 depend on the random field. It therefore does not average away when more
 realisations are added. And it is not noise, so it cannot be beaten down by
-measuring more carefully. For the pencil geometry used here it is a $34\%$
-deficit at the fundamental mode, the largest scale the region can measure.
+measuring more carefully. For the pencil geometry used here it is a $35\%$
+deficit at the largest scale the region can measure, and it deepens to $39\%$
+at $k_{\rm eq}$, where the theory turns over.
 
 Equation~\eqref{eq:conv} is a statement about an ensemble average, so it can be
 tested by averaging many measurements and comparing. Averaging $2\,005\,008$
@@ -272,10 +311,7 @@ $463\,200$ subvolume correlation functions is $1.015$ times the linear theory
 over $r < 88\,\mathrm{Mpc}/h$, against $1.008$ for the full box: both consistent
 with Eq.~\eqref{eq:xi-unbiased}, and neither needing a window correction. The
 same subvolumes in the same realisations measure a power spectrum $35\%$ below
-the theory at the largest scales. That figure is the average over a narrow band
-of large-scale wavenumbers, so it differs slightly from the $34\%$ quoted above
-at the single fundamental mode; the two describe the same deficit measured over
-slightly different ranges.
+the theory at the largest scale they reach.
 
 One practical warning follows from Eq.~\eqref{eq:xi-est}, and
 \texttt{xi\_estimators.tex} makes it at length: the denominator must be the
@@ -286,7 +322,7 @@ purely an error of normalisation.
 \section{What the search selects}
 \label{sec:selects}
 
-If the mean measurement lies $34\%$ below a curve, the only realisations that
+If the mean measurement lies $35\%$ below a curve, the only realisations that
 reach that curve are those with anomalously high power. A search for a matching
 seed does not find a region that agrees with the theory. It finds a region that
 is unusual in precisely the way needed to cancel a geometric deficit.
