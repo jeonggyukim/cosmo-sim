@@ -261,12 +261,14 @@ if HAVE_XI:
     # rather than the estimator, which is what filled the right of this panel
     # with excursions of several hundred per cent. The curves themselves run the
     # full range in the panel to the left.
-    # Cut relative to where the theory crosses zero, not to its amplitude: xi
-    # falls by orders of magnitude over this range, so any fixed fraction of its
-    # small-separation value stops the panel almost immediately.
-    _pos = np.where((rbin > 0) & (xi_th <= 0))[0]
-    _rzero = rbin[_pos[0]] if len(_pos) else rbin.max()
-    gr = gx & (rbin > 0) & (rbin <= 0.8*_rzero)
+    # The ratio panel stops at the pencil's transverse width. Past it a pencil
+    # holds no transverse pairs at all, only pairs strung along its long axis, so
+    # the measurement stops describing a three-dimensional region and starts
+    # describing a line of sight. The estimator stays unbiased there; it is the
+    # geometry being sampled that changes. The linear xi itself stays positive
+    # well beyond this, crossing zero near 122 Mpc/h, so this limit is not about
+    # a vanishing denominator.
+    gr = gx & (rbin > 0) & (rbin <= lperp)
     a = ax[2, 1]
     for i in show:
         a.semilogx(rbin[gr], (X_pen[i]/xi_th)[gr], **GREY)
@@ -285,6 +287,10 @@ if HAVE_XI:
     ax[2, 0].axvspan(lperp, rhi, color="0.85", alpha=0.45, lw=0, zorder=0)
     ax[2, 0].axvline(lperp, ls="--", color="C1", lw=1)
     ax[2, 0].set_xlim(L/N, rhi)
+    # Individual pencils dip several decades below the mean where their own xi
+    # passes through zero, which stretches the axis and squashes every curve that
+    # matters into the top of the panel.
+    ax[2, 0].set_ylim(1e-9, None)
     if gr.any():
         ax[2, 1].set_xlim(L/N, rbin[gr].max())
     # Setting the limits restores the default minor-tick labels, which collide on
