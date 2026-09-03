@@ -32,7 +32,11 @@ ap.add_argument("--keep", type=float, default=0.05)
 ap.add_argument("--keep2", type=float, default=0.001,
                 help="a second, tighter cut, drawn beside the first so the\n"
                      "saturation is visible in the figure rather than asserted")
-ap.add_argument("--nboot", type=int, default=500)
+ap.add_argument("--nboot", type=int, default=200,
+                help="bootstrap resamples per point. The error bars this "
+                     "produces are already far smaller than the shifts they sit "
+                     "on, and the cost of the whole figure is linear in this "
+                     "number, so raise it only to quote a bar to three digits")
 ap.add_argument("--nnull", type=int, default=200)
 ap.add_argument("--out", default=os.path.join(paths.FIGS, "selection_summary.png"))
 ap.add_argument("--cache", default=None,
