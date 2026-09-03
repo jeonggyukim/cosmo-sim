@@ -107,16 +107,33 @@ is
   \widetilde\delta(\bk') .
 \end{equation}
 
-The power spectrum is not the term-by-term square of this. It is defined through
-an ensemble average over realisations, and it is that average which does the
-work. Form $\avg{|\widetilde{(W\delta)}(\bk)|^2}$ from Eq.~\eqref{eq:masked} and
-a double integral appears, over two wavenumbers $\bk'$ and $\bk''$, containing
-the factor $\avg{\widetilde\delta(\bk')\widetilde\delta^*(\bk'')}$. For a
-statistically homogeneous field that factor vanishes unless $\bk' = \bk''$,
-where it equals $P_{\rm th}(\bk')$; this is what it means for a field to have a
-power spectrum, and it is the reason different Fourier modes of such a field are
-uncorrelated. Only the diagonal $\bk' = \bk''$ survives, so the double integral
-collapses to a single one:
+The power spectrum is the average of $|\widetilde{(W\delta)}|^2$ over
+realisations. Take Eq.~\eqref{eq:masked}, multiply it by its own complex
+conjugate, and average. Because the conjugate carries its own integration
+variable, call it $\bk''$, the result is a double integral:
+\begin{equation}
+  \label{eq:double}
+  \avg{|\widetilde{(W\delta)}(\bk)|^2} \;=\;
+  \int \! d^3k' \int \! d^3k'' \;
+  \widetilde W(\bk - \bk')\, \widetilde W^{*}(\bk - \bk'')\;
+  \avg{\widetilde\delta(\bk')\,\widetilde\delta^{*}(\bk'')} .
+\end{equation}
+Everything outside the angle brackets is fixed by the geometry, so the only
+factor that needs averaging is the last one.
+
+Here the assumption of statistical homogeneity is used. It says that different
+Fourier modes of the field are uncorrelated, which in an equation is
+\begin{equation}
+  \label{eq:homog}
+  \avg{\widetilde\delta(\bk')\,\widetilde\delta^{*}(\bk'')} \;=\;
+  \delta_{\rm D}(\bk' - \bk'')\; P_{\rm th}(\bk') ,
+\end{equation}
+with $\delta_{\rm D}$ the Dirac delta. This is the definition of the power
+spectrum: the average vanishes for $\bk' \neq \bk''$, and for $\bk' = \bk''$ it
+gives $P_{\rm th}$.
+
+Substituting Eq.~\eqref{eq:homog} into Eq.~\eqref{eq:double}, the delta function
+sets $\bk'' = \bk'$ and removes the second integral:
 \begin{equation}
   \label{eq:conv}
   \avg{\hat P(\bk)} \;=\; \int \! d^3k' \; |\widetilde W(\bk - \bk')|^2\,
