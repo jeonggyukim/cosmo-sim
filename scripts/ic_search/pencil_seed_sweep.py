@@ -70,6 +70,12 @@ _ap.add_argument("--interior-margin", type=float, default=0.0, metavar="M",
                       "face is built partly from material outside the pencil, so the "
                       "untrimmed average is not a property of the pencil alone. 0 "
                       "measures only the whole pencil")
+_ap.add_argument("--sigma-R", type=float, nargs="+", default=None, metavar="R",
+                 help="top-hat radii in Mpc/h at which to measure sigma(R), the rms "
+                      "of the smoothed field, for the pencil and for the whole box. "
+                      "8 gives sigma_8 itself. The field is linear and at zstart, so "
+                      "dividing by the growth factor the run reports turns the "
+                      "measurement into the z = 0 amplitude the region is equivalent to")
 _ap.add_argument("--powerspec", default=None, metavar="FILE",
                  help="monofonIC *_input_powerspec.txt to take the theory from. The "
                       "default reference table was written by a back-scaled run and is "
@@ -404,6 +410,11 @@ if ARGS.kernel_weight:
 
 # Pencils carrying the inside/outside source split, spread over the three axes
 # rather than taken from the front of the list, which would be one axis only.
+SIGMA_R = np.array(ARGS.sigma_R if ARGS.sigma_R else [], dtype=float)
+# Read from the first field the sweep opens; declared here so a chunk written
+# before any seed was measured still has something to record.
+Dplus = float('nan')
+
 SPLIT_PENCILS = ([] if not ARGS.source_split else
                  [int(round(t)) for t in
                   np.linspace(0, len(PENCILS) - 1,
@@ -493,7 +504,7 @@ ACC = {k: [] for k in ("seed", "P_full", "P_pencil", "xi_full", "xi_pencil",
                        "shear_interior", "dbar_interior", "lambda_interior",
                        "shear_box", "dbar_box", "lambda_box", "webtype_box",
                        "shear_kw", "dbar_kw", "webtype_kw",
-                       "shear_src", "dbar_src")}
+                       "shear_src", "dbar_src", "sigma", "sigma_box")}
 SKIPPED = []
 
 
@@ -538,6 +549,9 @@ def write_chunk():
                 f.attrs["interior_margin"] = ARGS.interior_margin
             if SPLIT_PENCILS:
                 f["split_pencils"] = np.array(SPLIT_PENCILS)
+            if len(SIGMA_R):
+                f["sigma_R"] = np.array(SIGMA_R)
+                f.attrs["Dplus"] = Dplus
         # Skipped seeds are recorded once, with the batch that was open when the
         # skip happened, so the totals over all files still come out right.
         f["skipped"] = np.array(SKIPPED, dtype=np.int64)
@@ -624,6 +638,9 @@ for s in SEEDS:
         web_kw = np.full((nR, len(PENCILS), 4), np.nan)
         shear_src = np.full((nR, len(SPLIT_PENCILS), 3), np.nan)  # in, out, cross
         dbar_src = np.full((nR, len(SPLIT_PENCILS), 2), np.nan)   # in, out
+        nSR = len(SIGMA_R)
+        sigma = np.full((nSR, len(PENCILS)), np.nan)   # rms in the pencil
+        sigma_box = np.full(nSR, np.nan)               # rms over the whole box
         bulk = np.empty((len(PENCILS), 3))        # mean Zel'dovich displacement, Mpc/h
         dk0 = np.fft.fftn(d["matter"])
         # Bulk flow: the region's mean displacement, Psi(k) = i k delta / k^2. It is
@@ -633,6 +650,22 @@ for s in SEEDS:
             sl = pencil_slice(*p)
             bulk[n] = [psi[a][sl].mean() for a in range(3)]
         del psi
+        # sigma(R) on a top-hat, the sphere the definition of sigma_8 uses, rather
+        # than the Gaussian used for the tidal quantities. W(kR) = 3 (sin x - x
+        # cos x)/x^3 with x = kR, which is 1 at k = 0 and needs the limit taken
+        # there explicitly.
+        for r, R in enumerate(SIGMA_R):
+            x = kk*R
+            W = np.where(x < 1e-6, 1.0 - x**2/10.0,
+                         3.0*(np.sin(x) - x*np.cos(x))/np.maximum(x, 1e-30)**3)
+            dth = np.real(np.fft.ifftn(dk0*W))
+            sigma_box[r] = np.sqrt((dth**2).mean())
+            for n, p in enumerate(PENCILS):
+                sigma[r, n] = np.sqrt((dth[pencil_slice(*p)]**2).mean())
+            if s == SEEDS[0]:
+                print(f"   sigma({R:.0f} Mpc/h) box = {sigma_box[r]:.5e}"
+                      f"  -> z=0 equivalent {sigma_box[r]/Dplus:.4f}")
+
         for r, R in enumerate(ARGS.smooth):
             dks = dk0*gauss_true(R)
             dsm = np.real(np.fft.ifftn(dks))
@@ -743,6 +776,9 @@ for s in SEEDS:
             ACC["lambda"].append(lam); ACC["webtype"].append(web)
             ACC["contrast"].append(contrast); ACC["bulk"].append(bulk)
             ACC["shear_box"].append(shear_box); ACC["dbar_box"].append(dbar_box)
+            if nSR:
+                ACC["sigma"].append(sigma)
+                ACC["sigma_box"].append(sigma_box)
             ACC["lambda_box"].append(lam_box); ACC["webtype_box"].append(web_box)
             if MARGIN_CELLS:
                 ACC["shear_interior"].append(shear_in)
@@ -767,6 +803,9 @@ for s in SEEDS:
             f["contrast"] = contrast
             f["bulk"] = bulk
             f["shear_box"] = shear_box
+            if nSR:
+                f["sigma"] = sigma
+                f["sigma_box"] = sigma_box
             f["dbar_box"] = dbar_box
             f["lambda_box"] = lam_box
             f["webtype_box"] = web_box
