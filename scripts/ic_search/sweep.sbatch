@@ -11,7 +11,7 @@
 # With the correlation function and the boundary measurements:
 #
 #   sbatch --array=0-199 --export=ALL,NPER=100,SEEDBASE=400000,RUNTAG=xi20k,\
-# XI=yes,KWEIGHT=yes,SPLIT=3 sweep.sbatch
+# XI=yes,KWEIGHT=yes,SPLIT=3,SIGMA="8 20 40" sweep.sbatch
 #
 # gives 400 x 250 = 100,000 seeds. Seed ranges are derived from the task index,
 # so they cannot overlap. Keep SEEDBASE distinct between runs that will later be
@@ -31,6 +31,8 @@
 #   KWEIGHT   yes to add the kernel-fraction weighted quantities (default no)
 #   SPLIT     pencils per realization carrying the inside/outside tidal source
 #             split; 0 disables it                    (default 0)
+#   SIGMA     top-hat radii in Mpc/h for sigma(R), blank to skip. 8 gives
+#             sigma_8 itself                          (default blank)
 #   RUNTAG    subdirectory under data/        (default run)
 #   WORKDIR   root holding scripts/ ref/ build/ data/ logs/
 #   PYTHON    interpreter with numpy and h5py
@@ -69,6 +71,7 @@ module load gnu12/12.2.0 openmpi4/4.1.5 fftw/3.3.10 hdf5/1.14.0 gsl/2.7.1
 : "${NRBIN:=50}"
 : "${KWEIGHT:=no}"
 : "${SPLIT:=0}"
+: "${SIGMA:=}"
 
 # Assembled rather than passed inline so that an option left at its default adds
 # no flag at all, and a run that wants none of these is byte-for-byte the command
@@ -77,6 +80,7 @@ EXTRA=()
 [ "$XI" = yes ] && EXTRA+=(--xi --rmax "$RMAX" --nrbin "$NRBIN")
 [ "$KWEIGHT" = yes ] && EXTRA+=(--kernel-weight)
 [ "$SPLIT" -gt 0 ] 2>/dev/null && EXTRA+=(--source-split "$SPLIT")
+[ -n "$SIGMA" ] && EXTRA+=(--sigma-R $SIGMA)
 
 export MONOFONIC_TESTS=$WORKDIR
 export MONOFONIC_REF=$WORKDIR/ref

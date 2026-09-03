@@ -51,7 +51,12 @@ keep_wn = np.argsort(crit_wn)[:nkeep]
 
 PREFER = ["tidal shear", "knot fraction", "filament fraction", "sheet fraction",
           "void fraction", "bulk flow", "mean overdensity"]
-SHOW = [n for stem in PREFER for n in COLS if n.startswith(stem)][:12]
+# A column with nothing finite in it draws an empty row, which reads as a
+# missing measurement rather than an impossible one. The interior variants at a
+# radius of half the region width are the case: the margin consumes the region,
+# so no cell is left that was smoothed without material from outside it.
+SHOW = [n for stem in PREFER for n in COLS if n.startswith(stem)
+        and np.any(np.isfinite(COLS[n]))][:12]
 
 def shift(c, T, idx=None):
     if idx is not None:
@@ -149,8 +154,10 @@ fig.suptitle(f"Selecting a pencil subvolume on its power spectrum: "
              f"{nseed} realizations, $N={int(N)}^3$, $L={L:g}$ Mpc/$h$, 2LPT, "
              f"$\\delta(q)$ matter, pencil = $(L/8)^2\\times L$, keeping {100*A.keep:g}%",
              fontsize=11)
-chunkio.annotate_shift(fig)
 fig.tight_layout(rect=(0, 0, 1, 0.94))
+# After the layout, so the panel positions are final, and under the right panel,
+# which is the one whose axis is the shift.
+chunkio.annotate_shift(fig, ax=axR)
 fig.savefig(A.out, dpi=300)
 print(f"wrote {A.out}")
 for n in SHOW:

@@ -143,8 +143,16 @@ SHIFT_DEF = (r"$\Delta_Q \equiv \left(\langle Q\rangle_{\rm selected}"
              r" - \langle Q\rangle_{\rm all}\right)/\sigma_Q$")
 
 
-def annotate_shift(fig, x=0.005, y=0.005, fontsize=10.5):
-    """Write the definition of the shift into a corner of the figure."""
+def annotate_shift(fig, x=0.005, y=0.005, fontsize=10.5, ax=None):
+    """Write the definition of the shift below the axes that plot it.
+
+    Passing `ax` puts the text under that panel's left edge. Without it the text
+    goes to the figure's bottom left, which is only right when the whole figure
+    plots the shift: in a figure whose left panel plots something else, a
+    definition parked under that panel appears to define it.
+    """
+    if ax is not None:
+        x = ax.get_position().x0
     fig.text(x, y, SHIFT_DEF, fontsize=fontsize, color="0.35",
              ha="left", va="bottom")
 
