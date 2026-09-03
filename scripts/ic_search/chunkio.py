@@ -245,20 +245,33 @@ def selection_stats(crit, cols, keep):
     Q = {n: v.ravel() for n, v in cols.items()}
     rng = np.random.default_rng(0)
 
-    def shift(name, which, idx=None):
+    def shift(name, which, idx=None, sd_from=None):
+        """Shift of `name` under criterion `which`, in units of its own scatter.
+
+        sd_from names a different quantity to take the denominator from. The
+        whole-box columns need it: normalised by the box-to-box scatter, a box
+        shift answers "is this box unusual, as boxes go", but it is then not
+        comparable on a shared axis with a region shift normalised by the
+        region-to-region scatter, which is several times larger. Passing the
+        region column as sd_from puts both in the same unit, and the box shift
+        then reads as the fraction of the region's displacement the box
+        inherited.
+        """
         T, c = Q[name], C[which]
+        S = Q[sd_from] if sd_from is not None else T
         if idx is not None:
-            T, c = T[idx], c[idx]
+            T, c, S = T[idx], c[idx], S[idx]
         n = max(1, int(round(keep*len(c))))
         sel = np.argpartition(c, n)[:n]
-        sd = T.std()
+        sd = S.std()
         return (T[sel].mean() - T.mean())/sd if sd > 0 else np.nan
 
-    def shift_err(name, which, nboot=200):
+    def shift_err(name, which, nboot=200, sd_from=None):
         boot = np.empty(nboot)
         for b in range(nboot):
             g = rng.integers(0, nseed, nseed)
-            boot[b] = shift(name, which, (g[:, None]*npen + np.arange(npen)).ravel())
+            boot[b] = shift(name, which, (g[:, None]*npen + np.arange(npen)).ravel(),
+                            sd_from=sd_from)
         return float(np.std(boot))
 
     def radii_for(stem):

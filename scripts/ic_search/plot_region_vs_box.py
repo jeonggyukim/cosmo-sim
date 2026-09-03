@@ -77,15 +77,30 @@ fig, ax = plt.subplots(figsize=(11.0, 0.52*len(rows) + 3.6))
 
 # Colour means which case, not which quantity: red for the proposed criterion,
 # green for the control, blue for the box.
-CASES = [(0.24, "C3", "D", "raw", 1, "pencil matched to the raw theory"),
-         (0.00, "C2", "s", "win", 1, "pencil matched to theory $\\ast$ window"),
-         (-0.24, "C0", "o", "raw", 2, "whole box")]
-for off, col, mk, which, col_idx, lab in CASES:
+#
+# The box appears twice, and the pair is the point of the figure. Normalised by
+# the box-to-box scatter it answers "is this box unusual, as boxes go". But the
+# box scatter is a fifth of the region scatter for the shear and a twentieth for
+# the web fractions, so on a shared axis that point reads as a much larger
+# fraction of the region's displacement than it is. The open marker renormalises
+# it by the region scatter, where it reads directly as the fraction the box
+# inherited.
+CASES = [(0.30, "C3", "D", "raw", 1, None, True,
+          "pencil matched to the raw theory"),
+         (0.10, "C2", "s", "win", 1, None, True,
+          "pencil matched to theory $\\ast$ window"),
+         (-0.10, "C0", "o", "raw", 2, None, True,
+          "whole box, per its own scatter"),
+         (-0.30, "C0", "o", "raw", 2, 1, False,
+          "whole box, per the region scatter")]
+for off, col, mk, which, col_idx, sd_idx, filled, lab in CASES:
     names = [row[col_idx] for row in rows]
-    v = [shift(n, which) for n in names]
-    e = [shift_err(n, which, A.nboot) for n in names]
+    sds = [row[sd_idx] if sd_idx is not None else None for row in rows]
+    v = [shift(n, which, sd_from=s) for n, s in zip(names, sds)]
+    e = [shift_err(n, which, A.nboot, sd_from=s) for n, s in zip(names, sds)]
     ax.errorbar(v, y + off, xerr=e, fmt=mk, color=col, ms=7, lw=1.6,
-                capsize=3.5, label=lab)
+                capsize=3.5, label=lab,
+                mfc=col if filled else "white", mew=1.4)
 
 ax.axvline(0.0, color="0.3", lw=1.2)
 # Fixed to the region-to-region scatter rather than to the shifts themselves.
@@ -117,7 +132,13 @@ chunkio.annotate_shift(fig)
 fig.tight_layout()
 fig.savefig(A.out)
 print(f"wrote {A.out}\n")
-print(f"{'quantity':<26}{'raw':>9}{'window':>9}{'box':>9}")
+hdr = (f"{'quantity':<26}{'raw':>9}{'window':>9}{'box':>9}{'box[reg]':>11}"
+       f"{'sd_box/sd_reg':>15}{'inherited':>11}")
+print(hdr); print("-"*len(hdr))
 for lab, name, box in rows:
-    print(f"{lab.replace('$', ''):<26}{shift(name, 'raw'):+9.3f}"
-          f"{shift(name, 'win'):+9.3f}{shift(box, 'raw'):+9.3f}")
+    a = shift(name, "raw")
+    b = shift(box, "raw", sd_from=box)
+    c = shift(box, "raw", sd_from=name)
+    sdr = COLS[box].std()/COLS[name].std()
+    print(f"{lab.replace('$', ''):<26}{a:+9.3f}{shift(name, 'win'):+9.3f}"
+          f"{b:+9.3f}{c:+11.4f}{sdr:>15.3f}{c/a if a else np.nan:>10.1%}")
