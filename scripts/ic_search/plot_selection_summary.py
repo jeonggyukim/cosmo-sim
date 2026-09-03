@@ -55,8 +55,32 @@ PREFER = ["tidal shear", "knot fraction", "filament fraction", "sheet fraction",
 # missing measurement rather than an impossible one. The interior variants at a
 # radius of half the region width are the case: the margin consumes the region,
 # so no cell is left that was smoothed without material from outside it.
+#
+# Radii that leave no interior are dropped outright. At half the region width the
+# smoothed field there is 92% sourced by matter outside the region, measured by
+# the inside/outside split in pencil_seed_sweep.py, so the number describes the
+# surroundings rather than the region. region_vs_box drops the same radii.
+def _no_interior():
+    import re
+    out = set()
+    for n, v in COLS.items():
+        m = re.fullmatch(r"tidal shear interior R=(\d+(?:\.\d+)?)", n)
+        if m and not np.any(np.isfinite(v)):
+            out.add(m.group(1))
+    return out
+
+
+DROP_R = _no_interior()
+
+
+def _keep(n):
+    import re
+    m = re.search(r" R=(\d+(?:\.\d+)?)$", n)
+    return not (m and m.group(1) in DROP_R)
+
+
 SHOW = [n for stem in PREFER for n in COLS if n.startswith(stem)
-        and np.any(np.isfinite(COLS[n]))][:12]
+        and np.any(np.isfinite(COLS[n])) and _keep(n)][:12]
 
 def shift(c, T, idx=None):
     if idx is not None:
@@ -96,9 +120,24 @@ fig, (axL, axR) = plt.subplots(1, 2, figsize=(13.5, 7.2),
 
 # ---- left: the spectra, as ratios to the linear theory -----------------------
 axL.axhline(1.0, color="0.25", lw=2.0, label="linear theory  $P_{\\rm th}$")
-axL.plot(k, P_win/P_th, color="C0", lw=2.2,
+# The same realizations measured without a mask. Drawn thick and faint beneath
+# everything else: it is the reference the pencil curves depart from, and its
+# flatness at 1 is what says the departure belongs to the window and not to the
+# estimator.
+if meta.get("P_box") is not None:
+    # Magenta rather than grey: the panel already uses grey for the theory line
+    # and for the shaded criterion band, so a third grey was unreadable.
+    axL.plot(k, meta["P_box"].mean(0)/P_th, color="magenta", lw=6.0, alpha=0.35,
+             solid_capstyle="round", zorder=1,
+             label=f"whole box, mean of {len(meta['P_box']):,} seeds")
+# Drawn thick and pale, with the measured mean laid over it in a different
+# colour. The two coincide, which is the point: the prediction is underneath and
+# the measurement sits on it. Giving both the same colour hid the measurement
+# entirely and made the agreement impossible to see.
+axL.plot(k, P_win/P_th, color="C0", lw=5.0, alpha=0.40, solid_capstyle="round",
+         zorder=2,
          label="theory $\\ast$ pencil window\n(what the estimator measures)")
-axL.plot(k, P.mean(0)/P_th, color="C0", ls="--", lw=1.6,
+axL.plot(k, P.mean(0)/P_th, color="k", ls="--", lw=1.4, zorder=3,
          label=f"mean of all {len(P):,} pencils")
 axL.plot(k, P[keep_th].mean(0)/P_th, color="C3", lw=2.2,
          label=f"mean of the {100*A.keep:g}% closest to $P_{{\\rm th}}$")
@@ -126,7 +165,8 @@ style = [("null", "0.6", "o", "random criterion (noise floor)"),
          ("theory", "C3", "D", "match raw theory (the proposal)")]
 axR.plot([RHO[n]*shift_power for n in SHOW], y - 0.26, marker="|", ls="none",
          ms=13, mew=1.8, color="0.15", zorder=5,
-         label="predicted: correlation $\\times$ %.2f" % shift_power)
+         label=("predicted: $\\rho$ with the selected power $\\times$ its own"
+                "\nshift of %.2f$\\sigma$" % shift_power))
 for off, (tag, col, mk, lab) in zip((+0.26, 0.0, -0.26), style):
     v = np.array([res[n][tag][0] for n in SHOW])
     e = np.array([res[n][tag][1] for n in SHOW])
@@ -145,9 +185,10 @@ axR.set_yticks(y)
 axR.set_yticklabels([n.replace("\n", " ") for n in SHOW], fontsize=8.5)
 axR.set_xlabel(f"shift {chunkio.SHIFT_SYMBOL} of the selected regions"
                "  [standard deviations]")
-axR.legend(fontsize=9, loc="lower right", framealpha=0.95)
-axR.set_title("Everything that moves, moves by exactly how much it tracks\n"
-              "the quantity being selected on", fontsize=10.5)
+axR.legend(fontsize=9, loc="lower left", framealpha=0.95)
+axR.set_title("The criterion never measures these, and moves them anyway,\n"
+              "by their correlation with the power it does measure",
+              fontsize=10.5)
 axR.grid(axis="x", alpha=0.25)
 
 fig.suptitle(f"Selecting a pencil subvolume on its power spectrum: "

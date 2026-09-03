@@ -88,6 +88,15 @@ for off, col, mk, which, col_idx, lab in CASES:
                 capsize=3.5, label=lab)
 
 ax.axvline(0.0, color="0.3", lw=1.2)
+# Fixed to the region-to-region scatter rather than to the shifts themselves.
+# Scaled to the data, a shift of a tenth of a standard deviation fills the axis
+# and reads as though the selection had moved the quantity across its whole
+# range. The dotted lines are where one standard deviation actually is.
+for x in (-1.0, 1.0):
+    ax.axvline(x, color="0.45", lw=1.0, ls=":")
+ax.set_xlim(-1.12, 1.28)
+ax.text(1.0, y.max() + 0.45, " 1 sd of the scatter\n between regions",
+        fontsize=9, color="0.4", va="top", ha="left")
 for yy in y[:-1]:
     ax.axhline(yy - 0.5, color="0.9", lw=0.8, zorder=0)
 ax.set_yticks(y)
@@ -97,8 +106,8 @@ ax.set_xlabel(f"shift {chunkio.SHIFT_SYMBOL}  [standard deviations]")
 ax.legend(framealpha=0.95, loc="lower right")
 ax.grid(axis="x", alpha=0.25)
 note = ("" if not dropped else
-        "\nradii with no interior left are omitted: the region value there is "
-        "the region blended with its surroundings")
+        "\nradii leaving no interior are omitted: the value there describes"
+        "\nthe surroundings, not the region")
 ax.set_title(f"Two ways of choosing a region, and the box that contains it{note}\n"
              f"{nseed:,} realizations $\\times$ {npen} subvolumes\n"
              f"$N={int(N)}^3$, $L={L:g}$ Mpc/$h$, keeping the closest "

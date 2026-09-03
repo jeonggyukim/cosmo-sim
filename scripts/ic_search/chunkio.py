@@ -45,7 +45,7 @@ def load(path, species="matter", nchunk=None, want_spectra=False):
     hi = (k > 2*meta["dkperp"]) & (k <= 0.9*meta["kny"])
     meta.update(k=k, P_th=P_th, P_win=P_win, lo=lo, hi=hi)
 
-    ct, cw, cols, spec = [], [], {}, []
+    ct, cw, cols, spec, spec_box = [], [], {}, [], []
 
     def add(name, arr):
         cols.setdefault(name, []).append(arr)
@@ -59,6 +59,11 @@ def load(path, species="matter", nchunk=None, want_spectra=False):
         add("small-scale power", (P[:, :, hi]/P_win[hi]).mean(2))
         if want_spectra:
             spec.append(P)
+            # The whole box of the same realizations, so a figure can show what
+            # the estimator does without a mask beside what it does with one.
+            if "P_full" in f:
+                pf = f["P_full"]
+                spec_box.append(pf[:, SP] if pf.ndim == 3 else pf[SP][None])
         if "shear" not in f:
             return
         RS = f["smooth_R"][:]
@@ -129,6 +134,10 @@ def load(path, species="matter", nchunk=None, want_spectra=False):
 
     ct = np.concatenate(ct); cw = np.concatenate(cw)
     cols = {n: np.concatenate(v) for n, v in cols.items()}
+    if want_spectra:
+        # The box spectra ride along in meta rather than in the return tuple, so
+        # that adding them does not change the signature every caller unpacks.
+        meta["P_box"] = np.concatenate(spec_box) if spec_box else None
     return (ct, cw, cols, meta,
             np.concatenate(spec) if want_spectra else None)
 
@@ -142,6 +151,14 @@ SHIFT_SYMBOL = r"$\Delta_Q$"
 SHIFT_DEF = (r"$\Delta_Q \equiv \left(\langle Q\rangle_{\rm selected}"
              r" - \langle Q\rangle_{\rm all}\right)/\sigma_Q$")
 
+# What the bars mean, which is not what the axis unit means. sigma_Q is the
+# spread between regions and sets the scale of the axis; the bar is the
+# uncertainty on the plotted shift, and shrinks as the sweep grows. Both live in
+# the same units, so a figure that shows one without naming the other invites
+# them to be read as the same thing.
+ERRBAR_DEF = ("error bars: bootstrap over realizations, resampling whole seeds "
+              "with their 24 subvolumes together")
+
 
 def annotate_shift(fig, x=0.005, y=0.005, fontsize=10.5, ax=None):
     """Write the definition of the shift below the axes that plot it.
@@ -153,8 +170,8 @@ def annotate_shift(fig, x=0.005, y=0.005, fontsize=10.5, ax=None):
     """
     if ax is not None:
         x = ax.get_position().x0
-    fig.text(x, y, SHIFT_DEF, fontsize=fontsize, color="0.35",
-             ha="left", va="bottom")
+    fig.text(x, y, SHIFT_DEF + "\n" + ERRBAR_DEF, fontsize=fontsize,
+             color="0.35", ha="left", va="bottom", linespacing=1.5)
 
 
 def plot_signed(ax, x, y, **kw):
