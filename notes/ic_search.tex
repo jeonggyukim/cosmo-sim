@@ -205,28 +205,83 @@ factors of $2i$ cancel and the exponentials combine into one phase,
 This is the \emph{Dirichlet kernel}, the periodic counterpart of $\sin x/x$.
 Taking the modulus squared discards the phase.
 
-The mask is a product of one such run per axis, so its transform factorises and
-the three axes simply multiply. Writing $\mathbf{m} = (m_1, m_2, m_3)$ for the
-integer wavevector, with $n_i$ cells masked along axis $i$, and dividing by
-$N^3$ to match the normalisation of Eq.~\eqref{eq:conv},
+So far this is one axis. Going to three is easy, because the pencil mask is
+itself built from three independent runs, one per axis: a cell is inside the
+pencil only if its $j_1$ lies in the masked range of axis $1$, and its $j_2$ in
+that of axis $2$, and its $j_3$ in that of axis $3$. In symbols,
+\begin{equation}
+  \label{eq:sep}
+  W(j_1, j_2, j_3) \;=\; w_1(j_1)\, w_2(j_2)\, w_3(j_3) ,
+\end{equation}
+where $w_i$ is $1$ on the $n_i$ masked cells of axis $i$ and $0$ elsewhere. A
+three-dimensional transform is three one-dimensional transforms applied in turn,
+one per axis, so a mask that separates like Eq.~\eqref{eq:sep} has a transform
+that separates the same way. Each axis contributes its own copy of
+Eq.~\eqref{eq:dirichlet}, with its own $n_i$ and its own index $m_i$.
+
+Write $\mathbf{m} = (m_1, m_2, m_3)$ for the integer wavevector and take the
+modulus squared, which drops the three phases:
 \begin{equation}
   \label{eq:winform}
   \frac{|\widetilde W(\mathbf{m})|^2}{N^6} \;=\;
   \prod_{i=1}^{3}
   \left[ \frac{\sin(\pi m_i n_i / N)}{N \sin(\pi m_i / N)} \right]^2 .
 \end{equation}
-At $m_i = 0$ both sine functions vanish and the ratio must be taken as a limit:
-for small $\theta$, $\sin\theta \to \theta$, so the factor tends to $n_i/N$. Two
-features of Eq.~\eqref{eq:winform} matter later.
+The $N^6$ on the left is bookkeeping: Eq.~\eqref{eq:conv} uses transforms
+divided by $N^3$, and squaring that gives $N^6$.
 
-First, the pencil spans the whole box along its length, $n_z = N$, so the $z$
-factor contains $\sin(\pi m_z)$ and vanishes for every integer $m_z \neq 0$. The
-window is a Kronecker delta in that direction: the pencil does not smear its
-long axis at all, and the entire deficit is transverse.
+Two special cases of Eq.~\eqref{eq:winform} are needed below, and both are worth
+doing slowly.
 
-Second, the transverse factors reduce to $\mathrm{sinc}^2(k_i \ell_\perp/2)$ at
-low $k$, with $\ell_\perp = L/8 = 87.5\Mpch$ the pencil width. The first zero
-sits at
+\paragraph{A mode index of zero.}
+At $m_i = 0$ the numerator and the denominator both vanish, so the factor has to
+be read as a limit. Using $\sin\theta \to \theta$ for small $\theta$ on each,
+\begin{equation}
+  \label{eq:m0}
+  \frac{\sin(\pi m_i n_i / N)}{N \sin(\pi m_i / N)}
+  \;\longrightarrow\;
+  \frac{\pi m_i n_i / N}{N \cdot \pi m_i / N} \;=\; \frac{n_i}{N} .
+\end{equation}
+The factor becomes the fraction of the axis the mask covers, which is the
+sensible answer: at zero wavenumber the window is measuring nothing but how much
+of the box the region occupies.
+
+\paragraph{An axis the mask covers completely.}
+Along the pencil's length the mask covers every cell, so $n_z = N$. Put that
+into the $z$ factor of Eq.~\eqref{eq:winform}. Its numerator becomes
+$\sin(\pi m_z N/N) = \sin(\pi m_z)$, which is zero for every integer $m_z$,
+while its denominator $N\sin(\pi m_z/N)$ is non-zero for every $m_z \neq 0$. So
+the factor is zero whenever $m_z \neq 0$. At $m_z = 0$ it is not zero: the limit
+in Eq.~\eqref{eq:m0} gives $n_z/N = 1$.
+
+Collecting those two, the $z$ factor equals $1$ at $m_z = 0$ and $0$ everywhere
+else, which is a Kronecker delta $\delta_{m_z 0}$. Said in words: \emph{the
+pencil does not smear its long axis at all}. It already spans the whole periodic
+box in that direction, so there is no boundary there and nothing to convolve
+with. The entire $35\%$ deficit comes from the two transverse directions.
+
+\paragraph{The two transverse axes.}
+Here $n_x = n_y = N/8$. For $m_i \ll N$ the denominator can be replaced by its
+small-angle form, $N\sin(\pi m_i/N) \to \pi m_i$, while the numerator must be
+kept as it is, since its argument $\pi m_i n_i/N$ is not small. Writing that
+argument as $k_i \ell_\perp/2$, with $k_i = 2\pi m_i/L$ from Eq.~\eqref{eq:mdef}
+and $\ell_\perp = L/8 = 87.5\Mpch$ the transverse width of the pencil, each
+transverse factor becomes
+\begin{equation}
+  \label{eq:winsinc}
+  \frac{\sin(\pi m_i n_i/N)}{N\sin(\pi m_i/N)}
+  \;\longrightarrow\;
+  \frac{n_i}{N}\,\mathrm{sinc}\!\left(\frac{k_i \ell_\perp}{2}\right),
+  \qquad \mathrm{sinc}\,x \equiv \frac{\sin x}{x} .
+\end{equation}
+The prefactor $n_i/N$ is the same volume fraction as in Eq.~\eqref{eq:m0}, and
+it is a constant: it scales the window without changing its shape, so it does
+not affect where the window falls to zero. Numerically Eq.~\eqref{eq:winsinc}
+matches the exact factor to better than $0.7\%$ over the range that matters.
+
+The shape is what sets the width of the smearing. A sinc first vanishes when its
+argument reaches $\pi$, that is at $k_i \ell_\perp/2 = \pi$, so the first zero is
+at
 \begin{equation}
   \label{eq:dkperp}
   \Delta k_\perp \;=\; \frac{2\pi}{\ell_\perp} \;=\; 0.072\ h\,\mathrm{Mpc}^{-1},
