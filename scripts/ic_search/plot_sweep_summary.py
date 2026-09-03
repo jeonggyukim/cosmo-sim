@@ -261,14 +261,15 @@ if HAVE_XI:
     # rather than the estimator, which is what filled the right of this panel
     # with excursions of several hundred per cent. The curves themselves run the
     # full range in the panel to the left.
-    # The ratio panel stops at the pencil's transverse width. Past it a pencil
-    # holds no transverse pairs at all, only pairs strung along its long axis, so
-    # the measurement stops describing a three-dimensional region and starts
-    # describing a line of sight. The estimator stays unbiased there; it is the
-    # geometry being sampled that changes. The linear xi itself stays positive
-    # well beyond this, crossing zero near 122 Mpc/h, so this limit is not about
-    # a vanishing denominator.
-    gr = gx & (rbin > 0) & (rbin <= lperp)
+    # The ratio runs until the linear xi crosses zero, near 122 Mpc/h here, past
+    # which the denominator vanishes and the ratio measures the crossing rather
+    # than the field. The pencil's transverse width, marked and shaded, is a
+    # different boundary and a softer one: beyond it a pencil holds no transverse
+    # pairs, only pairs along its long axis, so the measurement stops describing
+    # a three-dimensional region and starts describing a line of sight. The
+    # estimator stays unbiased there, which is why the curves are drawn through
+    # it rather than cut at it.
+    gr = gx & (rbin > 0) & (xi_th > 0)
     a = ax[2, 1]
     for i in show:
         a.semilogx(rbin[gr], (X_pen[i]/xi_th)[gr], **GREY)
@@ -293,6 +294,12 @@ if HAVE_XI:
     ax[2, 0].set_ylim(1e-9, None)
     if gr.any():
         ax[2, 1].set_xlim(L/N, rbin[gr].max())
+        # The same marker as the left panel, so the two rows agree on where the
+        # region stops being three-dimensional.
+        if rbin[gr].max() > lperp:
+            ax[2, 1].axvspan(lperp, rbin[gr].max(), color="0.85", alpha=0.45,
+                             lw=0, zorder=0)
+            ax[2, 1].axvline(lperp, ls="--", color="C1", lw=1)
     # Setting the limits restores the default minor-tick labels, which collide on
     # a log axis spanning less than a decade, so they are cleared again here.
     for a in ax[2]:
