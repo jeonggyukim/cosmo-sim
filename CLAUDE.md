@@ -157,7 +157,9 @@ LaTeX write-ups in `notes/`; full list and reading order in `notes/README.md`.
 
 Planning docs in `docs-claude/`: `CLAUDE_MUSIC2.md` (MUSIC2 code structure,
 transfer functions, file formats), `baryon_ic_plan.md`, `swift_gpu_gravity_plan.md`
-(KIAS GPU-porting project), plus per-feature plans.
+(KIAS GPU-porting project), `monofonic_class_index_bug.md` (why monofonIC
+segfaults at random with `transfer = CLASS`, and why the retry loop in
+`scripts/ic_search/` exists), plus per-feature plans.
 
 ## Pencil subvolumes (`scripts/ic_search/`)
 
